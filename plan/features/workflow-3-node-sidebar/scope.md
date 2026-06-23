@@ -118,13 +118,6 @@ Two LinkedIn-style buttons, full width:
 
 ---
 
-## Stretch Goals (implement only after core is complete)
-
-- **Copy tip button:** one-click copy of the AI talking point to clipboard
-- **"Reach out on LinkedIn" deep link:** `https://www.linkedin.com/in/` + name slug, opens in new tab (best-effort, no real profile verification)
-
----
-
 ## Out of Scope (do NOT implement here)
 
 | What | Owned by |
@@ -132,10 +125,6 @@ Two LinkedIn-style buttons, full width:
 | Canvas layout, node/edge rendering | W1 |
 | Connection scoring / ranking | W2 |
 | `GET /api/user/[userId]` endpoint | W2 |
-| `addSecondDegreeNode` Zustand action definition | W4 |
-| Edge color / thickness styling | W1 stretch |
-| Activity ring color values | W1 stretch |
-| "I met up" button and interaction score | W4 stretch |
-| Streaks, badges, notes | W4 stretch |
+| All stretch goals (copy tip, deep link, edge strength, activity rings, met-up button, streaks, badges, notes) | W4 |
 | Real LinkedIn OAuth or profile photos | Never (out of MVP) |
 | Sending real connection requests or messages | Never (out of MVP) |

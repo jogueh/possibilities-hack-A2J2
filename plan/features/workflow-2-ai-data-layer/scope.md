@@ -138,13 +138,6 @@ Returns `UserWithJobs` for a given `userId`. Used by W3's sidebar. Returns 404 i
 
 ---
 
-## Stretch Goals (implement only after core is complete)
-
-- **Goal proximity score:** compute a 0–100 "how close is this web to achieving your goal" metric from the aggregate `relevanceScore` of the current 1st-degree nodes. Exposed as a field on the response and rendered by W1 as a percentage pill.
-- **`activityStatus` on `WebNode`:** already derived in scoring — wire it through to the response so W1's stretch ring can use it.
-
----
-
 ## Out of Scope (do NOT implement here)
 
 | What | Owned by |
@@ -153,9 +146,7 @@ Returns `UserWithJobs` for a given `userId`. Used by W3's sidebar. Returns 404 i
 | React Flow canvas or node positioning | W1 |
 | Profile sidebar / talking points UI | W3 |
 | AI-generated talking points per connection | W3 |
-| Connect / message actions | W4 |
-| Interaction score updates | W4 stretch |
-| Streaks, badges, notes | W4 stretch |
+| All stretch goals (goal proximity, activity status ring, streaks, badges, notes) | W4 |
 | Course recommendation features | Post-MVP |
 | Saving web snapshots to a DB | Post-MVP |
 | Rate limiting or auth middleware | Post-MVP |

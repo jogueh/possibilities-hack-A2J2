@@ -104,9 +104,62 @@ interface JobMatch {
 
 ## Stretch Goals (implement only after core is complete)
 
-- **Filter bar on Jobs Panel:** filter by location, level (Entry / Mid / Senior), Easy Apply only
-- **"Save job" bookmark:** localStorage-persisted list of bookmarked job IDs; bookmark icon on each card
-- **Goal proximity boost:** if the user's web has ≥ 2 connections at a job match company, boost that job's card to the top regardless of score
+All stretch goals across the entire project live here. Pick up after W1–W4 cores are done.
+
+### 🔗 Edge Strength Visuals — W1 canvas (`src/components/StrengthEdge.tsx`)
+Custom React Flow edge type driven by `WebEdge.strength`. W1 registers the type; W4 provides the component:
+| Strength | Color | Thickness | Pulse |
+|----------|-------|-----------|-------|
+| 0–25 | `#E0DED8` (LinkedIn border grey) | 1px | No |
+| 26–50 | `#0A66C2` (LinkedIn blue) | 2px | No |
+| 51–75 | `#6366F1` (indigo) | 3px | Subtle |
+| 76–100 | `#8B5CF6 → #EC4899` gradient | 4px | Yes |
+
+### 🔵 Activity Status Ring — W1 canvas + W3 sidebar
+Secondary inner ring on node avatars derived from `posts_activity` volume (W2 already computes `activityStatus`; wire it through to the response):
+- `active` → `#3B82F6` blue — "Great time to reach out"
+- `moderate` → `#F59E0B` amber — "Worth a nudge"
+- `inactive` → `#EF4444` red — "Lead with shared context"
+Tooltip on hover explains the status. Rendered in both canvas nodes and the W3 sidebar header.
+
+### 📊 Goal Proximity Score — W2 API + W1 canvas
+Compute a 0–100 metric from the aggregate `relevanceScore` of the current 1st-degree nodes. W2 adds it to the `/api/web/generate` response; W1 renders it as a percentage pill in the top bar.
+
+### 🤝 "I Met Up" Button — W3 sidebar (`src/components/MetUpButton.tsx`)
+LinkedIn-style secondary button in the W3 sidebar Actions bar:
+- On click: calls `updateInteractionScore(nodeId, edgeId, 20)`, shows toast "🤝 Connection logged!", disables for the session
+- No API call, no localStorage — session memory only
+
+### 💬 Copy Tip Button — W3 sidebar
+One-click clipboard copy of the AI talking point. Rendered next to the tip callout card.
+
+### 🔗 "Reach Out on LinkedIn" Deep Link — W3 sidebar
+`https://www.linkedin.com/in/` + name slug button in the Actions bar, opens in new tab. Best-effort — no real profile verification.
+
+### 🔥 Streaks (`src/lib/streaks.ts`)
+Any day the user opens the web or logs a meetup = 1 streak day. Persisted in `localStorage` under `web_streak`. Rendered in top nav as 🔥 + count with pulse animation if at risk of breaking.
+
+### 🏅 Badges (`src/lib/badges.ts`)
+Awarded client-side, persisted in `localStorage` under `web_badges`. New badge → `canvas-confetti` burst + toast.
+| Badge | Trigger |
+|-------|---------|
+| 🌱 First Seed | First web generated |
+| 🕸️ Web Weaver | 3+ 2nd-degree nodes added |
+| 🤝 Connector | 3+ meetups logged |
+| 🔥 On Fire | 7-day streak |
+| ⚔️ Connection Warrior | All 5 first-degree nodes have `interactionScore > 0` |
+
+### 📝 Notes per Node
+Notes icon on each canvas node → popover with 280-char textarea. Persisted in `localStorage` under `note_[nodeId]`. Filled dot indicator when a note exists.
+
+### 🔍 Jobs Panel Filter Bar — W4 jobs panel
+Filter chips on the Jobs Panel: by location, level (Entry / Mid / Senior), Easy Apply only.
+
+### 🔖 Save Job Bookmark — W4 jobs panel
+Bookmark icon per job card. Persisted in `localStorage` under `saved_jobs`. Bookmarked jobs float to the top of the panel.
+
+### 🚀 Goal Proximity Job Boost — W4 jobs panel
+If the user's web has ≥ 2 connections at a job match company, boost that card to the top of the Jobs Panel regardless of relevance score.
 
 ---
 
@@ -119,7 +172,7 @@ interface JobMatch {
 | `GET /api/user/[userId]` endpoint | W2 |
 | Profile sidebar shell | W3 |
 | AI talking points | W3 |
-| Streaks, badges, met-up button, notes | Stretch (sprinkled across W1–W3) |
+| Streaks, badges, met-up button, notes, copy tip, deep link, edge strength, activity rings | Stretch — all in this file |
 | Real job applications or LinkedIn Easy Apply integration | Never (out of MVP) |
 | Course recommendations from courses dataset | Post-MVP |
 | Saving job matches to a database | Post-MVP |

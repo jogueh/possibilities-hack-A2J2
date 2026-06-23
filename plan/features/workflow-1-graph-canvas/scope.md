@@ -151,13 +151,6 @@ export interface WebSnapshot {
 
 ---
 
-## Stretch Goals (implement only after core is complete)
-
-- **Edge strength visuals:** custom `StrengthEdge` React Flow edge type — color/thickness tiers driven by `WebEdge.strength` (grey → indigo → violet → animated gradient)
-- **Activity status ring:** secondary inner ring on avatar using `activityStatus` from W2 (`blue` = active, `amber` = moderate, `red` = inactive)
-
----
-
 ## Out of Scope (do NOT implement here)
 
 | What | Owned by |
@@ -166,8 +159,7 @@ export interface WebSnapshot {
 | AI goal parsing or OpenRouter calls | W2 |
 | Profile sidebar on node click | W3 |
 | Talking points, shared context detection | W3 |
-| Connect / message actions | W4 |
-| 2nd-degree unlock logic | W4 |
+| All stretch goals (edge strength, activity rings, streaks, badges, notes, met-up, bookmarks) | W4 |
 | Streaks, badges, notes, met-up button | W4 stretch |
 | Real LinkedIn OAuth or external auth | Never (out of MVP) |
 | Mobile layout / responsive breakpoints | Post-MVP |
