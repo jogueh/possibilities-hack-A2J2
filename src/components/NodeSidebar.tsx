@@ -22,6 +22,10 @@ interface NodeSidebarProps {
 // Cache the AI tip per userId so re-opening the same node never re-calls the LLM.
 const tipCache = new Map<string, string>();
 
+// Test/dev helper (NOT part of the planned W1 API).
+export function __resetNodeSidebarTipCache() {
+  tipCache.clear();
+}
 function viewerSummary(viewer: UserWithJobs | null): string {
   if (!viewer) return "";
   const role = viewer.job_history[0];
