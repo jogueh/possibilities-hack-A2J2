@@ -92,7 +92,12 @@ export interface WebSnapshot {
 - Configure Tailwind (with LinkedIn design tokens above), shadcn/ui, React Flow, Zustand, Framer Motion, Vitest
 - Set up `src/types/web.ts` (shared contract above)
 - Set up global Zustand store: `useWebStore` — holds `WebSnapshot`, exposes actions:
-  `setGoal`, `seedWeb`, `expandWeb`, `resetWeb`, `updateInteractionScore(nodeId, edgeId, delta)`
+  - `setGoal(goal: GoalQuery)`
+  - `seedWeb(nodes: WebNode[], edges: WebEdge[])`
+  - `addSecondDegreeNode(node: WebNode, parentNodeId: string)` — appends node + edge (`isDotted: true`, `strength: 50`), transitions state to `'expanded'`, idempotent on duplicate id
+  - `updateInteractionScore(nodeId: string, edgeId: string, delta: number)` — increments both fields, clamps 0–100
+  - `expandWeb()` — triggers canvas re-layout
+  - `resetWeb()` — clears snapshot, returns to State A
 - Top nav shell: LinkedIn-style white nav bar, logo left, user avatar right
 
 ### 2. State A — Empty Web
@@ -131,7 +136,7 @@ export interface WebSnapshot {
 | Test file | What it covers |
 |-----------|---------------|
 | `src/lib/layout.test.ts` | Radial position calculation for 1, 3, 5 nodes; 2nd-degree outer ring placement |
-| `src/store/webStore.test.ts` | State transitions (A→B→C), `resetWeb` clears snapshot, `updateInteractionScore` clamps at 100 |
+| `src/store/webStore.test.ts` | State transitions (A→B→C), `resetWeb` clears snapshot, `updateInteractionScore` clamps at 100, `addSecondDegreeNode` is idempotent on duplicate id, `addSecondDegreeNode` transitions state to `'expanded'` |
 
 ---
 
