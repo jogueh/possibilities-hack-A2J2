@@ -67,6 +67,7 @@ const target = userWith({
 });
 
 beforeEach(() => {
+  __resetNodeSidebarTipCache();
   __resetMockWebState();
   deferred.resolve = undefined;
   vi.stubGlobal(
