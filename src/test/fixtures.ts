@@ -1,7 +1,7 @@
-import type { User, Job } from "@/types/data";
+import type { User, UserWithJobs, Job } from "@/types/data";
 import type { JobMatch } from "@/types/job";
-import type { WebNode } from "@/types/_w1Contract.mock";
-import type { ParsedGoal } from "@/types/_w2Contract.mock";
+import type { WebNode } from "@/types/web";
+import type { ParsedGoal } from "@/types/goal";
 
 // Shared fixtures used across W4 unit tests (steps 1–8).
 
@@ -41,6 +41,13 @@ export const userBob: User = {
   posts_activity: ["Won a hackathon"],
   skills: ["Education", "Psychology"],
   courses: [],
+};
+
+// userBob with job_history resolved to full Job records (the UserWithJobs shape
+// the scoring/overlap engines consume).
+export const userBobWithJobs: UserWithJobs = {
+  ...userBob,
+  job_history: [jobInnovatech],
 };
 
 export const goalSwe: ParsedGoal = {

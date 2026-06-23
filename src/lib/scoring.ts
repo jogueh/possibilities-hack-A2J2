@@ -1,61 +1,159 @@
 // =============================================================================
-// MOCK — owned by Workflow 4, swap on merge.
+// Shared scoring engine — owned by Workflow 4.
 // =============================================================================
-// W4 owns the pure scoring functions (see plan/features/workflow-4-job-discovery
-// and plan/features/workflow-2-ai-data-layer). This file is a clearly-labeled
-// placeholder so W2's API layer (notably POST /api/web/generate) is runnable
-// end-to-end while W4's real implementation is in flight.
+// Replaces the former MOCK in this file with the real weighted scorer. Signatures
+// are kept identical to the mock so W2's API layer (POST /api/web/generate) and
+// any other consumer keep working unchanged:
+//   - scoreUserAgainstGoal(user, parsedGoal) -> 0–100
+//   - deriveAlignmentTier(score) -> AlignmentTier
+//   - deriveActivityStatus(user) -> ActivityStatus
 //
-// Behavior here is deterministic but intentionally simplistic — it is NOT a
-// substitute for the real weighted scorer. W4's module will replace this file
-// wholesale; signatures must stay byte-for-byte identical.
-//
-// Note: W2/W4 scope uses a 0–100 score scale (tier thresholds 70 / 40). W1's
-// snapshot module currently uses a 0–1 scale internally for layout defaults;
-// the two will be reconciled when W4 lands. W2 emits 0–100 on the wire per
-// the W2 scope.
+// All functions are pure and deterministic — no randomness, I/O, or LLM calls.
+// Goal *parsing* (free text -> ParsedGoal) is owned by W2; this module only
+// consumes the already-parsed goal.
 // =============================================================================
 
-import type { ParsedGoal } from '@/types/goal'
-import type { User, UserWithJobs } from '@/types/data'
+import type { ParsedGoal } from "@/types/goal";
+import type { User, UserWithJobs, Job } from "@/types/data";
+import type { AlignmentTier } from "@/types/web";
 
-export type AlignmentTier = 'strong' | 'moderate' | 'weak'
-export type ActivityStatus = 'active' | 'moderate' | 'inactive'
+export type ActivityStatus = "active" | "moderate" | "inactive";
+
+// ---------------------------------------------------------------------------
+// Low-level signal primitives (case-insensitive keyword/substring matching)
+// ---------------------------------------------------------------------------
+
+function normalize(value: string): string {
+  return value.toLowerCase().trim();
+}
+
+/** Split a phrase into meaningful keyword tokens (drops short filler words). */
+function tokens(value: string): string[] {
+  return normalize(value)
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length > 2);
+}
+
+/** True if any keyword of `needle` appears in `haystack` (case-insensitive). */
+function keywordOverlap(haystack: string, needle?: string): boolean {
+  if (!needle) return false;
+  const hay = normalize(haystack);
+  return tokens(needle).some((t) => hay.includes(t));
+}
+
+export function matchesRole(text: string, goal: ParsedGoal): boolean {
+  return keywordOverlap(text, goal.targetRole);
+}
+
+export function matchesIndustry(industry: string, goal: ParsedGoal): boolean {
+  return keywordOverlap(industry, goal.targetIndustry);
+}
+
+export function matchesLocation(location: string, goal: ParsedGoal): boolean {
+  if (!goal.targetLocation) return false;
+  // Match on city OR state token so "Mountain View, CA" matches "CA".
+  const locationTokens = new Set(
+    normalize(location)
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length > 1),
+  );
+  return normalize(goal.targetLocation)
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length > 1)
+    .some((t) => locationTokens.has(t));
+}
+
+// ---------------------------------------------------------------------------
+// Weights (sum to 100 for the user scorer)
+// ---------------------------------------------------------------------------
+
+export const WEIGHTS = {
+  role: 35,
+  industry: 20,
+  location: 20,
+  skills: 15,
+  activity: 10,
+} as const;
+
+function clamp(score: number): number {
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+// ---------------------------------------------------------------------------
+// Derivations (signatures match the former mock)
+// ---------------------------------------------------------------------------
+
+export function deriveAlignmentTier(score: number): AlignmentTier {
+  if (score >= 70) return "strong";
+  if (score >= 40) return "moderate";
+  return "weak";
+}
+
+export function deriveActivityStatus(user: User | UserWithJobs): ActivityStatus {
+  const n = user.posts_activity?.length ?? 0;
+  if (n >= 3) return "active";
+  if (n >= 1) return "moderate";
+  return "inactive";
+}
+
+// ---------------------------------------------------------------------------
+// User scoring (consumed by W2 to seed the web)
+// ---------------------------------------------------------------------------
+
+function skillsOverlap(skills: string[], goal: ParsedGoal): boolean {
+  const target = `${goal.targetRole ?? ""} ${goal.targetIndustry ?? ""} ${goal.intent}`;
+  return skills.some((skill) => keywordOverlap(target, skill));
+}
 
 /**
- * MOCK: returns a deterministic 0–100 pseudo-score derived from byte sums of
- * the user id and parsed goal fields. Enough variance to differentiate users
- * so `/api/web/generate` can rank/filter, but NOT a real relevance signal.
+ * Score a user against a parsed goal, 0–100.
+ * Signals: role/position (across their resolved job history), industry,
+ * location, skills overlap, and posting activity.
  */
 export function scoreUserAgainstGoal(
   user: UserWithJobs,
   parsedGoal: ParsedGoal,
 ): number {
-  const seed =
-    hashString(user.id) +
-    hashString(parsedGoal.targetRole ?? '') +
-    hashString(parsedGoal.targetIndustry ?? '') +
-    hashString(parsedGoal.targetLocation ?? '')
-  return seed % 101
-}
+  let score = 0;
 
-export function deriveAlignmentTier(score: number): AlignmentTier {
-  if (score >= 70) return 'strong'
-  if (score >= 40) return 'moderate'
-  return 'weak'
-}
-
-export function deriveActivityStatus(user: User | UserWithJobs): ActivityStatus {
-  const n = user.posts_activity?.length ?? 0
-  if (n >= 3) return 'active'
-  if (n >= 1) return 'moderate'
-  return 'inactive'
-}
-
-function hashString(s: string): number {
-  let h = 0
-  for (let i = 0; i < s.length; i++) {
-    h = (h * 31 + s.charCodeAt(i)) >>> 0
+  if (user.job_history.some((j) => matchesRole(j.position, parsedGoal))) {
+    score += WEIGHTS.role;
   }
-  return h
+  if (user.job_history.some((j) => matchesIndustry(j.industry, parsedGoal))) {
+    score += WEIGHTS.industry;
+  }
+  if (matchesLocation(user.current_location, parsedGoal)) {
+    score += WEIGHTS.location;
+  }
+  if (skillsOverlap(user.skills, parsedGoal)) {
+    score += WEIGHTS.skills;
+  }
+
+  const activity = deriveActivityStatus(user);
+  if (activity === "active") score += WEIGHTS.activity;
+  else if (activity === "moderate") score += WEIGHTS.activity / 2;
+
+  return clamp(score);
+}
+
+// ---------------------------------------------------------------------------
+// Job scoring (consumed by W4 job discovery)
+// ---------------------------------------------------------------------------
+
+/**
+ * Score a job against a parsed goal, 0–100.
+ * Jobs have no skills/activity, so only the position/industry/location signals
+ * apply; they are re-weighted to sum to 100 so job scores stay comparable to
+ * user scores on the same 0–100 / alignmentTier scale.
+ */
+export function scoreJobAgainstGoal(job: Job, goal: ParsedGoal): number {
+  const total = WEIGHTS.role + WEIGHTS.industry + WEIGHTS.location; // 75
+  const scale = 100 / total;
+
+  let score = 0;
+  if (matchesRole(job.position, goal)) score += WEIGHTS.role;
+  if (matchesIndustry(job.industry, goal)) score += WEIGHTS.industry;
+  if (matchesLocation(job.location, goal)) score += WEIGHTS.location;
+
+  return clamp(score * scale);
 }
