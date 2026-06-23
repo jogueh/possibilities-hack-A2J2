@@ -14,6 +14,7 @@ import { getSharedContext } from "@/lib/sharedContext";
 import { LI, SIDEBAR_WIDTH } from "@/lib/linkedinTokens";
 import { CareerTimelineSlot } from "@/components/CareerTimelineSlot";
 import { SecondDegreePreview } from "@/components/SecondDegreePreview";
+import { ActionsBar } from "@/components/ActionsBar";
 
 interface NodeSidebarProps {
   node: WebNode | null;
@@ -264,8 +265,9 @@ export function NodeSidebar({ node, onClose }: NodeSidebarProps) {
             </Section>
           )}
 
-          {/* 2nd-degree preview (Step 5). Actions bar (Step 6) mounts below. */}
+          {/* 2nd-degree preview (Step 5), then Actions bar (Step 6). */}
           <SecondDegreePreview parentNode={node} parentName={user.name} />
+          <ActionsBar targetName={user.name} tip={tip} />
         </div>
       )}
     </aside>
