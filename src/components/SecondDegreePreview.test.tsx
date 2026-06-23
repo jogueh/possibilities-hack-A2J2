@@ -71,12 +71,16 @@ describe("SecondDegreePreview", () => {
     expect(screen.getAllByRole("button", { name: /Add .* to web/ })).toHaveLength(3);
   });
 
-  it("mock store actually appends the node when added", () => {
+  it("adds a solid edge to the mock store when added", () => {
     __setMockWebState({ nodes: [parent, child], edges: [edge] });
-    const { result } = renderHook(() => useWebStore((s) => s.nodes));
+    const { result } = renderHook(() => useWebStore((s) => s.edges));
     render(<SecondDegreePreview parentNode={parent} parentName="Alice" />);
     fireEvent.click(screen.getByRole("button", { name: "Add Carol to web" }));
-    // child already present (pre-loaded), so idempotent add keeps a single instance
-    expect(result.current.filter((x) => x.id === "n2")).toHaveLength(1);
+
+    expect(
+      result.current.some(
+        (e) => e.source === "n1" && e.target === "n2" && e.isDotted === false,
+      ),
+    ).toBe(true);
   });
 });
