@@ -33,13 +33,17 @@ function setState(partial: Partial<WebStoreState>) {
 }
 
 const defaultAddSecondDegreeNode: WebStoreState["addSecondDegreeNode"] = (node, parentNodeId) => {
+  const parentExists = state.nodes.some((n) => n.id === parentNodeId);
+
   const nextNodes = state.nodes.some((n) => n.id === node.id)
     ? state.nodes
     : [...state.nodes, node];
 
-  const hasSolidEdge = state.edges.some(
-    (e) => e.source === parentNodeId && e.target === node.id && e.isDotted === false,
-  );
+  const hasSolidEdge =
+    !parentExists ||
+    state.edges.some(
+      (e) => e.source === parentNodeId && e.target === node.id && e.isDotted === false,
+    );
   const nextEdges = hasSolidEdge
     ? state.edges
     : [
