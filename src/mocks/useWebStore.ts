@@ -32,10 +32,31 @@ function setState(partial: Partial<WebStoreState>) {
   listeners.forEach((l) => l());
 }
 
-state.addSecondDegreeNode = (node) => {
-  if (state.nodes.some((n) => n.id === node.id)) return; // idempotent
-  setState({ nodes: [...state.nodes, node] });
+const defaultAddSecondDegreeNode: WebStoreState["addSecondDegreeNode"] = (node, parentNodeId) => {
+  const nextNodes = state.nodes.some((n) => n.id === node.id)
+    ? state.nodes
+    : [...state.nodes, node];
+
+  const hasSolidEdge = state.edges.some(
+    (e) => e.source === parentNodeId && e.target === node.id && e.isDotted === false,
+  );
+  const nextEdges = hasSolidEdge
+    ? state.edges
+    : [
+        ...state.edges,
+        {
+          id: `e_${parentNodeId}_${node.id}_solid`,
+          source: parentNodeId,
+          target: node.id,
+          strength: 50,
+          isDotted: false,
+        },
+      ];
+
+  if (nextNodes === state.nodes && nextEdges === state.edges) return; // idempotent
+  setState({ nodes: nextNodes, edges: nextEdges });
 };
+state.addSecondDegreeNode = defaultAddSecondDegreeNode;
 
 function subscribe(listener: () => void) {
   listeners.add(listener);
@@ -66,7 +87,7 @@ export function __resetMockWebState() {
     nodes: [],
     edges: [],
     viewerProfile: null,
-    addSecondDegreeNode: state.addSecondDegreeNode,
+    addSecondDegreeNode: defaultAddSecondDegreeNode,
   };
   listeners.forEach((l) => l());
 }
