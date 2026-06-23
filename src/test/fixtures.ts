@@ -66,7 +66,7 @@ export const jobMatchInnovatech: JobMatch = {
   job: jobInnovatech,
   relevanceScore: 71,
   webConnections: [
-    { userId: "user_4579", name: "Bob Smith", role: "Marketing Specialist", overlapYears: "~2021–2023" },
+    { userId: userBob.id, name: userBob.name, role: jobInnovatech.position, overlapYears: "~2021–2023" },
   ],
   easyApply: true,
 };
