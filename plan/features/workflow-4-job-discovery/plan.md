@@ -43,7 +43,7 @@ Main now owns the shared contracts; W4 consumes them — do not redefine these l
 - `WebNode`/`WebEdge` → `@/types/web`.
 - Scoring derivations are named **`deriveAlignmentTier(score)`** and **`deriveActivityStatus(user)`** (match the former mock's signatures exactly).
 - **`JobMatch` has no `easyApply` field** — W3 removed it; consumers read `job.easy_apply` directly.
-- The old `_w1Contract.mock.ts` / `_w2Contract.mock.ts` / `types/scoring.ts` shims are **deleted** (real types exist now).
+- The old `_w1Contract.mock.ts` / `_w2Contract.mock.ts` shims are **still present on main** but should be deleted once all consumers migrate to the real types in `@/types/*` (goal/web/data). (`types/scoring.ts` is already gone.)
 
 ## Blocker legend
 ✅ available · 🟡 mocked locally until upstream lands (non-blocking) · 🔴 hard blocker (cannot fully integrate until upstream ships)
