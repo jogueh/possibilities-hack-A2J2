@@ -3,13 +3,13 @@
 // real W1 store is a pure import change. Only exposes the slice W3 reads/calls.
 import { useSyncExternalStore } from "react";
 import { useRef } from "react";
-import type { GoalQuery, WebNode } from "@/mocks/web";
+import type { GoalQuery, WebEdge, WebNode } from "@/mocks/web";
 import type { UserWithJobs } from "@/mocks/data";
 
 export interface WebStoreState {
   goal: GoalQuery | null;
   nodes: WebNode[];
-  nodes: WebNode[];
+  edges: WebEdge[];
   // Viewer's own resolved profile — W1 fetches once on app load and stores it; W3 reads it.
   viewerProfile: UserWithJobs | null;
   // W4-owned action (lives on W1 store). W3 only ever CALLS it. Appends `node` to `nodes`,
@@ -20,6 +20,7 @@ export interface WebStoreState {
 let state: WebStoreState = {
   goal: null,
   nodes: [],
+  edges: [],
   viewerProfile: null,
   addSecondDegreeNode: () => {},
 };
@@ -63,6 +64,7 @@ export function __resetMockWebState() {
   state = {
     goal: null,
     nodes: [],
+    edges: [],
     viewerProfile: null,
     addSecondDegreeNode: state.addSecondDegreeNode,
   };
