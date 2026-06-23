@@ -25,8 +25,9 @@ const tipCache = new Map<string, string>();
 function viewerSummary(viewer: UserWithJobs | null): string {
   if (!viewer) return "";
   const role = viewer.job_history[0];
-  const skills = viewer.skills.slice(0, 3).join(", ");
-  return `${skills}${role ? `; most recently ${role.position} at ${role.company}` : ""}`;
+  const skills = viewer.skills.slice(0, 3).filter(Boolean).join(", ");
+  const parts = [skills, role ? `most recently ${role.position} at ${role.company}` : ""].filter(Boolean);
+  return parts.join("; ");
 }
 
 function targetSummary(jobs: { position: string; company: string }[]): string {
