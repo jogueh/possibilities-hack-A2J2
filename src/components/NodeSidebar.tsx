@@ -47,7 +47,7 @@ export function NodeSidebar({ node, onClose }: NodeSidebarProps) {
   const userId = node?.userId ?? null;
 
   const user = loaded?.userId === userId ? loaded.user : null;
-  const error = !!userId && errorId === userId;
+  const error = !!userId && errorId === userId && !user;
   const loading = !!userId && !user && !error;
 
   // Load the target profile when the node changes.
@@ -58,7 +58,10 @@ export function NodeSidebar({ node, onClose }: NodeSidebarProps) {
       .then((u) => {
         if (cancelled) return;
         if (!u) setErrorId(userId);
-        else setLoaded({ userId, user: u });
+        else {
+          setErrorId(null);
+          setLoaded({ userId, user: u });
+        }
       })
       .catch(() => !cancelled && setErrorId(userId));
     return () => {
