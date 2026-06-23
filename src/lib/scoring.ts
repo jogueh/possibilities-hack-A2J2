@@ -1,23 +1,23 @@
-import type { Job } from "@/types/data";
-import type {
-  ParsedGoal,
-  UserWithJobs,
-  AlignmentTier,
-  ActivityStatus,
-} from "@/types/scoring";
+// =============================================================================
+// Shared scoring engine — owned by Workflow 4.
+// =============================================================================
+// Replaces the former MOCK in this file with the real weighted scorer. Signatures
+// are kept identical to the mock so W2's API layer (POST /api/web/generate) and
+// any other consumer keep working unchanged:
+//   - scoreUserAgainstGoal(user, parsedGoal) -> 0–100
+//   - deriveAlignmentTier(score) -> AlignmentTier
+//   - deriveActivityStatus(user) -> ActivityStatus
+//
+// All functions are pure and deterministic — no randomness, I/O, or LLM calls.
+// Goal *parsing* (free text -> ParsedGoal) is owned by W2 (src/lib/goalParser);
+// this module only consumes the already-parsed goal.
+// =============================================================================
 
-/**
- * Shared scoring engine.
- *
- * Single source of truth for all goal-based scoring across the app:
- *  - W2 (seed web) imports `scoreUserAgainstGoal`
- *  - W4 (job discovery) uses `scoreJobAgainstGoal`
- *
- * All functions are pure and deterministic — same inputs always produce the
- * same score, with no randomness, I/O, or LLM calls. Goal *parsing* (turning
- * free text into a ParsedGoal) is owned by W2; this module only consumes the
- * already-parsed goal.
- */
+import type { ParsedGoal } from "@/types/goal";
+import type { User, UserWithJobs, Job } from "@/types/data";
+
+export type AlignmentTier = "strong" | "moderate" | "weak";
+export type ActivityStatus = "active" | "moderate" | "inactive";
 
 // ---------------------------------------------------------------------------
 // Low-level signal primitives (case-insensitive keyword/substring matching)
@@ -72,18 +72,19 @@ function clamp(score: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// Derivations
+// Derivations (signatures match the former mock)
 // ---------------------------------------------------------------------------
 
-export function alignmentTier(score: number): AlignmentTier {
+export function deriveAlignmentTier(score: number): AlignmentTier {
   if (score >= 70) return "strong";
   if (score >= 40) return "moderate";
   return "weak";
 }
 
-export function activityStatus(postsActivityCount: number): ActivityStatus {
-  if (postsActivityCount >= 3) return "active";
-  if (postsActivityCount >= 1) return "moderate";
+export function deriveActivityStatus(user: User | UserWithJobs): ActivityStatus {
+  const n = user.posts_activity?.length ?? 0;
+  if (n >= 3) return "active";
+  if (n >= 1) return "moderate";
   return "inactive";
 }
 
@@ -98,31 +99,31 @@ function skillsOverlap(skills: string[], goal: ParsedGoal): boolean {
 
 /**
  * Score a user against a parsed goal, 0–100.
- * Signals: role/position (across their job history), industry, location,
- * skills overlap, and posting activity.
+ * Signals: role/position (across their resolved job history), industry,
+ * location, skills overlap, and posting activity.
  */
 export function scoreUserAgainstGoal(
   user: UserWithJobs,
-  goal: ParsedGoal,
+  parsedGoal: ParsedGoal,
 ): number {
   let score = 0;
 
-  const roleMatch = user.jobs.some((j) => matchesRole(j.position, goal));
-  if (roleMatch) score += WEIGHTS.role;
-
-  const industryMatch = user.jobs.some((j) => matchesIndustry(j.industry, goal));
-  if (industryMatch) score += WEIGHTS.industry;
-
-  if (matchesLocation(user.current_location, goal)) score += WEIGHTS.location;
-
-  if (skillsOverlap(user.skills, goal)) score += WEIGHTS.skills;
-
-  const activity = activityStatus(user.posts_activity.length);
-  if (activity === "active") {
-    score += WEIGHTS.activity;
-  } else if (activity === "moderate") {
-    score += WEIGHTS.activity / 2;
+  if (user.job_history.some((j) => matchesRole(j.position, parsedGoal))) {
+    score += WEIGHTS.role;
   }
+  if (user.job_history.some((j) => matchesIndustry(j.industry, parsedGoal))) {
+    score += WEIGHTS.industry;
+  }
+  if (matchesLocation(user.current_location, parsedGoal)) {
+    score += WEIGHTS.location;
+  }
+  if (skillsOverlap(user.skills, parsedGoal)) {
+    score += WEIGHTS.skills;
+  }
+
+  const activity = deriveActivityStatus(user);
+  if (activity === "active") score += WEIGHTS.activity;
+  else if (activity === "moderate") score += WEIGHTS.activity / 2;
 
   return clamp(score);
 }

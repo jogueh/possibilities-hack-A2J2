@@ -1,7 +1,7 @@
-import type { DatasetUser, Job } from "@/types/data";
+import type { User, UserWithJobs, Job } from "@/types/data";
 import type { JobMatch } from "@/types/job";
-import type { WebNode } from "@/types/_w1Contract.mock";
-import type { ParsedGoal } from "@/types/_w2Contract.mock";
+import type { WebNode } from "@/types/web";
+import type { ParsedGoal } from "@/types/goal";
 
 // Shared fixtures used across W4 unit tests (steps 1–8).
 
@@ -29,18 +29,25 @@ export const jobAcmeSwe: Job = {
   description: "Build delightful products as a Software Engineer.",
 };
 
-export const userBob: DatasetUser = {
+export const userBob: User = {
   id: "user_4579",
   name: "Bob Smith",
   school_history: [
     { school_name: "UC Berkeley", degree: "Psychology", graduation_year: 2019 },
     { school_name: "Stanford University", degree: "Education", graduation_year: 2023 },
   ],
-  job_history: ["job_550126"],
+  job_history: [jobInnovatech.id],
   current_location: "Boston, MA",
   posts_activity: ["Won a hackathon"],
   skills: ["Education", "Psychology"],
   courses: [],
+};
+
+// userBob with job_history resolved to full Job records (the UserWithJobs shape
+// the scoring/overlap engines consume).
+export const userBobWithJobs: UserWithJobs = {
+  ...userBob,
+  job_history: [jobInnovatech],
 };
 
 export const goalSwe: ParsedGoal = {
@@ -52,8 +59,8 @@ export const goalSwe: ParsedGoal = {
 
 export const webNodeBob: WebNode = {
   id: "n1",
-  userId: "user_4579",
-  label: "Bob Smith",
+  userId: userBob.id,
+  label: userBob.name,
   degree: 1,
   avatarInitials: "BS",
   alignmentTier: "strong",
@@ -66,7 +73,7 @@ export const jobMatchInnovatech: JobMatch = {
   job: jobInnovatech,
   relevanceScore: 71,
   webConnections: [
-    { userId: "user_4579", name: "Bob Smith", role: "Marketing Specialist", overlapYears: "~2021–2023" },
+    { userId: userBob.id, name: userBob.name, role: jobInnovatech.position, overlapYears: "~2021–2023" },
   ],
   easyApply: true,
 };
