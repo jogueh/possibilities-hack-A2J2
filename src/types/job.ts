@@ -11,11 +11,11 @@ export interface WebConnectionRef {
 }
 
 // A single scored job posting cross-referenced against the user's web.
+// Easy-apply status is read from job.easy_apply directly.
 export interface JobMatch {
   job: Job;
   relevanceScore: number; // 0–100, same scoring signals as W2 user scoring
   webConnections: WebConnectionRef[];
-  easyApply: boolean;
 }
 
 // Response shape for GET /api/jobs/matches
