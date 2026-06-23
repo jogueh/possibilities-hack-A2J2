@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, act, waitFor } from "@testing-library/react";
-import { NodeSidebar } from "@/components/NodeSidebar";
+import { NodeSidebar, __resetNodeSidebarTipCache } from "@/components/NodeSidebar";
 import { __setMockWebState, __resetMockWebState } from "@/mocks/useWebStore";
 import type { WebNode } from "@/mocks/web";
 import type { Job, UserWithJobs } from "@/mocks/data";
