@@ -8,8 +8,8 @@ import type { GoalQuery, WebNode } from "@/mocks/web";
 export interface WebStoreState {
   goal: GoalQuery | null;
   nodes: WebNode[];
-  // W4-owned action (lives on W1 store). W3 only ever CALLS it. Appends node + edge,
-  // transitions to 'expanded', idempotent on duplicate id.
+  // W4-owned action (lives on W1 store). W3 only ever CALLS it. Appends `node` to `nodes`,
+  // idempotent on duplicate id. (`parentNodeId` is accepted for signature parity but unused here.)
   addSecondDegreeNode: (node: WebNode, parentNodeId: string) => void;
 }
 
