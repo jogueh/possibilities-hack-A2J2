@@ -28,7 +28,8 @@ planning
 - 🟡 W2 `ParsedGoal` type — mock locally
 
 **Exposes**
-- `src/types/job.ts` — `Job`, `JobMatch`, `WebConnectionRef`
+- `src/types/data.ts` — `Job`, `DatasetUser`
+- `src/types/job.ts` — `JobMatch`, `WebConnectionRef`, `JobMatchesResponse`
 - Consumed by W4 steps 2–8
 
 ---
