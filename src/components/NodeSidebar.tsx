@@ -13,6 +13,7 @@ import { filterRelevantJobs } from "@/lib/relevance";
 import { getSharedContext } from "@/lib/sharedContext";
 import { LI, SIDEBAR_WIDTH } from "@/lib/linkedinTokens";
 import { CareerTimelineSlot } from "@/components/CareerTimelineSlot";
+import { SecondDegreePreview } from "@/components/SecondDegreePreview";
 
 interface NodeSidebarProps {
   node: WebNode | null;
@@ -263,7 +264,8 @@ export function NodeSidebar({ node, onClose }: NodeSidebarProps) {
             </Section>
           )}
 
-          {/* Step 5 (2nd-degree preview) and Step 6 (Actions bar) mount below. */}
+          {/* 2nd-degree preview (Step 5). Actions bar (Step 6) mounts below. */}
+          <SecondDegreePreview parentNode={node} parentName={user.name} />
         </div>
       )}
     </aside>
