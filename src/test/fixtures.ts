@@ -36,7 +36,7 @@ export const userBob: User = {
     { school_name: "UC Berkeley", degree: "Psychology", graduation_year: 2019 },
     { school_name: "Stanford University", degree: "Education", graduation_year: 2023 },
   ],
-  job_history: ["job_550126"],
+  job_history: [jobInnovatech.id],
   current_location: "Boston, MA",
   posts_activity: ["Won a hackathon"],
   skills: ["Education", "Psychology"],
@@ -52,8 +52,8 @@ export const goalSwe: ParsedGoal = {
 
 export const webNodeBob: WebNode = {
   id: "n1",
-  userId: "user_4579",
-  label: "Bob Smith",
+  userId: userBob.id,
+  label: userBob.name,
   degree: 1,
   avatarInitials: "BS",
   alignmentTier: "strong",
@@ -66,7 +66,7 @@ export const jobMatchInnovatech: JobMatch = {
   job: jobInnovatech,
   relevanceScore: 71,
   webConnections: [
-    { userId: "user_4579", name: "Bob Smith", role: "Marketing Specialist", overlapYears: "~2021–2023" },
+    { userId: userBob.id, name: userBob.name, role: jobInnovatech.position, overlapYears: "~2021–2023" },
   ],
   easyApply: true,
 };
