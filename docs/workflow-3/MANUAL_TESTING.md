@@ -16,10 +16,11 @@ store with a goal (`"Break into software engineering"`), a viewer profile (Bob S
 1st-degree nodes (Alice — strong, Bob — moderate), and one 2nd-degree node (Carol) connected
 to Alice.
 
-> **Note:** Without `OPENROUTER_API_KEY` set, the AI talking point shows the **static
-> fallback** text — this is expected and is itself a valid test of the fallback path.
+> **Note:** The talking-point endpoint is **owned by W2** (API setup + LLM calls). Until W2
+> provides it, W3's `fetch` 404s and the sidebar shows its **client-side fallback** tip — this
+> is expected and is itself a valid test of W3's fallback path.
 
-Optional — exercise the API directly:
+Once W2's endpoint exists, you can exercise it directly:
 ```bash
 curl -s -X POST http://localhost:3000/api/node/talking-points \
   -H "Content-Type: application/json" \
@@ -83,9 +84,9 @@ Open **Alice Nguyen**.
 | # | Check | Expected |
 |---|-------|----------|
 | 5.1 | Callout | A highlighted blue callout: `💬 Try: "…"`. |
-| 5.2 | No API key | Shows static fallback: `Mention your shared background in Software Engineering.` (or the shared school). |
-| 5.3 | With `OPENROUTER_API_KEY` | Shows an LLM-generated 1–2 sentence opener. If the call exceeds 5s, the fallback appears. |
-| 5.4 | **Caching** | Close Alice and re-open her → the tip appears immediately with **no new network call** (cached per `userId`; verify in the Network tab). |
+| 5.2 | W2 endpoint absent | W3 shows its client-side fallback tip (`Mention your shared background.`). |
+| 5.3 | W2 endpoint present | Shows the `tip` returned by **W2**'s `POST /api/node/talking-points` (LLM-generated). |
+| 5.4 | **Caching** | Close Alice and re-open her → the tip appears immediately with **no new network call** (W3 caches per `userId`; verify in the Network tab). |
 
 ---
 
@@ -124,18 +125,19 @@ Open any node.
 | Mock scaffolding & store idempotency | `src/mocks/mocks.test.ts` |
 | Experience relevance + salary stripping | `src/lib/relevance.test.ts` |
 | Commonalities detection / dedupe / empty | `src/lib/sharedContext.test.ts` |
-| Talking-point LLM path, fallback, timeout, no-salary | `src/app/api/node/talking-points/logic.test.ts` |
 | Sidebar skeleton/header/commonalities/tip cache | `src/components/NodeSidebar.test.tsx` |
 | 2nd-degree list / add-to-web / max-3 / omit | `src/components/SecondDegreePreview.test.tsx` |
 | Connect/Message modals, subject prefill, toasts | `src/components/ActionsBar.test.tsx` |
 
-Run all: `npm test` → **33 passing**.
+Run all: `npm test` → **27 passing**.
+
+> The talking-point API (logic, LLM, fallback, timeout) is **owned by W2** and tested there.
 
 ---
 
 ## 9. Regression checklist before integration
-- [ ] `npm test` green (33/33).
+- [ ] `npm test` green (27/27).
 - [ ] `npm run lint` clean.
 - [ ] `/w3-demo` exercises sections 1–7 with no console errors.
 - [ ] Salary text appears **nowhere** in the sidebar.
-- [ ] Re-opening a node does not re-call the talking-point API.
+- [ ] Re-opening a node does not re-call W2's talking-point API.

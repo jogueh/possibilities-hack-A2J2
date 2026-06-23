@@ -45,8 +45,6 @@ import-swap, not a rewrite. The swap checklist lives in the repo-root
 | `src/lib/relevance.ts` | `filterRelevantJobs(jobs, parsedGoal)` — pure, salary-stripped. |
 | `src/lib/sharedContext.ts` | `getSharedContext(viewer, target)` — pure commonalities detection. |
 | `src/lib/linkedinTokens.ts` | LinkedIn color/spacing tokens + `SIDEBAR_WIDTH` (mock of W1 design tokens). |
-| `src/app/api/node/talking-points/logic.ts` | Talking-point generation logic (OpenRouter + fallback), testable. |
-| `src/app/api/node/talking-points/route.ts` | `POST /api/node/talking-points` handler. |
 | `src/components/NodeSidebar.tsx` | The sidebar shell + header + experience + commonalities + tip orchestrator. |
 | `src/components/SecondDegreePreview.tsx` | 2nd-degree list + add-to-web. |
 | `src/components/ActionsBar.tsx` | Connect / Message modals + toasts. |
@@ -61,6 +59,7 @@ import-swap, not a rewrite. The swap checklist lives in the repo-root
 | `src/mocks/useWebStore.ts` | `src/store/useWebStore.ts` (zustand) — `goal`, `nodes`, `edges`, `viewerProfile`, `addSecondDegreeNode` | W1 / W4 |
 | `src/mocks/userApi.ts` | `GET /api/user/[userId]` → `fetchUserWithJobs` + fixtures | W2 |
 | `src/mocks/goalParser.ts` | `parseGoal` (`parseGoalRaw`) | W2 |
+| `fetch('/api/node/talking-points')` (in `NodeSidebar`) | **W2-owned** endpoint — API setup + LLM calls | W2 |
 
 ### Test harness & tooling (⚠️ temporary)
 | File | Purpose |
@@ -70,9 +69,9 @@ import-swap, not a rewrite. The swap checklist lives in the repo-root
 
 ### Tests
 `src/mocks/mocks.test.ts`, `src/lib/relevance.test.ts`, `src/lib/sharedContext.test.ts`,
-`src/app/api/node/talking-points/logic.test.ts`, `src/components/NodeSidebar.test.tsx`,
-`src/components/SecondDegreePreview.test.tsx`, `src/components/ActionsBar.test.tsx`
-— **33 tests total**.
+`src/components/NodeSidebar.test.tsx`, `src/components/SecondDegreePreview.test.tsx`,
+`src/components/ActionsBar.test.tsx`
+— **27 tests total**.
 
 ---
 
@@ -88,26 +87,29 @@ node click ─▶ NodeSidebar(node)
                 ├─ filterRelevantJobs(user.job_history, parsedGoal)          (W3, salary-stripped)
                 ├─ getSharedContext(viewerProfile, user) ─▶ SharedContext[]  (W3, client-side)
                 │
-                ├─ POST /api/node/talking-points ─▶ { tip }                  (W3-owned; cached per userId)
+                ├─ POST /api/node/talking-points ─▶ { tip }                  (W2-owned endpoint; W3 caches per userId)
                 │
                 ├─ SecondDegreePreview(node): edges→children, addSecondDegreeNode(child, node.id)
                 └─ ActionsBar(name, tip): Connect/Message modals → toast (UI-only)
 ```
 
 ### Key rules enforced
-- **Salary is never rendered or sent to the LLM.** `filterRelevantJobs` strips `salary_range`;
-  `buildPrompt` only receives summaries (asserted in tests).
+- **Salary is never rendered or sent to the LLM.** `filterRelevantJobs` strips `salary_range`
+  before any job data leaves W3 (asserted in tests).
 - **Sidebar is read-only to the graph** — it only *calls* `addSecondDegreeNode`; it never
   mutates `WebNode`/`WebEdge`.
 - **Goal context is always present** — read from `goal.raw`; the panel never re-prompts.
-- **Talking point is cached per `userId`** — re-opening the same node does not re-call the LLM.
+- **Talking point is cached per `userId`** — re-opening the same node does not re-call W2's API.
 - **Commonalities / 2nd-degree sections are omitted entirely when empty** (no empty states).
 
 ---
 
-## 5. API — `POST /api/node/talking-points`
+## 5. Dependency — `POST /api/node/talking-points` (owned by W2)
 
-**Request**
+> **Scope:** the talking-point endpoint, all API setup, and LLM calls are owned by **W2**.
+> W3 only *consumes* it from `NodeSidebar` and renders the returned `tip`.
+
+**Request W3 sends**
 ```jsonc
 {
   "goalRaw": "Break into software engineering",
@@ -117,15 +119,15 @@ node click ─▶ NodeSidebar(node)
 }
 ```
 
-**Response**
+**Response W3 expects**
 ```jsonc
 { "tip": "Hi Alice — saw we both studied at Berkeley; I'd love your advice on breaking into SWE." }
 ```
 
-- Model: `openai/gpt-4o-mini` via OpenRouter (`OPENROUTER_API_KEY`).
-- **5-second timeout** → static fallback: `"Mention your shared background in <skill|school>."`
-- Falls back on missing key, non-OK response, timeout, or any error — so the endpoint always
-  returns a usable `tip`.
+- W3 caches the `tip` per `userId` (no re-call on re-open).
+- If the call fails, W3 shows a simple client-side fallback string. The 5s timeout, model
+  selection, and richer fallback live in **W2**.
+- Until W2's endpoint exists, the call 404s and W3 shows its fallback; unit tests stub `fetch`.
 
 ---
 
@@ -170,7 +172,8 @@ npm run lint        # eslint
 npm run dev         # then open http://localhost:3000/w3-demo for the manual harness
 ```
 
-> Without `OPENROUTER_API_KEY` set, the talking point shows the static fallback — expected.
+> The talking-point endpoint is **W2-owned**. Until W2 provides it, the call 404s and W3 shows
+> its client-side fallback tip — expected. No `OPENROUTER_API_KEY` is needed in W3.
 
 ---
 

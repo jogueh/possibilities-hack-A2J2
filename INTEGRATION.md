@@ -13,11 +13,14 @@ real import below and delete the mock file. Tests should pass unchanged.
 | `src/mocks/alignmentColors.ts` | `src/lib/alignmentColors.ts` | W1 |
 | `src/mocks/useWebStore.ts` | `src/store/useWebStore.ts` (real zustand) | W1 (+ W4 `addSecondDegreeNode`) |
 | `src/mocks/userApi.ts` (`fetchUserWithJobs`) | `fetch('/api/user/' + userId)` | W2 |
-| OpenRouter env in `api/node/talking-points` | real OpenRouter config | W2 |
+| `fetch('/api/node/talking-points')` in `NodeSidebar` | **W2-owned** endpoint (API setup + LLM calls) | W2 |
 | `vitest.config.mts` / `vitest.setup.ts` (W3-temporary) | reconcile with W1 stack bootstrap | W1 |
 
+> **Scope note:** the talking-point endpoint, all API setup, and LLM calls are owned by **W2**.
+> W3 only *consumes* `POST /api/node/talking-points` (called from `NodeSidebar`) and renders the
+> returned `tip`, with a simple client-side fallback string if the call fails.
+
 ## W3 provides (real, no swap needed)
-- `POST /api/node/talking-points` — owned by W3.
 - `<CareerTimelineSlot />` placeholder inside `NodeSidebar` — W4 mounts `CareerTimeline` here.
 - `src/types/sharedContext.ts` (`SharedContext`) + `src/lib/sharedContext.ts` (`getSharedContext`).
 
