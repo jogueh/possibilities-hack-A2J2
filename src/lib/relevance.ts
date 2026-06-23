@@ -23,8 +23,9 @@ function overlaps(value: string, target: string | undefined): boolean {
 
 /**
  * Returns jobs whose `position` or `industry` overlaps with the parsed goal's
- * `targetRole` / `targetIndustry`. Falls back to the 2 most recent jobs when nothing
- * overlaps. NEVER exposes salary data — callers receive jobs with salary stripped.
+ * `targetRole` / `targetIndustry`. Falls back to the first 2 jobs (assuming the
+ * input is already sorted most-recent-first) when nothing overlaps. NEVER exposes
+ * salary data — callers receive jobs with salary values redacted.
  */
 export function filterRelevantJobs(jobs: Job[], parsedGoal: ParsedGoal): Job[] {
   const matched = jobs.filter(
