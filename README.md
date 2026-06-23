@@ -5,13 +5,50 @@ PIT Hackathon
 
 A visual mockup of the LinkedIn homepage built with **Next.js (App Router) + TypeScript + Ant Design 5**.
 
-### Run
+### Prerequisites
+
+- **Node.js** `^20.19.0`, `^22.13.0`, or `>=24.0.0` (check with `node -v`)
+- **npm** (ships with Node.js)
+
+### Run the app & see the website
+
+1. **Clone the repo and enter the folder:**
+
+   ```sh
+   git clone https://github.com/jogueh/possibilities-hack-A2J2.git
+   cd possibilities-hack-A2J2
+   ```
+
+2. **Install dependencies:**
+
+   ```sh
+   npm install
+   ```
+
+3. **Start the development server:**
+
+   ```sh
+   npm run dev
+   ```
+
+4. **Open the website:** visit **http://localhost:3000** in your browser. The dev server hot-reloads as you edit files.
+
+To stop the server, press `Ctrl+C` in the terminal.
+
+### Production build (optional)
+
+To run the app the way it would be deployed:
 
 ```sh
-npm install
-npm run dev      # http://localhost:3000
-npm run build    # production build
-npm run lint
+npm run build    # create an optimized production build
+npm run start    # serve it at http://localhost:3000
+```
+
+### Other useful commands
+
+```sh
+npm run lint     # check code with ESLint
+npm test         # run the Vitest test suite
 ```
 
 ### Routes
