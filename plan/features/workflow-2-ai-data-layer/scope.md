@@ -12,30 +12,32 @@ https://pit.najera.cc/jobs_data.json   — job postings
 https://pit.najera.cc/course_data.json — learning courses
 ```
 
+These are **static, immutable hackathon datasets**. They never change, so all three are fetched once with `{ cache: 'force-cache' }` and no revalidation period — there is nothing to refresh.
+
 ### User record shape
 ```ts
 {
-  id: string               // "user_4579"
+  id: string
   name: string
-  school_history: { school_name, degree, graduation_year }[]
-  job_history: string[]    // array of job IDs → resolve via jobs dataset
+  school_history: { school_name: string; degree: string; graduation_year: number }[]
+  job_history: string[]        // array of job IDs → resolve via jobs dataset
   current_location: string
-  posts_activity: string[] // activity strings used to derive activityStatus
+  posts_activity: string[]     // volume used to derive activityStatus
   skills: string[]
-  courses: string[]        // course IDs
+  courses: string[]
 }
 ```
 
 ### Job record shape
 ```ts
 {
-  id: string               // "job_550126"
+  id: string
   company: string
   location: string
   position: string
   salary_range: { from: string; to: string }
   industry: string
-  level: string            // "Entry", "Mid", "Senior"
+  level: string                // "Entry" | "Mid" | "Senior"
   easy_apply: boolean
   description: string
 }
@@ -46,83 +48,100 @@ https://pit.najera.cc/course_data.json — learning courses
 ## Features in Scope
 
 ### 1. Data Fetching + Server-Side Cache (`src/lib/data.ts`)
-- Fetch all three datasets at server startup using Next.js `fetch` with `{ cache: 'force-cache' }` (revalidate every 24h)
+- Fetch all three datasets at server startup using Next.js `fetch` with `{ cache: 'force-cache' }` — no `revalidate`, no TTL
 - Export resolution helpers:
   - `resolveJobs(jobIds: string[]): Job[]`
   - `resolveUser(userId: string): User | null`
-  - `resolveUserWithJobs(userId: string): UserWithJobs | null` — joins job records onto user
-- Export `getAllUsers(): User[]` for scoring pass
-- Keep raw dataset types in `src/types/data.ts` (separate from `web.ts`)
+  - `resolveUserWithJobs(userId: string): UserWithJobs | null`
+  - `getAllUsers(): User[]`
+- Raw dataset types live in `src/types/data.ts` (separate from `web.ts`)
 
 ### 2. Relevance Scoring (`src/lib/scoring.ts`)
-Pure function, no I/O, fully testable:
+Pure function, no I/O, fully unit tested:
 ```ts
 scoreUserAgainstGoal(user: UserWithJobs, parsedGoal: ParsedGoal): number // 0–100
 ```
-Scoring criteria (weighted):
-- **Role/position keyword match** (job titles vs. goal target role) — 35 pts
-- **Industry match** — 20 pts
-- **Location match** (city/state string comparison) — 20 pts
-- **Shared skills overlap** — 15 pts
-- **Activity level** (derived from `posts_activity.length`) — 10 pts
 
-`activityStatus` derivation:
+Scoring weights:
+| Signal | Points |
+|--------|--------|
+| Role/position keyword match | 35 |
+| Industry match | 20 |
+| Location match (city/state) | 20 |
+| Skills overlap | 15 |
+| Activity level (posts_activity.length) | 10 |
+
+`activityStatus` derivation (stored on `WebNode`, used by W1 stretch + W3):
 - `posts_activity.length >= 3` → `'active'`
-- `posts_activity.length === 1 or 2` → `'moderate'`
+- `posts_activity.length 1–2` → `'moderate'`
 - `posts_activity.length === 0` → `'inactive'`
+
+`alignmentTier` derivation (drives avatar ring color in W1):
+- score 70–100 → `'strong'`
+- score 40–69 → `'moderate'`
+- score < 40 → `'weak'`
 
 ### 3. Goal Parser (`src/lib/goalParser.ts`)
 ```ts
 interface ParsedGoal {
-  targetRole?: string      // e.g. "software engineer"
-  targetIndustry?: string  // e.g. "fintech"
-  targetLocation?: string  // e.g. "Mountain View, CA"
-  intent: string           // normalized free-text passed to LLM system prompt
+  targetRole?: string
+  targetIndustry?: string
+  targetLocation?: string
+  intent: string
 }
 
 parseGoal(raw: string): Promise<ParsedGoal>
 ```
-- Calls OpenRouter via Vercel AI SDK with a **structured output / JSON mode** prompt
-- System prompt instructs model to extract role, industry, location from free text
-- Falls back to keyword extraction (no LLM) if OpenRouter is unavailable
-- Model: `openai/gpt-4o-mini` via OpenRouter (cheap, fast, sufficient for extraction)
+- Calls OpenRouter via Vercel AI SDK using structured JSON output mode
+- Model: `openai/gpt-4o-mini` (cheap, fast, sufficient for extraction)
+- Falls back to simple keyword extraction if OpenRouter is unavailable
 
 ### 4. `POST /api/web/generate`
-**Request:**
-```ts
-{ goal: string; userId: string }
-```
-**Response:**
-```ts
-{ nodes: WebNode[]; edges: WebEdge[] }
-```
+**Request:** `{ goal: string; userId: string }`
+**Response:** `{ nodes: WebNode[]; edges: WebEdge[] }`
 
 **Algorithm:**
 1. Parse goal → `ParsedGoal`
 2. Load all users; resolve their job histories
-3. Score every user against `ParsedGoal` (exclude requesting userId)
-4. Sort descending by score; take top 20 candidates
-5. For each of the top 5 (1st-degree seed), build a `WebNode` with `degree: 1`
-6. For each 1st-degree node, pick top 3 of the remaining candidates that share at least one skill or job company → build `WebNode` with `degree: 2`
-7. Build edges:
-   - `center → 1st-degree`: `isDotted: false`, `strength: 50` (initial default)
-   - `1st-degree → 2nd-degree`: `isDotted: true`, `strength: 50`
+3. Score every user against `ParsedGoal` (exclude requesting `userId`)
+4. Sort descending; take **up to 5** candidates with score ≥ 40 (`'moderate'` or `'strong'` tier). If fewer than 5 qualify, return only those that do — **do not pad with weak matches**
+5. Build `WebNode` with `degree: 1` for each
+6. For each 1st-degree node, find 2nd-degree candidates from the remaining pool with score ≥ 70 (`'strong'` only) that also share at least one skill or company with the 1st-degree node. Take up to 3 per node. **If none meet the threshold, omit 2nd-degree for that node entirely**
+7. Build edges: `center → 1st` (`isDotted: false`, `strength: 50`); `1st → 2nd` (`isDotted: true`, `strength: 50`)
 8. Return `{ nodes, edges }`
 
-**The requesting user's own node** is NOT included in the response — the canvas always renders it as the fixed center node from local state.
-
 ### 5. `GET /api/user/[userId]`
-Returns `UserWithJobs` for a given userId. Used by W3's profile card to resolve full job history server-side. Accepts the `userId` path param, returns 404 if not found.
+Returns `UserWithJobs` for a given `userId`. Used by W3's sidebar. Returns 404 if not found.
+
+---
+
+## Unit Tests (Vitest)
+
+| Test file | What it covers |
+|-----------|---------------|
+| `src/lib/scoring.test.ts` | Score = 0 for no overlap; score = 100 for full match; each weight contributes correctly; `alignmentTier` thresholds; `activityStatus` derivation |
+| `src/lib/goalParser.test.ts` | Fallback keyword extraction when LLM unavailable; known goal strings produce expected `ParsedGoal` shape |
+| `src/lib/data.test.ts` | `resolveJobs` returns correct records; `resolveUser` returns null for unknown id |
+| `src/app/api/web/generate/route.test.ts` | Returns ≤ 5 nodes; returns fewer when < 5 qualify; 2nd-degree nodes only included when score ≥ 70; requesting userId excluded from results |
 
 ---
 
 ## Business Logic
 
-- **No user authentication.** The `userId` in the request is treated as trusted (hackathon scope). Use `user_4579` as the default "logged-in" user if none is provided.
-- **Scoring is deterministic** given the same goal and dataset. No randomness injected.
-- **The LLM is only used for goal parsing.** The ranking/scoring is pure algorithmic — the LLM does not pick connections.
-- **Top 5 first-degree nodes are fixed** in the response. The client-side toggle (1–5) shows/hides from this fixed set; it does not trigger a new API call.
-- **relevanceScore is included in WebNode** but must never be rendered in the UI (W1, W3, W4 must not display it).
+- **`force-cache` with no revalidation** — the dataset is static and never changes; there is nothing to refresh.
+- **No user authentication.** `userId` is trusted. Use `user_4579` as the default "logged-in" user if none provided.
+- **Scoring is deterministic** — no randomness. Same goal + same dataset = same result every time.
+- **The LLM only parses the goal.** All ranking is algorithmic — the LLM never picks connections.
+- **Never return weak-tier (score < 40) nodes as 1st-degree connections.** Return fewer nodes rather than padding.
+- **2nd-degree suggestions require strong alignment (score ≥ 70).** Irrelevant 2nd-degree connections are more harmful than none.
+- **`relevanceScore` is in the payload but must never be rendered** anywhere in the UI.
+
+---
+
+## Stretch Goals (implement only after core is complete)
+
+- **Goal proximity score:** compute a 0–100 "how close is this web to achieving your goal" metric from the aggregate `relevanceScore` of the current 1st-degree nodes. Exposed as a field on the response and rendered by W1 as a percentage pill.
+- **`activityStatus` on `WebNode`:** already derived in scoring — wire it through to the response so W1's stretch ring can use it.
 
 ---
 
@@ -132,11 +151,11 @@ Returns `UserWithJobs` for a given userId. Used by W3's profile card to resolve 
 |------|----------|
 | Rendering any UI | W1, W3, W4 |
 | React Flow canvas or node positioning | W1 |
-| Profile card / talking points UI | W3 |
+| Profile sidebar / talking points UI | W3 |
 | AI-generated talking points per connection | W3 |
-| Interaction score updates (met up, chat) | W4 |
-| Streaks, badges, notes persistence | W4 |
-| Real LinkedIn API or OAuth | Never (out of MVP) |
+| Connect / message actions | W4 |
+| Interaction score updates | W4 stretch |
+| Streaks, badges, notes | W4 stretch |
 | Course recommendation features | Post-MVP |
-| Saving/persisting web snapshots to a DB | Post-MVP |
+| Saving web snapshots to a DB | Post-MVP |
 | Rate limiting or auth middleware | Post-MVP |
