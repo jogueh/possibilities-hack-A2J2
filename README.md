@@ -7,7 +7,7 @@ A visual mockup of the LinkedIn homepage built with **Next.js (App Router) + Typ
 
 ### Prerequisites
 
-- **Node.js** `^20.19.0`, `^22.13.0`, or `>=24.0.0` (check with `node -v`)
+- **Node.js** `>=20.9.0` (check with `node -v`)
 - **npm** (ships with Node.js)
 
 ### Run the app & see the website
