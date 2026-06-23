@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { UserWithJobs } from "@/types/scoring";
+import type { UserWithJobs } from "@/types/data";
 import {
   findWebOverlap,
   roleAtCompany,
@@ -8,8 +8,8 @@ import {
 import { jobInnovatech, jobAcmeSwe, userBob } from "@/test/fixtures";
 
 // userBob's job_history includes job_550126 (Innovatech / Marketing Specialist).
-const bobWithJobs: UserWithJobs = { ...userBob, jobs: [jobInnovatech] };
-const bobNoJobs: UserWithJobs = { ...userBob, jobs: [] };
+const bobWithJobs: UserWithJobs = { ...userBob, job_history: [jobInnovatech] };
+const bobNoJobs: UserWithJobs = { ...userBob, job_history: [] };
 
 describe("roleAtCompany", () => {
   it("returns the role when the user worked at the company (case-insensitive)", () => {

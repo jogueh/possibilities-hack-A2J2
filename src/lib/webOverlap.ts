@@ -1,5 +1,5 @@
 import type { Job } from "@/types/data";
-import type { UserWithJobs } from "@/types/scoring";
+import type { UserWithJobs } from "@/types/data";
 import type { WebConnectionRef } from "@/types/job";
 
 /**
@@ -26,7 +26,7 @@ export function roleAtCompany(
   user: UserWithJobs,
   company: string,
 ): string | undefined {
-  const match = user.jobs.find((j) => sameCompany(j.company, company));
+  const match = user.job_history.find((j) => sameCompany(j.company, company));
   return match?.position;
 }
 

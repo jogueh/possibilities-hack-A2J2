@@ -1,6 +1,6 @@
-// MOCK of the W1 shared contract (src/types/web.ts).
-// TODO(W1): delete this file and import from "@/types/web" once W1 publishes it.
-// Mirrors the contract documented in plan/features/workflow-1-graph-canvas/scope.md.
+// ⚠️ W3 MOCK — replace with W1 real impl at `src/types/web.ts`. See plan.md
+// Mirrors the W1 shared contract EXACTLY (same names) so integration is an import swap.
+// DO NOT add W3-specific fields here; coordinate with W1 instead.
 
 export type AlignmentTier = "strong" | "moderate" | "weak";
 export type WebState = "empty" | "seeded" | "expanded";
@@ -29,4 +29,11 @@ export interface WebEdge {
 export interface GoalQuery {
   raw: string;
   userId: string;
+}
+
+export interface WebSnapshot {
+  state: WebState;
+  nodes: WebNode[];
+  edges: WebEdge[];
+  goal: GoalQuery | null;
 }
