@@ -1,7 +1,7 @@
-import type { Job } from "@/types/data";
-import type { UserWithJobs, ParsedGoal } from "@/types/scoring";
+import type { Job, UserWithJobs } from "@/types/data";
+import type { ParsedGoal } from "@/types/goal";
 import type { JobMatch } from "@/types/job";
-import { scoreJobAgainstGoal, alignmentTier } from "@/lib/scoring";
+import { scoreJobAgainstGoal, deriveAlignmentTier } from "@/lib/scoring";
 import { findWebOverlap } from "@/lib/webOverlap";
 
 /**
@@ -30,7 +30,7 @@ export function buildJobMatches(
   for (const job of jobs) {
     const relevanceScore = scoreJobAgainstGoal(job, goal);
     // Exclude weak matches — never pad the list with irrelevant jobs.
-    if (alignmentTier(relevanceScore) === "weak") continue;
+    if (deriveAlignmentTier(relevanceScore) === "weak") continue;
 
     scored.push({
       job,

@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import type { Job } from "@/types/data";
-import type { UserWithJobs, ParsedGoal } from "@/types/scoring";
+import type { Job, UserWithJobs } from "@/types/data";
+import type { ParsedGoal } from "@/types/goal";
 import { buildJobMatches, MAX_JOB_MATCHES } from "@/lib/jobMatches";
 import { jobAcmeSwe, jobInnovatech, userBob, goalSwe } from "@/test/fixtures";
 
-const bobAtInnovatech: UserWithJobs = { ...userBob, jobs: [jobInnovatech] };
+const bobAtInnovatech: UserWithJobs = { ...userBob, job_history: [jobInnovatech] };
 
 function sweJob(id: string, overrides: Partial<Job> = {}): Job {
   return { ...jobAcmeSwe, id, ...overrides };
