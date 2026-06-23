@@ -75,5 +75,4 @@ export const jobMatchInnovatech: JobMatch = {
   webConnections: [
     { userId: userBob.id, name: userBob.name, role: jobInnovatech.position, overlapYears: "~2021–2023" },
   ],
-  easyApply: true,
 };
