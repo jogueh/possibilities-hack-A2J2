@@ -6,16 +6,18 @@ Workflow 2 owns the **server-side** of LinkedIn Web — **all API and AI endpoin
 
 1. Fetching + caching the three static datasets (`user_data`, `jobs_data`, `course_data`) from `https://pit.najera.cc/*.json`
 2. Pure-function utilities for resolving users + their job histories
-3. A deterministic relevance-scoring engine
-4. An LLM-backed goal parser (with a fully working non-LLM fallback)
+3. An LLM-backed goal parser (with a fully working non-LLM fallback)
+4. AI-drafted talking-points generation
 5. Three HTTP routes:
    - `POST /api/web/generate` — consumed by W1
    - `GET /api/user/[userId]` — consumed by W3 (sidebar) and W4 (career timeline)
    - `POST /api/node/talking-points` — consumed by W3 (sidebar AI tip callout)
 
-All of this ships **independently** of W1/W3/W4. To keep that independence safe while W1 hasn't merged its shared `src/types/web.ts` yet, W2 ships a **clearly-labeled MOCK** of that file using the exact symbol names from the W1 spec — when W1 lands, the file is a clean swap (the cross-workflow stubbing convention already established in this repo).
+W2 explicitly **does not own** the pure scoring functions (`scoreUserAgainstGoal`, `deriveAlignmentTier`, `deriveActivityStatus`) — those have no I/O and are owned by **W4** at `src/lib/scoring.ts`. W2 imports them; while W4 hasn't merged that module yet, W2 ships a MOCK at the same path.
 
-The work is split into **6 sequential PRs**. Each PR is shippable on its own, has its own unit tests, and leaves the next PR with a green build.
+All of this ships **independently** of W1/W3/W4. To keep that independence safe while W1 hasn't merged its shared `src/types/web.ts` yet, W2 ships a **clearly-labeled MOCK** of that file using the exact symbol names from the W1 spec — when W1 lands, the file is a clean swap (the cross-workflow stubbing convention already established in this repo). The same approach applies to `src/lib/scoring.ts` until W4 lands the real implementation.
+
+The work is split into **5 sequential PRs**. Each PR is shippable on its own, has its own unit tests, and leaves the next PR with a green build.
 
 ---
 
@@ -40,7 +42,7 @@ These are the things that could trip W2 up while the other workflows are still i
 | 1 | **`src/types/web.ts` is owned by W1 and not merged yet.** W2's API response shape depends on it. | Ship a MOCK file labeled with a `// MOCK — owned by W1, swap on merge` banner that re-exports the exact same symbol names. Drop-in replacement when W1 lands. |
 | 2 | **`OPENROUTER_API_KEY` may not be set** locally or in CI. | `parseGoal()` falls back to deterministic keyword extraction. The endpoint never throws on missing key. Document in `.env.example`. |
 | 3 | **Vitest, `ai`, and `@openrouter/ai-sdk-provider` aren't in package.json yet.** Adding deps could conflict with W1 if W1 lands first. | Add deps in PR 1 only after a `git pull --rebase` check; W1 lists the same packages in its scope so a merge there is a no-op in `package-lock.json`. |
-| 4 | **No shared `scoring.ts` between W2 (user scoring) and W4 (job scoring)** yet — W4 explicitly says to coordinate. | Ship `scoreUserAgainstGoal` in PR 2 and design the module so a sibling `scoreJobAgainstGoal` slots in. Don't preemptively implement W4's function (out of scope), but leave the door open via shared helpers (e.g. `keywordOverlap`, `locationMatch`). |
+| 4 | **W4 owns `src/lib/scoring.ts` (pure functions), and hasn't merged it yet.** W2's `/api/web/generate` consumes those functions. | Ship a MOCK `src/lib/scoring.ts` in PR 1 with a `// MOCK — owned by W4, swap on merge` banner. The MOCK can be a thin, deterministic placeholder (e.g. returns a fixed score based on name hash) — its only job is to make `/api/web/generate` runnable end-to-end during W2 development. PR 4's tests against the route inject a mocked scoring fn rather than relying on the MOCK behavior. |
 | 5 | **Datasets are ~1.7 MB total.** Cold-start fetch latency on a Vercel-style serverless invocation could be noticeable. | `force-cache` means one fetch per server lifetime. Memoize JSON parsing in a module-level cache. Test with mocked fetch — never hit the real URL in tests. |
 | 6 | **Next.js 16 + React 19** (the repo is on 16, the W1 spec says 15). | Pin Vitest + AI SDK to versions verified against Next 16 / React 19. No code-level impact for W2. |
 | 7 | **Default viewer `user_4579` must exist in the dataset.** | Verified during plan exploration (it does — Bob Smith). Add a sanity-check log if `resolveUser('user_4579')` returns null at startup. |
@@ -62,6 +64,7 @@ Each PR has one clear scope, leaves the build green, and ships its own unit test
 - `src/types/data.ts` — `User`, `Job`, `Course`, `UserWithJobs` raw shapes
 - `src/types/web.ts` — **MOCK** of W1's contract (banner-commented), exporting `WebNode`, `WebEdge`, `GoalQuery`, `WebSnapshot`, `AlignmentTier`, `WebState`, `DegreeLevel`
 - `src/lib/data.ts` — `fetchUsers()`, `fetchJobs()`, `fetchCourses()` + `getAllUsers()`, `resolveUser(id)`, `resolveJobs(ids)`, `resolveUserWithJobs(id)`
+- `src/lib/scoring.ts` — **MOCK** of W4's contract (banner-commented), exporting `scoreUserAgainstGoal`, `deriveAlignmentTier`, `deriveActivityStatus` with stable, deterministic placeholder behavior so PR 4 has something to wire up. No unit tests on the MOCK (W4 owns the real tests).
 - `src/lib/data.test.ts` — mocks `globalThis.fetch`, asserts shape + resolution + null on unknown id
 - `.env.example` — adds `OPENROUTER_API_KEY=`
 - `package.json` — `test`, `test:watch`, `test:ui` scripts; deps `vitest`, `@vitest/ui`
@@ -74,32 +77,7 @@ Each PR has one clear scope, leaves the build green, and ships its own unit test
 
 ---
 
-### PR 2 — Relevance Scoring (pure functions)
-
-**Goal:** Ship the deterministic scoring engine — no I/O, no LLM, fully unit-tested.
-
-**Files added:**
-- `src/lib/scoring.ts`
-  - `scoreUserAgainstGoal(user: UserWithJobs, parsedGoal: ParsedGoal): number` (0–100)
-  - Weight constants (35 / 20 / 20 / 15 / 10) per scope table
-  - `deriveAlignmentTier(score): 'strong' | 'moderate' | 'weak'` (thresholds 70 / 40)
-  - `deriveActivityStatus(user): 'active' | 'moderate' | 'inactive'` (3+ / 1–2 / 0)
-  - Private helpers: `keywordOverlap`, `locationMatch`, `skillsOverlap` — designed to be reusable by W4's future `scoreJobAgainstGoal`
-- `src/lib/scoring.test.ts`
-
-**Unit tests (cover the W2-spec table exactly):**
-- Score = 0 for no overlap on any signal
-- Score = 100 for full match across all 5 signals
-- Each weight contributes the correct increment independently (5 sub-tests)
-- `deriveAlignmentTier`: 100 → strong, 70 → strong, 69 → moderate, 40 → moderate, 39 → weak, 0 → weak
-- `deriveActivityStatus`: 0 → inactive, 1 → moderate, 2 → moderate, 3 → active, 5 → active
-- Deterministic: same input → same output (run scorer twice, assert ===)
-
-**Depends on:** PR 1 (types only).
-
----
-
-### PR 3 — Goal Parser (LLM + fallback)
+### PR 2 — Goal Parser (LLM + fallback)
 
 **Goal:** Convert a raw goal string into a `ParsedGoal` via OpenRouter, with a hard fallback to keyword extraction when the LLM is unavailable.
 
@@ -124,21 +102,22 @@ Each PR has one clear scope, leaves the build green, and ships its own unit test
 
 ---
 
-### PR 4 — `POST /api/web/generate`
+### PR 3 — `POST /api/web/generate`
 
-**Goal:** Stitch goal parser + scoring + dataset together. The headline endpoint W1 consumes.
+**Goal:** Stitch goal parser + scoring (imported from W4 MOCK) + dataset together. The headline endpoint W1 consumes.
 
 **Files added:**
 - `src/app/api/web/generate/route.ts`
   - `POST` handler: `{ goal: string, userId?: string }` → `{ nodes: WebNode[], edges: WebEdge[] }`
   - 8-step algorithm exactly as in the scope
+  - Imports `scoreUserAgainstGoal`, `deriveAlignmentTier`, `deriveActivityStatus` from `@/lib/scoring` (W4 owns; MOCK lands in PR 1)
   - Center node id `'self'`; 1st-degree node ids `'node-1-<userId>'`; 2nd-degree `'node-2-<userId>'`
   - Positions are emitted as `{ x: 0, y: 0 }` (W1 owns layout — never compute positions server-side)
 - `src/app/api/web/generate/route.test.ts`
-- `src/lib/webBuilder.ts` (optional split if route gets too large) — pure builder used by the handler so the unit test can hit it without going through `Request`/`Response`
+- `src/lib/webBuilder.ts` (optional split if route gets too large) — pure builder used by the handler so the unit test can hit it without going through `Request`/`Response`. **Tests inject a mock scoring function** rather than depending on the W4 MOCK's behavior.
 
 **Unit tests:**
-- Returns ≤ 5 1st-degree nodes
+- Returns ≤ 5 1st-degree nodes (with mocked scoring that returns predictable scores)
 - Returns fewer when < 5 candidates clear score ≥ 40 (no padding)
 - Excludes the requesting `userId` from the candidate pool
 - 2nd-degree nodes only emitted when scoring ≥ 70 AND share ≥ 1 skill or company with the 1st-degree parent
@@ -147,11 +126,11 @@ Each PR has one clear scope, leaves the build green, and ships its own unit test
 - Response shape conforms to MOCK `WebNode[]` / `WebEdge[]` types
 - `parseGoal` failures don't break the endpoint — fall back to keyword path
 
-**Depends on:** PR 1, 2, 3.
+**Depends on:** PR 1, 2.
 
 ---
 
-### PR 5 — `GET /api/user/[userId]`
+### PR 4 — `GET /api/user/[userId]`
 
 **Goal:** Resolve a full `UserWithJobs` payload for W3's sidebar and W4's career timeline.
 
@@ -170,7 +149,7 @@ Each PR has one clear scope, leaves the build green, and ships its own unit test
 
 ---
 
-### PR 6 — `POST /api/node/talking-points`
+### PR 5 — `POST /api/node/talking-points`
 
 **Goal:** AI-generated 1–2 sentence outreach opener for the W3 sidebar. **All LLM logic lives here in W2** — W3 only sends the payload and renders `{ tip }`.
 
@@ -197,7 +176,7 @@ Each PR has one clear scope, leaves the build green, and ships its own unit test
 - Handler returns 400 on a body missing `goalRaw` or `targetSummary`
 - Handler does NOT include the request's `targetSummary` verbatim in the prompt if the scrub would remove parts — assert the prompt passed to `generateObject` is the scrubbed version
 
-**Depends on:** PR 1 (types), PR 3 (OpenRouter client to share).
+**Depends on:** PR 1 (types), PR 2 (OpenRouter client to share).
 
 ---
 
@@ -206,7 +185,7 @@ Each PR has one clear scope, leaves the build green, and ships its own unit test
 - **Module-level cache.** Use `let _users: User[] | null = null` patterns inside `src/lib/data.ts` so parsed JSON isn't re-parsed on every request. Reset hooks for tests.
 - **Determinism in tests.** Always mock `fetch` and the AI SDK — never reach the network. Use `vi.spyOn(globalThis, 'fetch')` and `vi.mock('ai')`.
 - **`relevanceScore` on the wire but not in UI.** W2's responsibility ends at putting the right number in the payload. W1 owns the "never render this" rule.
-- **Salary data hygiene.** PR 5 must call out in code comments that consumers strip salary on the raw user payload. PR 6 (`/api/node/talking-points`) is the highest-risk path because text reaches an LLM — that route has its own `scrubSalary` helper plus required upstream stripping from W3.
+- **Salary data hygiene.** PR 4 (`/api/user/[userId]`) must call out in code comments that consumers strip salary on the raw user payload. PR 5 (`/api/node/talking-points`) is the highest-risk path because text reaches an LLM — that route has its own `scrubSalary` helper plus required upstream stripping from W3.
 - **No course features in W2.** Per scope, course recommendations are post-MVP. PR 1 still fetches the courses dataset (for completeness + to seed the cache), but no helpers consume it yet.
 - **No course endpoint in W2 scope.** Courses dataset stays loaded but unused by W2's API surface; W4-future-stretch may consume it.
 - **All endpoints are stateless.** No DB, no session storage, no auth middleware. `userId` is trusted.
@@ -219,4 +198,4 @@ Each PR has one clear scope, leaves the build green, and ships its own unit test
 
 ## SQL Todo Mapping
 
-Each PR above maps to one top-level todo, with dependencies wired so PRs 2/3 unblock 4, and 1 unblocks everything.
+Each PR above maps to one top-level todo, with dependencies wired so PR 2 (goal parser) unblocks PR 3 (`/api/web/generate`) and PR 5 (`/api/node/talking-points`); PR 1 unblocks everything.
