@@ -1,4 +1,4 @@
-import type { DatasetUser, Job } from "@/types/data";
+import type { User, Job } from "@/types/data";
 import type { JobMatch } from "@/types/job";
 import type { WebNode } from "@/types/_w1Contract.mock";
 import type { ParsedGoal } from "@/types/_w2Contract.mock";
@@ -29,7 +29,7 @@ export const jobAcmeSwe: Job = {
   description: "Build delightful products as a Software Engineer.",
 };
 
-export const userBob: DatasetUser = {
+export const userBob: User = {
   id: "user_4579",
   name: "Bob Smith",
   school_history: [

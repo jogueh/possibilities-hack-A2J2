@@ -1,37 +1,53 @@
-// Raw dataset record shapes from https://pit.najera.cc
-// Shared dataset types. W2 also consumes these (src/types/data.ts in their scope);
-// W4 defines the job-relevant subset here and re-exports as needed.
+// Raw dataset shapes from pit.najera.cc. These mirror the JSON exactly — do not
+// add UI concerns here. Consumed by Workflow 2's API layer and shared with W3/W4.
 
 export interface SchoolHistoryEntry {
-  school_name: string;
-  degree: string;
-  graduation_year: number;
+  school_name: string
+  degree: string
+  graduation_year: number
 }
 
-export interface DatasetUser {
-  id: string;
-  name: string;
-  school_history: SchoolHistoryEntry[];
-  job_history: string[]; // job IDs → resolve via jobs dataset
-  current_location: string;
-  posts_activity: string[];
-  skills: string[];
-  courses: string[];
-}
-
-export interface SalaryRange {
-  from: string;
-  to: string;
+export interface User {
+  id: string
+  name: string
+  school_history: SchoolHistoryEntry[]
+  job_history: string[]
+  current_location: string
+  posts_activity: string[]
+  skills: string[]
+  courses: string[]
 }
 
 export interface Job {
-  id: string;
-  company: string;
-  location: string;
-  position: string;
-  salary_range: SalaryRange; // NOTE: never rendered in any UI (see W4 scope)
-  industry: string;
-  level: string; // "Entry" | "Mid" | "Senior"
-  easy_apply: boolean;
-  description: string;
+  id: string
+  company: string
+  location: string
+  position: string
+  salary_range: { from: string; to: string }
+  industry: string
+  level: string
+  easy_apply: boolean
+  description: string
+}
+
+export interface CourseLength {
+  value: number
+  unit: string
+}
+
+export interface Course {
+  id: string
+  name: string
+  category: string
+  skills: string[]
+  length: CourseLength
+  level: string
+}
+
+/**
+ * A User with `job_history` resolved from string ids to full Job records.
+ * Returned by `resolveUserWithJobs` and the `GET /api/user/[userId]` endpoint.
+ */
+export interface UserWithJobs extends Omit<User, 'job_history'> {
+  job_history: Job[]
 }
