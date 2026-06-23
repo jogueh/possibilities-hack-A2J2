@@ -27,7 +27,7 @@ planning
 ## Progress
 | Step | Branch | Status | PR |
 |------|--------|--------|----|
-| 1. job types + Vitest infra | `w4-step1-types` | ✅ done | [#2](https://github.com/jogueh/possibilities-hack-A2J2/pull/2) |
+| 1. job types + Vitest infra | `w4-step1-types` | 🟡 open PR | [#2](https://github.com/jogueh/possibilities-hack-A2J2/pull/2) |
 | 2. job scoring | `w4-step2-job-scoring` | ⬜ next | — |
 | 3. web overlap | `w4-step3-web-overlap` | ⬜ pending | — |
 | 4. jobs match API | `w4-step4-jobs-api` | ⬜ pending | — |
@@ -43,7 +43,7 @@ planning
 
 ## Global rules
 - Datasets are static → `force-cache`, **no revalidation**.
-- Job scoring **reuses W2 signals** (`src/lib/scoring.ts`) — do NOT invent a parallel system.
+- Job scoring **reuses W2 signals** (planned shared path: `src/lib/scoring.ts` once W2 lands) — do NOT invent a parallel system.
 - Timeline date ranges are **approximate** — anchor on `graduation_year`, label `~[year]`, never fabricate exact dates.
 - **Salary data must never be rendered**, even though `salary_range` exists on job records.
 
@@ -54,8 +54,8 @@ planning
 
 ## Steps — deps & blockers
 
-### Step 1 — `w4-step1-types` ✅
-- **Needs:** 🟡 W1 `web.ts` (`WebNode`/`WebEdge`/`GoalQuery`); 🟡 W2 `ParsedGoal` → both mocked in `src/types/_w1Contract.mock.ts`, `_w2Contract.mock.ts`
+### Step 1 — `w4-step1-types` 🟡
+- **Needs:** ✅ W1 `src/types/web.ts` (`WebNode`/`WebEdge`/`GoalQuery`); 🟡 W2 `ParsedGoal` → only W2 remains mocked locally in `src/types/_w2Contract.mock.ts`
 - **Exposes:** `src/types/job.ts` (`Job`, `JobMatch`, `WebConnectionRef`), Vitest infra — consumed by steps 2–8
 - **Blockers:** none. Fully self-contained against mocks.
 
@@ -104,7 +104,6 @@ planning
 ## Upstream asks (file to W1/W2/W3 owners)
 | Ask | Owner | Unblocks |
 |-----|-------|----------|
-| Publish `src/types/web.ts` contract | W1 | Step 1 (already mocked) |
 | Extract shared scoring helpers into `src/lib/scoring.ts` | W2 | Step 2 |
 | Expose `useWebStore` (`snapshot.nodes` + `goal`) | W1 | Step 5 🔴 |
 | Provide canvas node-data injection hook for `hasJobOverlap` | W1 | Step 6 🔴 |
