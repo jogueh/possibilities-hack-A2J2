@@ -119,7 +119,7 @@ Highest-demo-impact stretch: makes the web visibly react to user behaviour. Buil
 |------|------|-----------------|
 | 10. Activity Status Ring | Secondary avatar ring from `deriveActivityStatus` (blue/amber/red). Exports `ACTIVITY_RING` constant in `src/lib/activityColors.ts`. Rendered on W1 nodes + W3 header, with hover tooltip. | 🟡 W2 wires `activityStatus` onto `WebNode` (mock until then) · 🔴 W1 node renderer + W3 sidebar header |
 | 11. "I Met Up" button | Button in W3 Actions bar → `updateInteractionScore(nodeId, edgeId, +20)`, toast, disables for session. No backend. Produces the data step 12 visualizes. | 🟡 W1 store `updateInteractionScore` (mock until then) · 🔴 W3 Actions-bar slot |
-| 12. Edge Strength visuals | Custom `StrengthEdge.tsx`; tiered look (grey→blue→indigo→violet-gradient+pulse) from `WebEdge.strength`. Extract pure `strengthTier(strength)` util for tests. Dotted edges always dashed. | 🔴 W1 must register the custom edge type in React Flow config |
+| 12. Edge Strength visuals | Custom `StrengthEdge.tsx`; tiered look (grey→blue→indigo→violet-gradient+pulse) from `WebEdge.strength`. Extract pure `strengthTier(strength)` util for tests. Dotted edges always dashed. | 🔴 W1 must expose a hook in the SVG edge renderer (e.g. `WebCanvas` / `edgeStrokeWidth`) to apply tiered styling based on `WebEdge.strength` |
 
 **Testable cores (build standalone even while UI-blocked):** `activityRingColor(status)` constant · `strengthTier(strength)` pure function · the interaction-increment logic.
 
