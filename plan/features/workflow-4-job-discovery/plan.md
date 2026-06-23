@@ -82,7 +82,7 @@ Main now owns the shared contracts; W4 consumes them — do not redefine these l
 ### Step 6 — canvas overlay (fresh off main)
 - **Needs:** ✅ step 3 overlap, step 5 panel state.
 - **Exposes:** `useJobOverlapFlags(nodes, matches)` hook + `node-job-overlap` pulsing-ring CSS class.
-- **Blockers:** 🔴 **HARD — W1 node renderer hook** to inject `hasJobOverlap` into React Flow node `data`. Ship hook + CSS + tests standalone; defer visual integration.
+- **Blockers:** 🔴 **HARD — W1 node renderer hook** to inject `hasJobOverlap` into the SVG node renderer (e.g. `WebNodeMarker` / `WebCanvas`). Ship hook + CSS + tests standalone; defer visual integration.
 
 ### Step 7 — career timeline (fresh off main)
 - **Needs:** ✅ step 4 (matched companies); 🟡 W2 `GET /api/user/[userId]` (mock fetch).
