@@ -52,8 +52,8 @@ export const goalSwe: ParsedGoal = {
 
 export const webNodeBob: WebNode = {
   id: "n1",
-  userId: "user_4579",
-  label: "Bob Smith",
+  userId: userBob.id,
+  label: userBob.name,
   degree: 1,
   avatarInitials: "BS",
   alignmentTier: "strong",
