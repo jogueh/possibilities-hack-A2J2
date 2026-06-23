@@ -16,9 +16,10 @@ export function ActionsBar({ targetName, tip }: ActionsBarProps) {
   const [body, setBody] = useState("");
   const [toast, setToast] = useState<string | null>(null);
 
-  // Pre-fill the subject from the AI talking point when opening the composer.
+  // Pre-fill the subject from the AI talking point and clear the body when opening the composer.
   const openMessage = () => {
     setSubject(tip ? tip : `Connecting with you, ${targetName}`);
+    setBody("");
     setMessageOpen(true);
   };
 
@@ -41,12 +42,14 @@ export function ActionsBar({ targetName, tip }: ActionsBarProps) {
     <section style={{ marginTop: 24, paddingTop: 16, borderTop: `1px solid ${LI.border}` }}>
       <div style={{ display: "flex", gap: 8 }}>
         <button
+          type="button"
           onClick={() => setConnectOpen(true)}
           style={{ ...btn, background: LI.blue, color: "#fff", border: "none" }}
         >
           Connect
         </button>
         <button
+          type="button"
           onClick={openMessage}
           style={{ ...btn, background: "transparent", color: LI.blue, border: `1px solid ${LI.blue}` }}
         >
@@ -58,8 +61,9 @@ export function ActionsBar({ targetName, tip }: ActionsBarProps) {
         <Modal title="Connect" onClose={() => setConnectOpen(false)}>
           <p>Send {targetName} a connection request?</p>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button onClick={() => setConnectOpen(false)}>Cancel</button>
+            <button type="button" onClick={() => setConnectOpen(false)}>Cancel</button>
             <button
+              type="button"
               onClick={() => {
                 setToast(`Connection request sent to ${targetName}`);
                 setConnectOpen(false);
@@ -90,8 +94,9 @@ export function ActionsBar({ targetName, tip }: ActionsBarProps) {
             style={{ width: "100%", marginBottom: 8, padding: 6 }}
           />
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button onClick={() => setMessageOpen(false)}>Cancel</button>
+            <button type="button" onClick={() => setMessageOpen(false)}>Cancel</button>
             <button
+              type="button"
               onClick={() => {
                 setToast(`Message sent to ${targetName}`);
                 setMessageOpen(false);
@@ -134,10 +139,17 @@ function Modal({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  // Close on Escape for keyboard accessibility.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
     <div
-      role="dialog"
-      aria-label={title}
       style={{
         position: "fixed",
         inset: 0,
@@ -150,6 +162,9 @@ function Modal({
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         onClick={(e) => e.stopPropagation()}
         style={{ background: LI.surface, borderRadius: 10, padding: 20, width: 320, maxWidth: "90%" }}
       >

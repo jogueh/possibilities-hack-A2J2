@@ -35,4 +35,27 @@ describe("ActionsBar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(screen.getByRole("status")).toHaveTextContent("Message sent to Alice");
   });
+
+  it("closes a modal when Escape is pressed", () => {
+    render(<ActionsBar targetName="Alice" />);
+    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    expect(screen.getByRole("dialog", { name: "Connect" })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Connect" })).not.toBeInTheDocument();
+  });
+
+  it("clears a previously typed message body when the composer is reopened", () => {
+    render(<ActionsBar targetName="Alice" tip="hi" />);
+    fireEvent.click(screen.getByRole("button", { name: "Message" }));
+    fireEvent.change(screen.getByLabelText("Message body"), { target: { value: "draft text" } });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Message" }));
+    expect(screen.getByLabelText("Message body")).toHaveValue("");
+  });
+
+  it("renders action buttons with explicit type=button", () => {
+    render(<ActionsBar targetName="Alice" />);
+    expect(screen.getByRole("button", { name: "Connect" })).toHaveAttribute("type", "button");
+    expect(screen.getByRole("button", { name: "Message" })).toHaveAttribute("type", "button");
+  });
 });
