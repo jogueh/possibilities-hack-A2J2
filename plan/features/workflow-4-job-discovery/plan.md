@@ -57,11 +57,11 @@ Main now owns the shared contracts; W4 consumes them — do not redefine these l
 
 ### Step 2 — `w4-step2-scoring-engine` ✅ ready to merge (#18)
 - **Needs:** ✅ main's `@/types/goal`, `@/types/data`; ✅ W2 sign-off on W4 owning the scorer.
-- **Exposes:** `src/lib/scoring.ts` (pure, no API/LLM):
+- **Exposes (once #18 merges):** `src/lib/scoring.ts` (pure, no API/LLM):
   - `scoreUserAgainstGoal(user: UserWithJobs, parsedGoal): number` (role 35 / industry 20 / location 20 / skills 15 / activity 10) — consumed by **W2**
   - `scoreJobAgainstGoal(job, goal): number` (role/industry/location re-weighted to 100) — consumed by step 4
   - `matchesRole`/`matchesIndustry`/`matchesLocation`, `deriveAlignmentTier`, `deriveActivityStatus`, `WEIGHTS`
-- **Blockers:** ✅ resolved. Replaced main's MOCK with identical signatures. 13 unit tests.
+- **Blockers:** until #18 merges, `main` still contains the MOCK placeholder implementation.
 
 ### Step 3 — web overlap (recreate fresh off main)
 - **Needs:** ✅ step 2 merged; `UserWithJobs` from `@/types/data`.
