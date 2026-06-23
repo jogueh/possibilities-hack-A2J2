@@ -108,7 +108,9 @@ export function NodeSidebar({ node, onClose }: NodeSidebarProps) {
         if (!cancelled) setTipState({ userId, tip: t });
       })
       .catch(() => {
-        if (!cancelled) setTipState({ userId, tip: "Mention your shared background." });
+        const t = "Mention your shared background.";
+        tipCache.set(userId, t);
+        if (!cancelled) setTipState({ userId, tip: t });
       });
     return () => {
       cancelled = true;
