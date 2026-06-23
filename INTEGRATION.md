@@ -14,7 +14,7 @@ real import below and delete the mock file. Tests should pass unchanged.
 | `src/mocks/useWebStore.ts` | `src/store/useWebStore.ts` (real zustand) | W1 (+ W4 `addSecondDegreeNode`) |
 | `src/mocks/userApi.ts` (`fetchUserWithJobs`) | `fetch('/api/user/' + userId)` | W2 |
 | OpenRouter env in `api/node/talking-points` | real OpenRouter config | W2 |
-| `vitest.config.ts` / `vitest.setup.ts` (W3-temporary) | reconcile with W1 stack bootstrap | W1 |
+| `vitest.config.mts` / `vitest.setup.ts` (W3-temporary) | reconcile with W1 stack bootstrap | W1 |
 
 ## W3 provides (real, no swap needed)
 - `POST /api/node/talking-points` — owned by W3.
