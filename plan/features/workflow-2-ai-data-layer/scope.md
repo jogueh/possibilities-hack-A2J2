@@ -93,7 +93,7 @@ interface ParsedGoal {
 parseGoal(raw: string): Promise<ParsedGoal>
 ```
 - Calls OpenRouter via Vercel AI SDK using structured JSON output mode
-- Model: `openai/gpt-4o-mini` (cheap, fast, sufficient for extraction)
+- Model: `meta-llama/llama-3.3-70b-instruct:free` (free OpenRouter tier, sufficient for extraction)
 - Falls back to simple keyword extraction if OpenRouter is unavailable
 
 ### 4. `POST /api/web/generate`
@@ -113,6 +113,29 @@ parseGoal(raw: string): Promise<ParsedGoal>
 ### 5. `GET /api/user/[userId]`
 Returns `UserWithJobs` for a given `userId`. Used by W3's sidebar. Returns 404 if not found.
 
+### 6. `POST /api/node/talking-points`
+Generates a 1–2 sentence personalized outreach opener for a target connection. Consumed by W3's sidebar; W3 only renders the response.
+
+**Request:**
+```ts
+{
+  goalRaw: string
+  viewerSummary: string    // viewer's top skills + most recent role
+  targetSummary: string    // target's relevant experience (caller strips salary)
+  sharedContext: {
+    type: 'school' | 'company' | 'skill' | 'location'
+    label: string
+  }[]
+}
+```
+**Response:** `{ tip: string }`
+
+- LLM prompt: given goal + viewer context + target experience + shared context → generate one specific message opener
+- Model: `meta-llama/llama-3.3-70b-instruct:free` via OpenRouter (same provider setup as the goal parser)
+- 5-second server-side timeout → falls back to a deterministic string: `"Mention your shared background in [top shared context label, or 'industry' if none]."`
+- **Defensive scrub:** even though callers are expected to strip salary, the handler additionally regex-scrubs any `salary`, `$`, or numeric `xxxxx–xxxxx` patterns from `targetSummary` before building the prompt
+- Reuses the OpenRouter client + zod schema pattern from the goal parser (`generateObject` with a `{ tip: z.string() }` schema)
+
 ---
 
 ## Unit Tests (Vitest)
@@ -123,6 +146,7 @@ Returns `UserWithJobs` for a given `userId`. Used by W3's sidebar. Returns 404 i
 | `src/lib/goalParser.test.ts` | Fallback keyword extraction when LLM unavailable; known goal strings produce expected `ParsedGoal` shape |
 | `src/lib/data.test.ts` | `resolveJobs` returns correct records; `resolveUser` returns null for unknown id |
 | `src/app/api/web/generate/route.test.ts` | Returns ≤ 5 nodes; returns fewer when < 5 qualify; 2nd-degree nodes only included when score ≥ 70; requesting userId excluded from results |
+| `src/app/api/node/talking-points/route.test.ts` | Returns `{ tip }` with mocked LLM; falls back to deterministic string on LLM error/timeout; salary scrubber removes `$`, `salary`, and numeric range patterns from `targetSummary` before the prompt is built |
 
 ---
 
@@ -131,7 +155,7 @@ Returns `UserWithJobs` for a given `userId`. Used by W3's sidebar. Returns 404 i
 - **`force-cache` with no revalidation** — the dataset is static and never changes; there is nothing to refresh.
 - **No user authentication.** `userId` is trusted. Use `user_4579` as the default "logged-in" user if none provided.
 - **Scoring is deterministic** — no randomness. Same goal + same dataset = same result every time.
-- **The LLM only parses the goal.** All ranking is algorithmic — the LLM never picks connections.
+- **The LLM only parses the goal and drafts talking points.** All ranking is algorithmic — the LLM never picks connections or scores users.
 - **Never return weak-tier (score < 40) nodes as 1st-degree connections.** Return fewer nodes rather than padding.
 - **2nd-degree suggestions require strong alignment (score ≥ 70).** Irrelevant 2nd-degree connections are more harmful than none.
 - **`relevanceScore` is in the payload but must never be rendered** anywhere in the UI.
