@@ -36,7 +36,7 @@ export const userBob: DatasetUser = {
     { school_name: "UC Berkeley", degree: "Psychology", graduation_year: 2019 },
     { school_name: "Stanford University", degree: "Education", graduation_year: 2023 },
   ],
-  job_history: ["job_550126"],
+  job_history: [jobInnovatech.id],
   current_location: "Boston, MA",
   posts_activity: ["Won a hackathon"],
   skills: ["Education", "Psychology"],
