@@ -1,5 +1,11 @@
 import '@testing-library/jest-dom/vitest'
+import { afterEach } from 'vitest'
+import { cleanup } from '@testing-library/react'
 import { vi } from 'vitest'
+
+afterEach(() => {
+  cleanup()
+})
 
 // Polyfills for antd components under jsdom.
 const globalRef = globalThis as unknown as {
