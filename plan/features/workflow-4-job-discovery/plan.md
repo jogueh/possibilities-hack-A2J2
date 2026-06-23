@@ -36,6 +36,10 @@ planning
 | 7. career timeline | `w4-step7-career-timeline` | ⬜ pending | — |
 | 8. why-now badge | `w4-step8-why-now` | ⬜ pending | — |
 | 9. verify | `w4-step9-verify` | ⬜ pending | — |
+| **— Stretch: "Living Web" cluster —** | | | |
+| 10. activity status ring | `w4-s10-activity-ring` | ⬜ stretch | — |
+| 11. "I met up" button | `w4-s11-met-up` | ⬜ stretch | — |
+| 12. edge strength visuals | `w4-s12-edge-strength` | ⬜ stretch | — |
 
 ## Global rules
 - Datasets are static → `force-cache`, **no revalidation**.
@@ -108,4 +112,24 @@ planning
 | Add `<CareerTimelineSlot />` + "open sidebar for userId" action | W3 | Steps 5, 7 🔴 |
 
 ## Stretch (only after all cores green)
-Jobs Panel filter bar · Save Job bookmark · Goal Proximity job boost · plus the cross-project stretch goals catalogued in `scope.md`.
+
+### Priority cluster — "Living Web" (chained steps 10–12)
+The highest-demo-impact stretch: makes the web visibly react to user behaviour. Build in this order so the demo story flows (the button produces the interaction data the edges visualize). Each is its own branch + PR + unit tests, chained.
+
+```
+w4-step9-verify
+ └─ w4-s10-activity-ring
+     └─ w4-s11-met-up
+         └─ w4-s12-edge-strength
+```
+
+| Step | Branch | What | Deps & blockers |
+|------|--------|------|-----------------|
+| 10. Activity Status Ring | `w4-s10-activity-ring` | Secondary avatar ring from `activityStatus` (blue/amber/red). Exports `ACTIVITY_RING` constant in `src/lib/activityColors.ts`. Rendered on W1 nodes + W3 header, with hover tooltip. | 🟡 W2 must wire `activityStatus` onto `WebNode` (mock until then) · 🔴 W1 node renderer + W3 sidebar header for full integration |
+| 11. "I Met Up" button | `w4-s11-met-up` | Button in W3 Actions bar → `updateInteractionScore(nodeId, edgeId, +20)`, toast, disables for session. No backend. Produces the data step 12 visualizes. | 🟡 W1 store `updateInteractionScore` (mock until then) · 🔴 W3 Actions-bar slot |
+| 12. Edge Strength visuals | `w4-s12-edge-strength` | Custom `StrengthEdge.tsx`; tiered look (grey→blue→indigo→violet-gradient+pulse) from `WebEdge.strength`. Extract pure `strengthTier(strength)` util for tests. Dotted edges always dashed. | 🔴 W1 must register the custom edge type in React Flow config |
+
+**Testable cores (build standalone even while UI-blocked):** `activityRingColor(status)` constant · `strengthTier(strength)` pure function · the interaction-increment logic. Visual integration deferred until W1/W3 expose their hook points (already in the Upstream asks table).
+
+### Other stretch (lower priority)
+Jobs Panel filter bar · Save Job bookmark · Goal Proximity job boost · plus the remaining cross-project stretch goals catalogued in `scope.md` (streaks, badges, notes, goal proximity score, copy-tip, LinkedIn deep link).
