@@ -14,7 +14,7 @@ export interface WebConnectionRef {
 // Easy-apply status is read from job.easy_apply directly.
 export interface JobMatch {
   job: Job;
-  relevanceScore: number; // 0–100, same scoring signals as W2 user scoring
+  relevanceScore: number; // 0–100, scored from role/industry/location goal alignment
   webConnections: WebConnectionRef[];
 }
 

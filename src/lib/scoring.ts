@@ -9,14 +9,14 @@
 //   - deriveActivityStatus(user) -> ActivityStatus
 //
 // All functions are pure and deterministic — no randomness, I/O, or LLM calls.
-// Goal *parsing* (free text -> ParsedGoal) is owned by W2 (src/lib/goalParser);
-// this module only consumes the already-parsed goal.
+// Goal *parsing* (free text -> ParsedGoal) is owned by W2; this module only
+// consumes the already-parsed goal.
 // =============================================================================
 
 import type { ParsedGoal } from "@/types/goal";
 import type { User, UserWithJobs, Job } from "@/types/data";
+import type { AlignmentTier } from "@/types/web";
 
-export type AlignmentTier = "strong" | "moderate" | "weak";
 export type ActivityStatus = "active" | "moderate" | "inactive";
 
 // ---------------------------------------------------------------------------
@@ -52,7 +52,15 @@ export function matchesIndustry(industry: string, goal: ParsedGoal): boolean {
 export function matchesLocation(location: string, goal: ParsedGoal): boolean {
   if (!goal.targetLocation) return false;
   // Match on city OR state token so "Mountain View, CA" matches "CA".
-  return keywordOverlap(location, goal.targetLocation);
+  const locationTokens = new Set(
+    normalize(location)
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length > 1),
+  );
+  return normalize(goal.targetLocation)
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length > 1)
+    .some((t) => locationTokens.has(t));
 }
 
 // ---------------------------------------------------------------------------

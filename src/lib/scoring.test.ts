@@ -31,6 +31,7 @@ describe("signal primitives", () => {
 
   it("matchesLocation matches on a shared token", () => {
     expect(matchesLocation("Mountain View, CA", goalSwe)).toBe(true);
+    expect(matchesLocation("San Francisco, CA", goalSwe)).toBe(true);
     expect(matchesLocation("Boston, MA", goalSwe)).toBe(false);
   });
 
