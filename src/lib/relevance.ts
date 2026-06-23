@@ -37,8 +37,8 @@ export function filterRelevantJobs(jobs: Job[], parsedGoal: ParsedGoal): Job[] {
   const selected = matched.length > 0 ? matched : jobs.slice(0, 2);
 
   // Salary must never appear downstream — strip it defensively at the boundary.
-  return selected.map((job) => {
-    const { salary_range: _salary_range, ...rest } = job;
-    return { ...rest, salary_range: { from: "", to: "" } };
-  });
+  return selected.map((job) => ({
+    ...job,
+    salary_range: { from: "", to: "" },
+  }));
 }
