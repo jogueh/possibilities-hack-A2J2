@@ -1,6 +1,10 @@
 import type { GoalQuery, WebSnapshot } from '@/types/web'
 import type { LayoutOptions } from '@/lib/web/layout'
-import { buildSnapshot, expandNode, type PersonInput } from '@/lib/web/snapshot'
+import {
+  buildSnapshot,
+  expandNode,
+  type PersonInput,
+} from '@/lib/web/snapshot'
 
 // Pure state machine backing the WebBoard. Kept framework-free so the
 // empty -> seeded -> expanded transitions and selection are unit-testable.
@@ -53,8 +57,24 @@ export function boardReducer(
     }
 
     case 'selectNode': {
+      const clicked = state.snapshot.nodes.find((n) => n.id === action.id)
+      // Selecting a 2nd-degree node (or an unknown id) only changes the
+      // selection — it must not collapse or rebuild the web.
+      if (!clicked || clicked.degree !== 1 || !state.snapshot.goal) {
+        return { ...state, selectedId: action.id }
+      }
+
+      // Selecting a 1st-degree node reveals ONLY that connector's 2nd-degree
+      // people, clustered next to it. Rebuilding from the seeded snapshot first
+      // collapses any other connector that was previously expanded, so the web
+      // never shows a different person's warm path.
+      const seeded = buildSnapshot(
+        state.snapshot.goal,
+        config.people,
+        config.options,
+      )
       const snapshot = expandNode(
-        state.snapshot,
+        seeded,
         action.id,
         config.people,
         config.options,
