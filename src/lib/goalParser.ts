@@ -1,6 +1,11 @@
 import { z } from 'zod'
 import { generateObject } from 'ai'
-import { openrouter } from '@openrouter/ai-sdk-provider'
+import {
+  getOpenRouterModel,
+  hasOpenRouterKey,
+  LLM_TIMEOUT_MS,
+  OPENROUTER_MODEL,
+} from '@/lib/openrouter'
 import type { ParsedGoal } from '@/types/goal'
 
 // =============================================================================
@@ -14,8 +19,9 @@ import type { ParsedGoal } from '@/types/goal'
 // The endpoint never throws — callers always get a valid ParsedGoal.
 // =============================================================================
 
-export const LLM_TIMEOUT_MS = 5_000
-export const GOAL_PARSER_MODEL = 'meta-llama/llama-3.3-70b-instruct:free'
+// Re-exported for backwards compatibility with existing tests / imports.
+export { LLM_TIMEOUT_MS }
+export const GOAL_PARSER_MODEL = OPENROUTER_MODEL
 
 const goalSchema = z.object({
   targetRole: z.string().optional(),
@@ -128,12 +134,12 @@ function buildPrompt(raw: string): string {
 }
 
 async function runLLM(raw: string): Promise<ParsedGoal | null> {
-  if (!process.env.OPENROUTER_API_KEY) return null
+  if (!hasOpenRouterKey()) return null
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS)
   try {
     const { object } = await generateObject({
-      model: openrouter(GOAL_PARSER_MODEL),
+      model: getOpenRouterModel(),
       schema: goalSchema,
       prompt: buildPrompt(raw),
       abortSignal: controller.signal,
