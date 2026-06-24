@@ -3,7 +3,7 @@
 import type { KeyboardEvent } from 'react'
 import { motion } from 'framer-motion'
 import type { WebNode } from '@/types/web'
-import { tierColor, tierRadius, truncateLabel } from '@/lib/web/layout'
+import { tierColor, tierRadius, truncateLabel, wrapLabel, activityRingColor, activityRingLabel } from '@/lib/web/layout'
 
 /**
  * Per-node visual decorations injected by sibling workflows. Workflow 1 owns the
@@ -23,11 +23,11 @@ export interface WebNodeMarkerProps {
   decoration?: NodeDecoration
 }
 
-// Caption length caps keep each node's name + headline narrower than the gap
-// between adjacent nodes so labels never collide. The full text remains in the
-// marker's `aria-label` for screen readers.
+// The name caption stays on one line (capped width). The headline wraps across
+// lines so the full role is shown without overflowing the node's width.
 const NAME_MAX = 18
-const HEADLINE_MAX = 22
+const HEADLINE_WRAP = 16
+const HEADLINE_LINE_HEIGHT = 13
 
 // Presentational SVG marker for a single person node.
 export default function WebNodeMarker({
@@ -37,7 +37,17 @@ export default function WebNodeMarker({
   decoration,
 }: WebNodeMarkerProps) {
   const r = tierRadius(node.alignmentTier)
-  const ring = tierColor(node.alignmentTier)
+  // The avatar ring encodes outreach-activity status (blue/amber/red). Falls back
+  // to the alignment-tier colour for nodes that don't carry an activity status.
+  const ring = node.activityStatus
+    ? activityRingColor(node.activityStatus)
+    : tierColor(node.alignmentTier)
+  const activityTooltip = node.activityStatus ? activityRingLabel(node.activityStatus) : undefined
+  const baseLabel = node.headline ? `${node.label}, ${node.headline}` : node.label
+  // Fold the activity nudge into the accessible name: the `<g>`'s aria-label
+  // overrides the SVG `<title>`, so screen-reader users would otherwise miss the
+  // ring's meaning that sighted users get from the hover tooltip.
+  const ariaLabel = activityTooltip ? `${baseLabel}. ${activityTooltip}` : baseLabel
   const interactive = Boolean(onSelect)
   const hasJobOverlap = Boolean(decoration?.hasJobOverlap)
 
@@ -54,7 +64,7 @@ export default function WebNodeMarker({
       className={hasJobOverlap ? 'node-job-overlap' : undefined}
       data-job-overlap={hasJobOverlap ? 'true' : undefined}
       role={interactive ? 'button' : undefined}
-      aria-label={node.headline ? `${node.label}, ${node.headline}` : node.label}
+      aria-label={ariaLabel}
       aria-pressed={interactive ? selected : undefined}
       tabIndex={interactive ? 0 : undefined}
       style={{ cursor: interactive ? 'pointer' : 'default', outline: 'none' }}
@@ -66,12 +76,18 @@ export default function WebNodeMarker({
       whileHover={interactive ? { scale: 1.07 } : undefined}
       transition={{ type: 'spring', stiffness: 260, damping: 22 }}
     >
-      {/* Selection halo */}
+      {/* Native hover tooltip describing the activity-ring nudge */}
+      {activityTooltip && <title>{activityTooltip}</title>}
+
+      {/* Selection halo — soft glow + ring (non-interactive so clicks reach the node) */}
       {selected && (
-        <circle r={r + 5} fill="none" stroke={ring} strokeWidth={2} opacity={0.35} />
+        <g style={{ pointerEvents: 'none' }}>
+          <circle r={r + 11} fill={ring} opacity={0.12} />
+          <circle r={r + 6} fill="none" stroke={ring} strokeWidth={2.5} opacity={0.55} />
+        </g>
       )}
 
-      {/* Avatar disc + alignment ring */}
+      {/* Avatar disc + activity-status ring (falls back to alignment-tier colour) */}
       <circle r={r} fill="#eef3f8" stroke={ring} strokeWidth={selected ? 4 : 3} />
       <text
         textAnchor="middle"
@@ -101,12 +117,20 @@ export default function WebNodeMarker({
         {truncateLabel(node.label, NAME_MAX)}
       </text>
 
-      {/* Headline */}
-      {node.headline && (
-        <text textAnchor="middle" y={r + 31} fontSize={10.5} fill="#6b7280">
-          {truncateLabel(node.headline, HEADLINE_MAX)}
-        </text>
-      )}
+      {/* Headline — width-constrained: wraps across lines so the full role
+          (e.g. "Product Manager at Tech Innovators Inc.") is always shown. */}
+      {node.headline &&
+        wrapLabel(node.headline, HEADLINE_WRAP).map((line, i) => (
+          <text
+            key={i}
+            textAnchor="middle"
+            y={r + 31 + i * HEADLINE_LINE_HEIGHT}
+            fontSize={10.5}
+            fill="#6b7280"
+          >
+            {line}
+          </text>
+        ))}
     </motion.g>
   )
 }

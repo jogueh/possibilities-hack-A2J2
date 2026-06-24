@@ -1,6 +1,7 @@
 import { describe, it, expectTypeOf } from 'vitest'
 import type {
   AlignmentTier,
+  ActivityStatus,
   WebState,
   DegreeLevel,
   WebNode,
@@ -14,6 +15,7 @@ import type {
 describe('web types contract', () => {
   it('exposes the expected literal unions', () => {
     expectTypeOf<AlignmentTier>().toEqualTypeOf<'strong' | 'moderate' | 'weak'>()
+    expectTypeOf<ActivityStatus>().toEqualTypeOf<'active' | 'moderate' | 'inactive'>()
     expectTypeOf<WebState>().toEqualTypeOf<'empty' | 'seeded' | 'expanded'>()
     expectTypeOf<DegreeLevel>().toEqualTypeOf<1 | 2>()
   })
@@ -30,6 +32,7 @@ describe('web types contract', () => {
       relevanceScore: number
       position: { x: number; y: number }
       headline?: string
+      activityStatus?: ActivityStatus
     }>()
   })
 

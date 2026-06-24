@@ -2,14 +2,22 @@
 // W3-OWNED. Actions bar at the bottom of the node sidebar: Connect + Message.
 // UI-only — no real LinkedIn API calls. See plan.md
 import { useEffect, useState } from "react";
+import type { DegreeLevel } from "@/types/web";
 import { LI } from "@/lib/linkedinTokens";
 
 interface ActionsBarProps {
   targetName: string;
   tip?: string | null; // AI talking point used to pre-fill the message subject
+  /** Degree of the open node. 1st-degree people are already connected, so the
+   *  Connect button is hidden for them. */
+  degree?: DegreeLevel;
+  /** True once the viewer has connected with this (2nd-degree) person. */
+  connected?: boolean;
+  /** Called when a connection request is confirmed; promotes the person on the web. */
+  onConnect?: () => void;
 }
 
-export function ActionsBar({ targetName, tip }: ActionsBarProps) {
+export function ActionsBar({ targetName, tip, degree, connected, onConnect }: ActionsBarProps) {
   const [connectOpen, setConnectOpen] = useState(false);
   const [messageOpen, setMessageOpen] = useState(false);
   const [subject, setSubject] = useState("");
@@ -41,13 +49,25 @@ export function ActionsBar({ targetName, tip }: ActionsBarProps) {
   return (
     <section style={{ marginTop: 24, paddingTop: 16, borderTop: `1px solid ${LI.border}` }}>
       <div style={{ display: "flex", gap: 8 }}>
-        <button
-          type="button"
-          onClick={() => setConnectOpen(true)}
-          style={{ ...btn, background: LI.blue, color: "#fff", border: "none" }}
-        >
-          Connect
-        </button>
+        {/* 1st-degree people are already connections — no Connect button. */}
+        {degree !== 1 &&
+          (connected ? (
+            <button
+              type="button"
+              disabled
+              style={{ ...btn, background: LI.green, color: "#fff", border: "none", cursor: "default" }}
+            >
+              Connected ✓
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConnectOpen(true)}
+              style={{ ...btn, background: LI.blue, color: "#fff", border: "none" }}
+            >
+              Connect
+            </button>
+          ))}
         <button
           type="button"
           onClick={openMessage}
@@ -65,6 +85,7 @@ export function ActionsBar({ targetName, tip }: ActionsBarProps) {
             <button
               type="button"
               onClick={() => {
+                onConnect?.();
                 setToast(`Connection request sent to ${targetName}`);
                 setConnectOpen(false);
               }}

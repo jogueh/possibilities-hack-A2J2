@@ -81,4 +81,42 @@ describe('boardReducer', () => {
     expect(reduce(s, { type: 'clearSelection' }).selectedId).toBeNull()
     expect(reduce(s, { type: 'reset' }).snapshot.state).toBe('empty')
   })
+
+  it('connectNode solidifies the dotted bridge to a 2nd-degree person', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'selectNode', id: 'a' }) // expands a -> reveals c via dotted bridge
+    const bridgeId = 'a__c'
+    expect(s.snapshot.edges.find((e) => e.id === bridgeId)?.isDotted).toBe(true)
+
+    s = reduce(s, { type: 'connectNode', id: 'c' })
+    const bridge = s.snapshot.edges.find((e) => e.id === bridgeId)!
+    expect(s.connectedIds).toContain('c')
+    expect(bridge.isDotted).toBe(false) // turns solid (blue)
+    expect(bridge.strength).toBeGreaterThanOrEqual(0.9) // strengthened
+  })
+
+  it('keeps a connection solid after the connector is re-expanded', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    s = reduce(s, { type: 'connectNode', id: 'c' })
+    // Visit b, then return to a (rebuilds a's expansion from scratch).
+    s = reduce(s, { type: 'selectNode', id: 'b' })
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    expect(s.snapshot.edges.find((e) => e.id === 'a__c')?.isDotted).toBe(false)
+  })
+
+  it('connectNode is idempotent and resets on a new goal', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    s = reduce(s, { type: 'connectNode', id: 'c' })
+    s = reduce(s, { type: 'connectNode', id: 'c' })
+    expect(s.connectedIds).toEqual(['c'])
+    // Mapping a new goal clears prior connections.
+    s = reduce(s, { type: 'setGoalText', value: 'New goal' })
+    s = reduce(s, { type: 'submitGoal' })
+    expect(s.connectedIds).toEqual([])
+  })
 })

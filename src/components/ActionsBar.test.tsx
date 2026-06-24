@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { ActionsBar } from "@/components/ActionsBar";
 
@@ -57,5 +57,32 @@ describe("ActionsBar", () => {
     render(<ActionsBar targetName="Alice" />);
     expect(screen.getByRole("button", { name: "Connect" })).toHaveAttribute("type", "button");
     expect(screen.getByRole("button", { name: "Message" })).toHaveAttribute("type", "button");
+  });
+
+  it("hides the Connect button for 1st-degree connections", () => {
+    render(<ActionsBar targetName="Alice" degree={1} />);
+    expect(screen.queryByRole("button", { name: "Connect" })).not.toBeInTheDocument();
+    // Message stays available for everyone.
+    expect(screen.getByRole("button", { name: "Message" })).toBeInTheDocument();
+  });
+
+  it("shows the Connect button for 2nd-degree connections", () => {
+    render(<ActionsBar targetName="Alice" degree={2} />);
+    expect(screen.getByRole("button", { name: "Connect" })).toBeInTheDocument();
+  });
+
+  it("invokes onConnect when a connection request is confirmed", () => {
+    const onConnect = vi.fn();
+    render(<ActionsBar targetName="Alice" degree={2} onConnect={onConnect} />);
+    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(onConnect).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a disabled Connected state once connected", () => {
+    render(<ActionsBar targetName="Alice" degree={2} connected />);
+    expect(screen.queryByRole("button", { name: "Connect" })).not.toBeInTheDocument();
+    const connected = screen.getByRole("button", { name: "Connected ✓" });
+    expect(connected).toBeDisabled();
   });
 });

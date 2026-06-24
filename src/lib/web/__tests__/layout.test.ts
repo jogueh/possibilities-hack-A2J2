@@ -6,9 +6,14 @@ import {
   tierColor,
   tierRadius,
   truncateLabel,
+  wrapLabel,
   edgeStrokeWidth,
   edgeStrokeDasharray,
   TIER_COLORS,
+  ACTIVITY_RING_COLORS,
+  ACTIVITY_RING_LABELS,
+  activityRingColor,
+  activityRingLabel,
 } from '@/lib/web/layout'
 import type { WebNode, DegreeLevel, AlignmentTier } from '@/types/web'
 
@@ -72,6 +77,32 @@ describe('truncateLabel', () => {
   it('handles degenerate limits', () => {
     expect(truncateLabel('anything', 0)).toBe('')
     expect(truncateLabel('anything', 1)).toBe('…')
+  })
+})
+
+describe('wrapLabel', () => {
+  it('keeps a short label on a single line', () => {
+    expect(wrapLabel('Data Scientist', 16)).toEqual(['Data Scientist'])
+  })
+
+  it('wraps a long role onto multiple lines without dropping any words', () => {
+    const lines = wrapLabel('Product Manager at Tech Innovators Inc.', 16)
+    // Every line stays within the width budget...
+    lines.forEach((line) => expect(line.length).toBeLessThanOrEqual(16))
+    // ...and the full text is preserved (nothing truncated).
+    expect(lines.join(' ')).toBe('Product Manager at Tech Innovators Inc.')
+    expect(lines.length).toBeGreaterThan(1)
+  })
+
+  it('keeps a single over-long word whole on its own line', () => {
+    expect(wrapLabel('Supercalifragilistic role', 10)).toEqual([
+      'Supercalifragilistic',
+      'role',
+    ])
+  })
+
+  it('returns an empty list for blank text', () => {
+    expect(wrapLabel('   ', 16)).toEqual([])
   })
 })
 
@@ -166,5 +197,21 @@ describe('deriveEdges', () => {
     )
     expect(edges).toHaveLength(1)
     expect(edges[0].strength).toBe(1)
+  })
+})
+
+describe('activity ring mapping', () => {
+  it('maps each activity status to its ring colour', () => {
+    expect(activityRingColor('active')).toBe('#3B82F6')
+    expect(activityRingColor('moderate')).toBe('#F59E0B')
+    expect(activityRingColor('inactive')).toBe('#EF4444')
+    expect(activityRingColor('active')).toBe(ACTIVITY_RING_COLORS.active)
+  })
+
+  it('maps each activity status to its tooltip label', () => {
+    expect(activityRingLabel('active')).toBe('Great time to reach out')
+    expect(activityRingLabel('moderate')).toBe('Worth a nudge')
+    expect(activityRingLabel('inactive')).toBe('Lead with shared context')
+    expect(activityRingLabel('inactive')).toBe(ACTIVITY_RING_LABELS.inactive)
   })
 })
