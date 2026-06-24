@@ -115,12 +115,16 @@ export function buildSnapshot(
 }
 
 /**
- * Expands a 1st-degree node, revealing the 2nd-degree people that reach the user
- * through it. Returns an `expanded` snapshot with dotted bridge edges. The new
- * 2nd-degree nodes are clustered next to their connector (not on a global outer
- * ring) so the warm path reads clearly. Existing nodes keep their positions, so
- * expanding one node never reshuffles the rest of the web. Calling it for an
- * unknown / already-expanded node is a no-op (idempotent).
+ * Expands a node, revealing the next-ring people that reach the user through
+ * it. Returns an `expanded` snapshot with dotted bridge edges. The new nodes
+ * are clustered next to their connector (not on a global outer ring) so the
+ * warm path reads clearly. Existing nodes keep their positions, so expanding
+ * one node never reshuffles the rest of the web. Calling it for an unknown /
+ * already-expanded node — or a node with no further children — is a no-op
+ * (idempotent).
+ *
+ * Works at any depth: clicking a degree-N node reveals its degree-(N+1)
+ * children whose `via` matches, one warm-path hop further out.
  */
 export function expandNode(
   snapshot: WebSnapshot,
@@ -130,12 +134,14 @@ export function expandNode(
 ): WebSnapshot {
   if (!snapshot.goal) return snapshot
 
-  const parent = snapshot.nodes.find((n) => n.id === nodeId && n.degree === 1)
+  const parent = snapshot.nodes.find((n) => n.id === nodeId)
   if (!parent) return snapshot
 
+  // Children sit one ring further out than their parent.
+  const childDegree: DegreeLevel = parent.degree + 1
   const existingIds = new Set(snapshot.nodes.map((n) => n.id))
   const newPeople = people.filter(
-    (p) => p.degree === 2 && p.via === nodeId && !existingIds.has(p.id),
+    (p) => p.degree === childDegree && p.via === nodeId && !existingIds.has(p.id),
   )
   if (newPeople.length === 0) {
     return snapshot

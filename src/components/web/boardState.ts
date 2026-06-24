@@ -135,28 +135,33 @@ export function boardReducer(
 
     case 'selectNode': {
       const clicked = state.snapshot.nodes.find((n) => n.id === action.id)
-      // Selecting a 2nd-degree node (or an unknown id) only changes the
-      // selection — it must not collapse or rebuild the web.
-      if (!clicked || clicked.degree !== 1 || !state.snapshot.goal) {
+      if (!clicked || !state.snapshot.goal) {
         return { ...state, selectedId: action.id }
       }
 
-      // Selecting a 1st-degree node reveals ONLY that connector's 2nd-degree
-      // people, clustered next to it. Rebuilding from the seeded snapshot first
-      // collapses any other connector that was previously expanded, so the web
-      // never shows a different person's warm path.
       const people = effectivePeople(state, config)
-      const seeded = buildSnapshot(
-        state.snapshot.goal,
-        people,
-        config.options,
-      )
-      const snapshot = expandNode(
-        seeded,
-        action.id,
-        people,
-        config.options,
-      )
+      let snapshot
+      if (clicked.degree === 1) {
+        // Selecting a 1st-degree node reveals ONLY that connector's
+        // 2nd-degree people, clustered next to it. Rebuilding from the
+        // seeded snapshot first collapses any other connector that was
+        // previously expanded, so the web never shows a different person's
+        // warm path.
+        const seeded = buildSnapshot(
+          state.snapshot.goal,
+          people,
+          config.options,
+        )
+        snapshot = expandNode(seeded, action.id, people, config.options)
+      } else {
+        // Selecting a deeper node (2nd+) reveals its next-ring children IN
+        // PLACE — we keep the surrounding expansion intact so the viewer
+        // can drill deeper into the same warm-path branch without losing
+        // the context that got them there. `expandNode` is a no-op if the
+        // node has no further children (already at MAX_DEGREE or no warm
+        // path), so a click on a leaf only changes selection.
+        snapshot = expandNode(state.snapshot, action.id, people, config.options)
+      }
       return {
         ...state,
         snapshot: applyConnections(snapshot, state.connectedIds),
