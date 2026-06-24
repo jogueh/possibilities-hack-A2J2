@@ -5,8 +5,14 @@ import { openrouter } from '@openrouter/ai-sdk-provider'
 // every LLM-touching endpoint behaving the same: silent skip when the key is
 // unset, structured output via generateObject in the calling module.
 
-export const OPENROUTER_MODEL = 'meta-llama/llama-3.3-70b-instruct:free'
-export const LLM_TIMEOUT_MS = 5_000
+// openrouter/free auto-routes across whatever free model is currently healthy
+// and supports the requested capability (tool calling for structured output).
+// This avoids hard-coding a single free model that may be rate-limited or
+// deprecated upstream.
+export const OPENROUTER_MODEL = 'openrouter/free'
+// 10s gives the auto-router enough headroom when it picks a slower free model;
+// the goal parser's keyword fallback handles longer outages gracefully.
+export const LLM_TIMEOUT_MS = 10_000
 
 /** Returns true when an LLM call should be attempted. */
 export function hasOpenRouterKey(): boolean {
