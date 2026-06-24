@@ -20,15 +20,18 @@ import {
   createInitialBoardState,
   type BoardConfig,
 } from './boardState'
+import { TIER_COLORS } from '@/lib/web/layout'
 import { SELF_USER_ID, webPeople } from '@/data/web_people'
 
 const CANVAS_WIDTH = 760
 const CANVAS_HEIGHT = 560
 
-const TIER_LABEL: Record<AlignmentTier, { text: string; color: string }> = {
-  strong: { text: 'Strong fit', color: 'blue' },
-  moderate: { text: 'Moderate fit', color: 'gold' },
-  weak: { text: 'Weak fit', color: 'default' },
+// Tag text per tier. The Tag colour reuses TIER_COLORS (the same palette the
+// node rings use) so the tier's colour semantic stays consistent across the UI.
+const TIER_LABEL: Record<AlignmentTier, string> = {
+  strong: 'Strong fit',
+  moderate: 'Moderate fit',
+  weak: 'Weak fit',
 }
 
 // Static goal suggestions — clicking one pre-fills the goal box (no API call).
@@ -93,6 +96,8 @@ export default function WebBoard() {
             style={{ marginTop: 12 }}
             onChange={(e) => dispatch({ type: 'setGoalText', value: e.target.value })}
             onPressEnter={(e) => {
+              // Shift+Enter inserts a newline; plain Enter submits the goal.
+              if (e.shiftKey) return
               e.preventDefault()
               dispatch({ type: 'submitGoal' })
             }}
@@ -196,8 +201,8 @@ export default function WebBoard() {
                   {selected.headline && (
                     <Typography.Text type="secondary">{selected.headline}</Typography.Text>
                   )}
-                  <Tag color={TIER_LABEL[selected.alignmentTier].color}>
-                    {TIER_LABEL[selected.alignmentTier].text}
+                  <Tag color={TIER_COLORS[selected.alignmentTier]}>
+                    {TIER_LABEL[selected.alignmentTier]}
                   </Tag>
                   <Typography.Text type="secondary">
                     {selected.degree === 1 ? '1st-degree connection' : '2nd-degree (warm path)'}
