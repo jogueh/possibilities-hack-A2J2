@@ -73,10 +73,9 @@ export interface WebEdge {
   strength: number
   isDotted: boolean
   /**
-   * True when this is the connection line into a person the viewer has logged a
-   * real-world meetup with ("I met up with this person"). Rendered purple to
-   * distinguish it from a normal (blue) connection. Set by `applyStages` when a
-   * self-edge reaches the `met` stage or beyond.
+   * True when this direct self-edge has a relationship-depth stage and should be
+   * rendered with its stage tier styling instead of the normal connection style.
+   * `met` subsumes the old "I met up with this person" action.
    */
   isMetUp?: boolean
   /**
