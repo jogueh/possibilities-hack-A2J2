@@ -33,6 +33,7 @@ describe('web types contract', () => {
       position: { x: number; y: number }
       headline?: string
       activityStatus?: ActivityStatus
+      photo?: string
     }>()
   })
 

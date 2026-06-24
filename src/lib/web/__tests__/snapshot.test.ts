@@ -57,6 +57,20 @@ describe('buildSnapshot', () => {
     expect(a.avatarInitials).toBe('AL')
     expect(a.alignmentTier).toBe('strong')
   })
+
+  it('derives a deterministic avatar photo and lets an explicit one override', () => {
+    const snap = buildSnapshot(goal, people, options)
+    const a = snap.nodes.find((n) => n.id === 'a')!
+    // Derived from the member id via photoUrlForUser — stable randomuser portrait.
+    expect(a.photo).toMatch(/^https:\/\/randomuser\.me\/api\/portraits\/(men|women)\/\d+\.jpg$/)
+    expect(buildSnapshot(goal, people, options).nodes.find((n) => n.id === 'a')!.photo).toBe(a.photo)
+
+    const withPhoto: PersonInput[] = [
+      { id: 'a', name: 'Ada Lovelace', degree: 1, photo: 'https://example.com/ada.png' },
+    ]
+    const explicit = buildSnapshot(goal, withPhoto, options).nodes.find((n) => n.id === 'a')!
+    expect(explicit.photo).toBe('https://example.com/ada.png')
+  })
 })
 
 describe('expandNode', () => {
