@@ -3,7 +3,7 @@ import { render, screen, act, waitFor } from "@testing-library/react";
 import { NodeSidebar, __resetNodeSidebarTipCache } from "@/components/NodeSidebar";
 import { __setMockWebState, __resetMockWebState } from "@/mocks/useWebStore";
 import type { WebNode } from "@/mocks/web";
-import type { Job, UserWithJobs } from "@/mocks/data";
+import type { Job, UserWithJobs } from "@/types/data";
 
 // Controllable deferred for the profile fetch so we can assert the loading skeleton.
 const deferred = vi.hoisted(() => {
@@ -42,6 +42,7 @@ function userWith(p: Partial<UserWithJobs> & { id: string; name: string }): User
     posts_activity: [],
     skills: [],
     courses: [],
+    connections: [],
     ...p,
   };
 }

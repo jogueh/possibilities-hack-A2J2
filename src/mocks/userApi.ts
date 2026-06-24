@@ -1,7 +1,7 @@
 // ⚠️ W3 MOCK — replace with W2 real endpoint `GET /api/user/[userId]`. See plan.md
 // Provides the same resolved `UserWithJobs` payload W2 will return, so the W3 sidebar can
 // be built/tested now. Swap `fetchUserWithJobs` for a real `fetch('/api/user/'+id)` later.
-import type { Job, UserWithJobs } from "@/mocks/data";
+import type { Job, UserWithJobs } from "@/types/data";
 
 const JOB_A: Job = {
   id: "job_500483",
@@ -40,6 +40,7 @@ export const MOCK_USERS: Record<string, UserWithJobs> = {
     posts_activity: ["Participated in a hackathon and won first place"],
     skills: ["Education", "Psychology", "Software Engineering"],
     courses: [],
+    connections: ["user_1001"],
   },
   user_1001: {
     id: "user_1001",
@@ -52,6 +53,7 @@ export const MOCK_USERS: Record<string, UserWithJobs> = {
     posts_activity: ["Shared an article", "Commented on a post", "Posted a job opening"],
     skills: ["Software Engineering", "Python", "Distributed Systems"],
     courses: [],
+    connections: ["user_4579"],
   },
 };
 

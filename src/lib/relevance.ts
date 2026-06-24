@@ -1,5 +1,6 @@
 // W3-OWNED. Goal-relevant experience filter for the node sidebar. See plan.md
-import type { Job, ParsedGoal } from "@/mocks/data";
+import type { Job } from "@/types/data";
+import type { ParsedGoal } from "@/types/goal";
 
 function norm(s: string | undefined): string {
   return (s ?? "").toLowerCase().trim();

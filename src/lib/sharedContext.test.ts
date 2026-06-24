@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { getSharedContext } from "@/lib/sharedContext";
-import type { Job, UserWithJobs } from "@/mocks/data";
+import type { Job, UserWithJobs } from "@/types/data";
 
 function job(company: string): Job {
   return {
@@ -25,6 +25,7 @@ function user(p: Partial<UserWithJobs> & { id: string }): UserWithJobs {
     posts_activity: [],
     skills: [],
     courses: [],
+    connections: [],
     ...p,
   };
 }

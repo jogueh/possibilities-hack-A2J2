@@ -4,7 +4,7 @@
 import { useSyncExternalStore } from "react";
 import { useRef } from "react";
 import type { GoalQuery, WebEdge, WebNode } from "@/mocks/web";
-import type { UserWithJobs } from "@/mocks/data";
+import type { UserWithJobs } from "@/types/data";
 
 export interface WebStoreState {
   goal: GoalQuery | null;

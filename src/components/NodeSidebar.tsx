@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { WebNode } from "@/mocks/web";
 import type { SharedContext } from "@/types/sharedContext";
-import type { UserWithJobs } from "@/mocks/data";
+import type { UserWithJobs } from "@/types/data";
 import { useWebStore } from "@/mocks/useWebStore";
 import { fetchUserWithJobs } from "@/mocks/userApi";
 import { ALIGNMENT_LABELS, alignmentColor } from "@/mocks/alignmentColors";
