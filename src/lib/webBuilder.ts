@@ -1,4 +1,4 @@
-import type { WebEdge, WebNode } from '@/types/web'
+import type { DegreeLevel, WebEdge, WebNode } from '@/types/web'
 import type { ParsedGoal } from '@/types/goal'
 import type { UserWithJobs } from '@/types/data'
 import {
@@ -30,8 +30,20 @@ export interface BuildWebOutput {
 
 export const FIRST_DEGREE_MIN_SCORE = 40
 export const FIRST_DEGREE_MAX = 5
+// The same threshold + per-parent cap apply to every ring BEYOND 1st-degree —
+// the warm-path framing is identical at each hop (one more introduction step
+// removed). Tighter caps would starve the canvas on thin-signal goals; looser
+// caps would explode it (per-parent fan-out compounds geometrically with depth).
 export const SECOND_DEGREE_MIN_SCORE = 70
 export const SECOND_DEGREE_PER_NODE_MAX = 3
+// Hard ceiling on warm-path depth. 4 keeps the canvas readable: with the
+// per-parent cap of SECOND_DEGREE_PER_NODE_MAX=3 and FIRST_DEGREE_MAX=5, the
+// worst case is ~5 + 15 + 45 + 135 = 200 nodes. Pushing further explodes the
+// node count geometrically (depth 6 ~= 1500 nodes on a dense graph) and the
+// "warm path" framing breaks down past 3-4 introduction hops anyway. Loop
+// supports arbitrary depth — bump this constant if a richer canvas can
+// handle the density.
+export const MAX_DEGREE = 4
 export const DEFAULT_EDGE_STRENGTH = 50
 
 interface ScoredUser {
@@ -46,7 +58,7 @@ function initialsFromName(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
-function toNode(user: UserWithJobs, degree: 1 | 2, score: number): WebNode {
+function toNode(user: UserWithJobs, degree: DegreeLevel, score: number): WebNode {
   return {
     id: user.id,
     userId: user.id,
@@ -96,17 +108,21 @@ function edge(source: string, target: string, isDotted: boolean): WebEdge {
  *       structural suggestions from `suggestConnections(...)` (warm 2nd-
  *       degree, then hubs). The score threshold IS enforced on this path so
  *       we don't recommend irrelevant strangers — these aren't real edges.
- *   2. 2nd-degree pool per 1st-degree node = that node's `connections`, minus
- *      the viewer and anyone already in the web. Score, filter
- *      >= SECOND_DEGREE_MIN_SCORE, sort desc, take top
- *      SECOND_DEGREE_PER_NODE_MAX. Edges 1st -> 2nd are DOTTED ("people to
- *      meet" via a warm path). A user appears at most once across the web.
- *   2a. WEAK-MATCH FALLBACK (mirrors 1a): if a 1st-degree parent has friends-
- *       of-friends in the candidate set but NONE clear the threshold (e.g.
- *       location-only goals that cap at ~30 points), surface the parent's
- *       top SECOND_DEGREE_PER_NODE_MAX by score anyway. Clicking a
- *       1st-degree node otherwise reveals no warm path for thin-signal goals.
- *       The alignmentTier on each node still conveys the weak match visually.
+ *   2. Ring N for N in [2..MAX_DEGREE]: each node in ring N-1 acts as a
+ *      parent. Its `connections` (minus everyone already in the web)
+ *      become the ring-N candidates, scored against the goal, filtered to
+ *      >= SECOND_DEGREE_MIN_SCORE, sorted desc, capped at
+ *      SECOND_DEGREE_PER_NODE_MAX. Edges across the ring boundary are
+ *      DOTTED ("warm-path introduction"). A user appears at most once
+ *      across the whole web.
+ *   2a. WEAK-MATCH FALLBACK (mirrors 1a): if a parent in ring N-1 has
+ *       candidates in the dataset but NONE clear the threshold, surface its
+ *       top SECOND_DEGREE_PER_NODE_MAX by score anyway. Clicking a node
+ *       otherwise reveals no warm path for thin-signal goals at deeper
+ *       rings. The alignmentTier on each surfaced node still conveys the
+ *       weak match visually.
+ *   2b. Expansion stops early when a ring yields zero new nodes — every
+ *       reachable person is already on the canvas; no need to keep iterating.
  *   3. No edges to strangers outside the candidates set.
  */
 export function buildWeb({
@@ -164,42 +180,50 @@ export function buildWeb({
     edge(viewerUserId, user.id, false),
   )
 
-  // Tracks every userId already placed in the web (viewer + 1st-degree +
-  // 2nd-degree as they are added) so a user appears at most once.
+  // Tracks every userId already placed in the web so a user appears at most
+  // once across all rings.
   const inWeb = new Set<string>([viewerUserId, ...firstDegree.map((s) => s.user.id)])
 
-  // 2nd-degree: friends-of-friends per 1st-degree node, ranked by goal score.
-  for (const parent of firstDegree) {
-    const candidateScored: ScoredUser[] = []
-    for (const id of connectionsOf(parent.user.id)) {
-      if (inWeb.has(id)) continue
-      const user = byId.get(id)
-      if (!user) continue
-      candidateScored.push({ user, score: scorer(user, parsedGoal) })
-    }
-    candidateScored.sort((a, b) => b.score - a.score)
+  // Frontier-expansion loop: at depth N, every node in the previous ring acts
+  // as a parent. Its `connections` (minus everyone already in the web) become
+  // the depth-(N+1) candidates, ranked + capped by the same warm-path rules
+  // as 2nd-degree. The loop terminates either at MAX_DEGREE or when a depth
+  // yields no new nodes (every reachable person is already on the canvas).
+  let frontier: ScoredUser[] = firstDegree
+  for (let depth = 2; depth <= MAX_DEGREE; depth++) {
+    const nextFrontier: ScoredUser[] = []
+    for (const parent of frontier) {
+      const candidateScored: ScoredUser[] = []
+      for (const id of connectionsOf(parent.user.id)) {
+        if (inWeb.has(id)) continue
+        const user = byId.get(id)
+        if (!user) continue
+        candidateScored.push({ user, score: scorer(user, parsedGoal) })
+      }
+      candidateScored.sort((a, b) => b.score - a.score)
 
-    // Strict path: keep only candidates clearing SECOND_DEGREE_MIN_SCORE.
-    const qualifying = candidateScored.filter(
-      (s) => s.score >= SECOND_DEGREE_MIN_SCORE,
-    )
-    // Weak-match fallback: when a parent has friends-of-friends but none clear
-    // the threshold (e.g. a location-only goal that caps at ~30 points),
-    // surface the top SECOND_DEGREE_PER_NODE_MAX anyway. Without this, clicking
-    // a 1st-degree node never reveals a warm path for goals with thin scoring
-    // signals. The alignmentTier on each surfaced node still reflects the
-    // weak score so the UI's visual cue is intact. Threshold remains in effect
-    // whenever the parent has at least one strong match — no weakening of the
-    // rubric when good data is available.
-    const picked =
-      qualifying.length > 0
-        ? qualifying.slice(0, SECOND_DEGREE_PER_NODE_MAX)
-        : candidateScored.slice(0, SECOND_DEGREE_PER_NODE_MAX)
-    for (const m of picked) {
-      inWeb.add(m.user.id)
-      nodes.push(toNode(m.user, 2, m.score))
-      edges.push(edge(parent.user.id, m.user.id, true))
+      // Strict path: keep only candidates clearing the threshold.
+      const qualifying = candidateScored.filter(
+        (s) => s.score >= SECOND_DEGREE_MIN_SCORE,
+      )
+      // Weak-match fallback: when a parent has friends-of-friends but none
+      // clear the threshold (e.g. location-only goals that cap at ~30 points),
+      // surface the top SECOND_DEGREE_PER_NODE_MAX anyway so deep expansion
+      // is never starved on thin-signal goals. Threshold remains binding
+      // whenever the parent has at least one strong match.
+      const picked =
+        qualifying.length > 0
+          ? qualifying.slice(0, SECOND_DEGREE_PER_NODE_MAX)
+          : candidateScored.slice(0, SECOND_DEGREE_PER_NODE_MAX)
+      for (const m of picked) {
+        inWeb.add(m.user.id)
+        nodes.push(toNode(m.user, depth, m.score))
+        edges.push(edge(parent.user.id, m.user.id, true))
+        nextFrontier.push(m)
+      }
     }
+    if (nextFrontier.length === 0) break
+    frontier = nextFrontier
   }
 
   return { nodes, edges }

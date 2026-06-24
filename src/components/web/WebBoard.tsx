@@ -59,7 +59,10 @@ function apiResponseToPeople(
       relevanceScore: n.relevanceScore / 100,
       interactionScore: n.interactionScore,
     }
-    if (n.degree === 2) {
+    if (n.degree > 1) {
+      // For any non-1st-degree node the connector is the previous-ring node
+      // that introduces them (degree N-1). Derived from the dotted bridge
+      // edge the server emits for the cross-ring link.
       const via = viaByTarget.get(n.id)
       if (via) person.via = via
     }
