@@ -5,7 +5,6 @@ import {
   Alert,
   Button,
   Card,
-  Empty,
   Input,
   Space,
   Typography,
@@ -58,6 +57,8 @@ function apiResponseToPeople(
       degree: n.degree,
       relevanceScore: n.relevanceScore / 100,
       interactionScore: n.interactionScore,
+      ...(n.headline ? { headline: n.headline } : {}),
+      ...(n.activityStatus ? { activityStatus: n.activityStatus } : {}),
     }
     if (n.degree > 1) {
       // For any non-1st-degree node the connector is the previous-ring node
@@ -251,7 +252,7 @@ export default function WebBoard() {
         <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
           <div>
             <Typography.Title level={4} style={{ marginTop: 0, marginBottom: 4 }}>
-              Your Network Web
+              Your Web
             </Typography.Title>
             <Typography.Text type="secondary">
               Interactively re-rank your relationships.
@@ -271,9 +272,12 @@ export default function WebBoard() {
               }}
             >
               {isEmpty ? (
-                <div style={{ padding: 48 }}>
-                  <Empty description="No goal yet — tell us where you want to go and we'll map who can help." />
-                </div>
+                <WebCanvas
+                  snapshot={snapshot}
+                  width={CANVAS_WIDTH}
+                  height={CANVAS_HEIGHT}
+                  alwaysShowSelf
+                />
               ) : (
                 <WebCanvas
                   snapshot={snapshot}

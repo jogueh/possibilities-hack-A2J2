@@ -2,6 +2,7 @@ import type { DegreeLevel, WebEdge, WebNode } from '@/types/web'
 import type { ParsedGoal } from '@/types/goal'
 import type { UserWithJobs } from '@/types/data'
 import {
+  deriveActivityStatus,
   deriveAlignmentTier,
   scoreUserAgainstGoal as defaultScorer,
 } from '@/lib/scoring'
@@ -58,7 +59,17 @@ function initialsFromName(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
+// Builds the "role at company" headline shown under a node from the member's
+// most recent job. Returns undefined when the member has no job history so the
+// node simply renders without a role line.
+function headlineOf(user: UserWithJobs): string | undefined {
+  const job = user.job_history?.[0]
+  if (!job) return undefined
+  return job.company ? `${job.position} at ${job.company}` : job.position
+}
+
 function toNode(user: UserWithJobs, degree: DegreeLevel, score: number): WebNode {
+  const headline = headlineOf(user)
   return {
     id: user.id,
     userId: user.id,
@@ -66,6 +77,9 @@ function toNode(user: UserWithJobs, degree: DegreeLevel, score: number): WebNode
     degree,
     avatarInitials: initialsFromName(user.name),
     alignmentTier: deriveAlignmentTier(score),
+    // The activity ring (blue/amber/red) is derived from the member's recent
+    // posting cadence so the canvas conveys "good time to reach out" at a glance.
+    activityStatus: deriveActivityStatus(user),
     // interactionScore starts at 0 per src/types/web.ts contract; W4 stretch
     // updates it client-side via the Zustand store.
     interactionScore: 0,
@@ -73,6 +87,7 @@ function toNode(user: UserWithJobs, degree: DegreeLevel, score: number): WebNode
     // Server emits placeholder positions — W1 owns the layout algorithm and
     // recomputes positions client-side when nodes change.
     position: { x: 0, y: 0 },
+    ...(headline ? { headline } : {}),
   }
 }
 

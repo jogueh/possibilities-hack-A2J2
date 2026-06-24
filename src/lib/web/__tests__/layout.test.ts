@@ -3,12 +3,15 @@ import {
   layoutNodes,
   deriveEdges,
   placeNearParent,
+  resolveCollisions,
   tierColor,
   tierRadius,
   truncateLabel,
   wrapLabel,
+  wrapWords,
   edgeStrokeWidth,
   edgeStrokeDasharray,
+  NODE_MIN_DISTANCE,
   TIER_COLORS,
   ACTIVITY_RING_COLORS,
   ACTIVITY_RING_LABELS,
@@ -213,5 +216,52 @@ describe('activity ring mapping', () => {
     expect(activityRingLabel('moderate')).toBe('Worth a nudge')
     expect(activityRingLabel('inactive')).toBe('Lead with shared context')
     expect(activityRingLabel('inactive')).toBe(ACTIVITY_RING_LABELS.inactive)
+  })
+})
+
+describe('wrapWords', () => {
+  it('wraps into lines of N words each (last line may be shorter)', () => {
+    expect(wrapWords('Product Manager at Tech Innovators Inc.', 2)).toEqual([
+      'Product Manager',
+      'at Tech',
+      'Innovators Inc.',
+    ])
+  })
+
+  it('collapses surrounding/extra whitespace and ignores empty input', () => {
+    expect(wrapWords('  Senior   Engineer  ', 2)).toEqual(['Senior Engineer'])
+    expect(wrapWords('', 2)).toEqual([])
+    expect(wrapWords('   ', 2)).toEqual([])
+  })
+
+  it('keeps everything on one line when wordsPerLine <= 0', () => {
+    expect(wrapWords('a b c', 0)).toEqual(['a b c'])
+  })
+})
+
+describe('resolveCollisions', () => {
+  const center = { x: 100, y: 100 }
+
+  it('leaves already-separated candidates untouched', () => {
+    const fixed = [center]
+    const candidates = [{ x: 300, y: 300 }]
+    expect(resolveCollisions(fixed, candidates, NODE_MIN_DISTANCE, center)).toEqual(candidates)
+  })
+
+  it('pushes a candidate that is too close to a fixed point at least NODE_MIN_DISTANCE away', () => {
+    const fixed = [center]
+    const candidate = { x: 110, y: 100 } // 10px from centre — overlaps
+    const [resolved] = resolveCollisions(fixed, [candidate], NODE_MIN_DISTANCE, center)
+    const dist = Math.hypot(resolved.x - center.x, resolved.y - center.y)
+    expect(dist).toBeGreaterThanOrEqual(NODE_MIN_DISTANCE - 0.01)
+  })
+
+  it('separates two coincident candidates from each other', () => {
+    const fixed: Array<{ x: number; y: number }> = []
+    const a = { x: 200, y: 200 }
+    const b = { x: 200, y: 200 }
+    const [ra, rb] = resolveCollisions(fixed, [a, b], NODE_MIN_DISTANCE, center)
+    const dist = Math.hypot(ra.x - rb.x, ra.y - rb.y)
+    expect(dist).toBeGreaterThanOrEqual(NODE_MIN_DISTANCE - 0.01)
   })
 })

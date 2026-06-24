@@ -28,6 +28,12 @@ export interface WebCanvasProps {
    * and ring styling are owned by the injecting workflow.
    */
   nodeDecorations?: Record<string, NodeDecoration>
+  /**
+   * When true the self ("You") centre node is rendered even with no goal mapped
+   * yet. Used by the empty-state board so a blank web still shows the user at
+   * the centre instead of an empty placeholder.
+   */
+  alwaysShowSelf?: boolean
 }
 
 const SELF_RADIUS = 30
@@ -54,6 +60,7 @@ export default function WebCanvas({
   selectedId = null,
   onNodeSelect,
   nodeDecorations,
+  alwaysShowSelf = false,
 }: WebCanvasProps) {
   const center = { x: width / 2, y: height / 2 }
   const svgRef = useRef<SVGSVGElement>(null)
@@ -240,7 +247,7 @@ export default function WebCanvas({
             })}
           </g>
 
-          {snapshot.goal && (
+          {(snapshot.goal || alwaysShowSelf) && (
             <motion.g
               data-testid="web-self"
               initial={{ opacity: 0, x: center.x, y: center.y, scale: 0.7 }}

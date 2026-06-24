@@ -42,6 +42,13 @@ export function tierRadius(tier: AlignmentTier): number {
 }
 
 /**
+ * Minimum allowed centre-to-centre distance between two node positions. Larger
+ * than twice the biggest node radius (30) so even two `strong` discs keep a
+ * clear gap and never visually overlap on the canvas.
+ */
+export const NODE_MIN_DISTANCE = 92
+
+/**
  * Activity-status → ring colour. This is the "activity ring" shown around node
  * avatars: blue = active, amber = moderate, red = inactive.
  */
@@ -105,6 +112,76 @@ export function wrapLabel(text: string, maxChars: number): string[] {
   }
   if (line) lines.push(line)
   return lines
+}
+
+/**
+ * Word-wraps a label into lines of exactly `wordsPerLine` words each (the last
+ * line may have fewer). Unlike `wrapLabel` this is purely word-count driven, so
+ * a role like "Product Manager at Tech Innovators Inc." with `wordsPerLine = 2`
+ * renders as ["Product Manager", "at Tech", "Innovators Inc."]. Pure and
+ * deterministic.
+ */
+export function wrapWords(text: string, wordsPerLine: number): string[] {
+  const words = text.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return []
+  if (wordsPerLine <= 0) return [words.join(' ')]
+  const lines: string[] = []
+  for (let i = 0; i < words.length; i += wordsPerLine) {
+    lines.push(words.slice(i, i + wordsPerLine).join(' '))
+  }
+  return lines
+}
+
+/**
+ * Nudges candidate positions apart so no candidate sits closer than `minDist`
+ * to any `fixed` point or any already-resolved candidate. Each candidate is
+ * pushed directly away from whatever it collides with (away from the canvas
+ * `center` when two points are exactly coincident), iterating a few passes so
+ * chains of overlaps settle. Order-stable and deterministic: candidates are
+ * resolved in input order and earlier ones act as fixed obstacles for later
+ * ones. Returns a new positions array aligned with `candidates`.
+ */
+export function resolveCollisions(
+  fixed: Array<{ x: number; y: number }>,
+  candidates: Array<{ x: number; y: number }>,
+  minDist: number,
+  center: { x: number; y: number },
+): Array<{ x: number; y: number }> {
+  const placed = fixed.map((p) => ({ x: p.x, y: p.y }))
+  const result: Array<{ x: number; y: number }> = []
+  for (const candidate of candidates) {
+    let pos = { x: candidate.x, y: candidate.y }
+    for (let iter = 0; iter < 24; iter++) {
+      let collided = false
+      for (const p of placed) {
+        const dx = pos.x - p.x
+        const dy = pos.y - p.y
+        const dist = Math.hypot(dx, dy)
+        if (dist < minDist) {
+          collided = true
+          let nx: number
+          let ny: number
+          if (dist < 1e-6) {
+            // Coincident points: push outward from the canvas centre.
+            const ax = pos.x - center.x
+            const ay = pos.y - center.y
+            const al = Math.hypot(ax, ay) || 1
+            nx = ax / al
+            ny = ay / al
+          } else {
+            nx = dx / dist
+            ny = dy / dist
+          }
+          const push = minDist - dist
+          pos = { x: round2(pos.x + nx * push), y: round2(pos.y + ny * push) }
+        }
+      }
+      if (!collided) break
+    }
+    placed.push(pos)
+    result.push(pos)
+  }
+  return result
 }
 
 const round2 = (n: number): number => Math.round(n * 100) / 100

@@ -84,17 +84,13 @@ export function createInitialBoardState(): BoardState {
 }
 
 /**
- * Solidifies every dotted bridge edge whose TARGET is a connected person —
- * the line stops being dotted, turns into a strong link and is strengthened.
- * Re-applied after a snapshot rebuild so a connection survives re-expanding
- * its connector.
- *
- * IMPORTANT: only the target endpoint counts. Edges in this app are emitted
- * with source = parent (shallower, closer to viewer) and target = child
- * (deeper). Connecting to person X solidifies the parent -> X bridge, NOT
- * the X -> grandchild bridges that appear when X is later expanded — those
- * grandchildren are still suggestions until the viewer connects with each
- * one in turn.
+/**
+ * Solidifies every dotted bridge edge that leads INTO a connected person (the
+ * connected id is the edge target): the line stops being dotted, turns into a
+ * strong link and is strengthened. Re-applied after a snapshot rebuild so a
+ * connection survives re-expanding its connector. Outgoing bridges FROM a
+ * connected node (to its not-yet-connected warm-path suggestions) intentionally
+ * stay dotted — they only solidify once that further person is connected too.
  */
 function applyConnections(
   snapshot: WebSnapshot,

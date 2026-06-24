@@ -11,6 +11,8 @@ import {
   deriveEdges,
   layoutNodes,
   placeNearParent,
+  resolveCollisions,
+  NODE_MIN_DISTANCE,
   type LayoutOptions,
   type Relationship,
 } from '@/lib/web/layout'
@@ -222,9 +224,17 @@ export function expandNode(
   )
 
   const center = { x: options.width / 2, y: options.height / 2 }
+  const rawPositions = ordered.map((_, i) =>
+    placeNearParent(parent.position, center, i, ordered.length, options),
+  )
+  // Keep the new warm-path nodes from overlapping the self centre or any node
+  // already on the canvas (existing rings + siblings placed earlier in this
+  // fan), so expanding a node never stacks circles on top of each other.
+  const fixed = [center, ...snapshot.nodes.map((n) => n.position)]
+  const resolved = resolveCollisions(fixed, rawPositions, NODE_MIN_DISTANCE, center)
   const newNodes: WebNode[] = ordered.map((p, i) => ({
     ...toNode(p),
-    position: placeNearParent(parent.position, center, i, ordered.length, options),
+    position: resolved[i],
   }))
   const nodes = [...snapshot.nodes, ...newNodes]
 
