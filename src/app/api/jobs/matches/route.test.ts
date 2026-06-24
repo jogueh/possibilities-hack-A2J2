@@ -16,9 +16,13 @@ import type { JobMatch } from '@/types/job'
 import { generateObject } from 'ai'
 
 const jobsFixture = jobs as Job[]
+// Anchor user_0 to a job that matches the test goal ("software engineer roles in
+// Boston"): an engineering role located in Boston. This keeps the job in the
+// top relevance matches (role + location) so the web-overlap assertion below
+// stays valid regardless of how company/position values are distributed.
 const overlapJob =
   jobsFixture.find(
-    (j) => j.company === 'Global Solutions LLC' && j.position === 'Software Engineer',
+    (j) => j.location === 'Boston, MA' && /\bengineer\b/i.test(j.position),
   ) ?? jobsFixture[0]
 
 const users: User[] = [

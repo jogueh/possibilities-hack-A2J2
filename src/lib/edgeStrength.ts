@@ -6,18 +6,14 @@
 // (chats, posts, "I met up") — render thicker, warmer, and eventually pulse, so
 // the web visibly "strengthens its roots".
 //
-// SCALE: this util expects the store's 0–100 strength scale — the same scale
-// `useWebStore` produces and clamps (`DEFAULT_EDGE_STRENGTH = 50`, `[0,100]`),
-// shared with `interactionScore` / `relevanceScore`. Inputs are clamped to
-// [0,100] (NaN → weakest), so passing a 0..1 value would land almost everything
-// in the faint tier — convert to 0–100 first.
+// SCALE: the core functions (`edgeStrengthTier`, `edgeStrengthStyle`) work on a
+// 0–100 strength scale (matching the store's `interactionScore` / edge strength,
+// `DEFAULT_EDGE_STRENGTH = 50`). Inputs are clamped to [0,100] (NaN → weakest).
 //
-// CAUTION — mixed scales exist: `src/lib/web/layout.ts` `edgeStrokeWidth()`
-// still documents/clamps strength as 0..1 (and is, today, mis-fed the 0–100
-// `edge.strength` in WebCanvas, pinning every edge to max width). Do not route
-// this util's value through those 0..1 helpers. When the canvas adopts this
-// util it should replace `edgeStrokeWidth(edge.strength)` with
-// `edgeStrengthStyle(edge.strength).width`, retiring the 0..1 path.
+// The web canvas, however, renders the boardState/`buildSnapshot` graph whose
+// edge `strength` is on a 0..1 scale (`clamp01`, `CONNECTED_STRENGTH = 0.9`).
+// Canvas callers should use `edgeStrengthStyleUnit(strength01)`, which scales a
+// 0..1 value into the 0–100 logic. Don't mix the two scales.
 //
 // The canvas is custom DOM/SVG (not React Flow), so this exposes plain style
 // data (colour / width / pulse / optional gradient) that the renderer applies;
@@ -93,4 +89,20 @@ export function edgeStrengthStyle(strength0to100: number): EdgeStrengthStyle {
   return style.gradient
     ? { ...style, gradient: { ...style.gradient } }
     : { ...style };
+}
+
+/**
+ * Tier for a 0..1 edge strength (the web canvas / boardState scale). Convenience
+ * wrapper that scales into the 0–100 `edgeStrengthTier` logic.
+ */
+export function edgeStrengthTierUnit(strength0to1: number): EdgeStrengthTier {
+  return edgeStrengthTier((Number.isNaN(strength0to1) ? 0 : strength0to1) * 100);
+}
+
+/**
+ * Stroke styling for a 0..1 edge strength (the web canvas / boardState scale).
+ * Convenience wrapper that scales into the 0–100 `edgeStrengthStyle` logic.
+ */
+export function edgeStrengthStyleUnit(strength0to1: number): EdgeStrengthStyle {
+  return edgeStrengthStyle((Number.isNaN(strength0to1) ? 0 : strength0to1) * 100);
 }

@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   EDGE_TIER_THRESHOLDS,
   edgeStrengthStyle,
+  edgeStrengthStyleUnit,
   edgeStrengthTier,
+  edgeStrengthTierUnit,
   type EdgeStrengthTier,
 } from "./edgeStrength";
 
@@ -82,5 +84,26 @@ describe("edgeStrengthStyle", () => {
       return edgeStrengthStyle(sample).color;
     });
     expect(new Set(colors).size).toBe(ALL_TIERS.length);
+  });
+});
+
+describe("edgeStrength 0..1 unit adapters (canvas scale)", () => {
+  it("maps a 0..1 strength into the same tiers as the 0–100 scale", () => {
+    expect(edgeStrengthTierUnit(0)).toBe("faint");
+    expect(edgeStrengthTierUnit(0.25)).toBe("faint");
+    expect(edgeStrengthTierUnit(0.4)).toBe("steady");
+    expect(edgeStrengthTierUnit(0.6)).toBe("strong");
+    expect(edgeStrengthTierUnit(0.9)).toBe("vibrant");
+  });
+
+  it("produces the same style as scaling ×100 through edgeStrengthStyle", () => {
+    for (const u of [0, 0.25, 0.5, 0.75, 0.9, 1]) {
+      expect(edgeStrengthStyleUnit(u)).toEqual(edgeStrengthStyle(u * 100));
+    }
+  });
+
+  it("treats NaN as the weakest tier", () => {
+    expect(edgeStrengthTierUnit(NaN)).toBe("faint");
+    expect(edgeStrengthStyleUnit(NaN).tier).toBe("faint");
   });
 });

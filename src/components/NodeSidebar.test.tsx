@@ -116,6 +116,17 @@ describe("NodeSidebar", () => {
     expect(screen.getByText("Strong match for your goal")).toBeInTheDocument();
   });
 
+  it("renders the avatar photo over the initials fallback", async () => {
+    render(<NodeSidebar node={node} onClose={() => {}} />);
+    await act(async () => deferred.resolve!(target));
+    await screen.findByText("Alice Nguyen");
+    const overlay = screen.getByTestId("avatar-ring").querySelector("span[aria-hidden]");
+    expect(overlay?.getAttribute("style")).toMatch(
+      /url\(["']?https:\/\/randomuser\.me\/api\/portraits\/(men|women)\/\d+\.jpg["']?\)/,
+    );
+    expect(screen.getByTestId("avatar-ring")).toHaveTextContent("AN");
+  });
+
   it("hides the commonalities section when there is no overlap", async () => {
     render(<NodeSidebar node={node} onClose={() => {}} />);
     await act(async () => deferred.resolve!(target));

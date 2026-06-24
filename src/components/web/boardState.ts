@@ -14,6 +14,11 @@ import {
 // 2nd-degree person it reaches, so the (now solid) line reads as a strong link.
 const CONNECTED_STRENGTH = 0.9
 
+// Tie strength applied to a node's solid edge once the viewer logs a real-world
+// meetup ("I met up with this person"). Meeting in person is the strongest
+// signal, so the edge jumps to full strength (vibrant) via the s12 visuals.
+const MET_UP_STRENGTH = 1
+
 export type BoardStatus = 'idle' | 'loading' | 'error'
 
 export interface BoardState {
@@ -22,6 +27,8 @@ export interface BoardState {
   goalText: string
   /** Ids of people the viewer has connected with (dotted bridge -> solid link). */
   connectedIds: string[]
+  /** Ids of people the viewer has logged a real-world meetup with (edge -> full strength). */
+  metUpIds: string[]
   /**
    * Ids of people the viewer has explicitly pinned to the canvas via
    * "Add to web". Their warm-path chain back to the viewer is re-applied
@@ -52,6 +59,7 @@ export type BoardAction =
   | { type: 'selectNode'; id: string }
   | { type: 'connectNode'; id: string }
   | { type: 'pinNode'; id: string }
+  | { type: 'logMeetup'; id: string }
   | { type: 'clearSelection' }
   | { type: 'reset' }
 
@@ -68,6 +76,7 @@ export function createInitialBoardState(): BoardState {
     goalText: '',
     connectedIds: [],
     pinnedIds: [],
+    metUpIds: [],
     people: [],
     status: 'idle',
     error: null,
@@ -160,6 +169,30 @@ function walkViaChain(
   return chain
 }
 
+/**
+ * Strengthens only the solid self↔person edge for each person the viewer has
+ * logged a meetup with, bumping it to full strength. Idempotent (uses
+ * `Math.max`) so it can be re-applied after a snapshot rebuild without
+ * over-accumulating.
+ */
+function applyMeetups(
+  snapshot: WebSnapshot,
+  metUpIds: string[],
+): WebSnapshot {
+  if (metUpIds.length === 0) return snapshot
+  const selfId = snapshot.goal?.userId
+  if (!selfId) return snapshot
+  const metUp = new Set(metUpIds)
+  const edges = snapshot.edges.map((e) =>
+    !e.isDotted &&
+    ((metUp.has(e.target) && e.source === selfId) ||
+      (metUp.has(e.source) && e.target === selfId))
+      ? { ...e, strength: Math.max(e.strength, MET_UP_STRENGTH) }
+      : e,
+  )
+  return { ...snapshot, edges }
+}
+
 // Picks the people list to feed the layout: real API-resolved people if the
 // board has them (`submitGoalWithPeople` ran), otherwise the static fallback
 // from config. This preserves existing test/demo behavior for callers that
@@ -188,6 +221,7 @@ export function boardReducer(
         selectedId: null,
         connectedIds: [],
         pinnedIds: [],
+        metUpIds: [],
         status: 'idle',
         error: null,
       }
@@ -206,6 +240,7 @@ export function boardReducer(
         selectedId: null,
         connectedIds: [],
         pinnedIds: [],
+        metUpIds: [],
         people: action.people,
         status: 'idle',
         error: null,
@@ -254,7 +289,10 @@ export function boardReducer(
       snapshot = applyPins(snapshot, state.pinnedIds, people, config.options)
       return {
         ...state,
-        snapshot: applyConnections(snapshot, state.connectedIds),
+        snapshot: applyMeetups(
+          applyConnections(snapshot, state.connectedIds),
+          state.metUpIds,
+        ),
         selectedId: action.id,
       }
     }
@@ -272,7 +310,23 @@ export function boardReducer(
       return {
         ...state,
         connectedIds,
-        snapshot: applyConnections(state.snapshot, connectedIds),
+        snapshot: applyMeetups(
+          applyConnections(state.snapshot, connectedIds),
+          state.metUpIds,
+        ),
+      }
+    }
+
+    case 'logMeetup': {
+      // Logging a real-world meetup strengthens the solid edge to this person to
+      // full strength, so it renders thick/vibrant (s12 visuals). Idempotent —
+      // logging again is a no-op.
+      if (state.metUpIds.includes(action.id)) return state
+      const metUpIds = [...state.metUpIds, action.id]
+      return {
+        ...state,
+        metUpIds,
+        snapshot: applyMeetups(state.snapshot, metUpIds),
       }
     }
 

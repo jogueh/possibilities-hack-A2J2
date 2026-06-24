@@ -1,9 +1,10 @@
 "use client";
-// W3-OWNED. Actions bar at the bottom of the node sidebar: Connect + Message.
+// W3-OWNED. Actions bar at the bottom of the node sidebar: Connect + InMail.
 // UI-only — no real LinkedIn API calls. See plan.md
 import { useEffect, useState } from "react";
 import type { DegreeLevel } from "@/types/web";
 import { LI } from "@/lib/linkedinTokens";
+import { MetUpButton } from "@/components/MetUpButton";
 
 interface ActionsBarProps {
   targetName: string;
@@ -25,6 +26,12 @@ interface ActionsBarProps {
    * nodes (always on the canvas regardless).
    */
   onPin?: () => void;
+  /** Graph id of the open node — passed to the "I met up" button as its key. */
+  nodeId?: string;
+  /** True when board state says the meetup has already been logged for this node. */
+  metUpLogged?: boolean;
+  /** Called when the viewer logs a real-world meetup (strengthens the edge). */
+  onLogMeetup?: () => void;
 }
 
 export function ActionsBar({
@@ -35,6 +42,9 @@ export function ActionsBar({
   onConnect,
   pinned,
   onPin,
+  nodeId,
+  metUpLogged,
+  onLogMeetup,
 }: ActionsBarProps) {
   const [connectOpen, setConnectOpen] = useState(false);
   const [messageOpen, setMessageOpen] = useState(false);
@@ -89,9 +99,19 @@ export function ActionsBar({
         <button
           type="button"
           onClick={openMessage}
-          style={{ ...btn, background: "transparent", color: LI.blue, border: `1px solid ${LI.blue}` }}
+          style={{
+            ...btn,
+            background: "transparent",
+            color: LI.blue,
+            border: `1px solid ${LI.blue}`,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+          }}
         >
-          Message
+          <img src="/premiumin.svg" alt="" aria-hidden="true" width={16} height={16} style={{ display: "block" }} />
+          InMail
         </button>
       </div>
 
@@ -136,6 +156,12 @@ export function ActionsBar({
             </button>
           )}
         </div>
+      )}
+
+      {/* 1st-degree people are existing connections — logging a real-world meetup
+          with them strengthens the edge on the web (W4 stretch s11). */}
+      {degree === 1 && nodeId && onLogMeetup && (
+        <MetUpButton edgeId={nodeId} logged={metUpLogged} onLog={onLogMeetup} />
       )}
 
       {connectOpen && (

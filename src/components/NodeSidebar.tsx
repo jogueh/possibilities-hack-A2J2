@@ -8,6 +8,7 @@ import type { UserWithJobs } from "@/types/data";
 import { useWebStore } from "@/store/useWebStore";
 import { fetchUserWithJobs } from "@/lib/userApi";
 import { ALIGNMENT_LABELS, alignmentColor } from "@/lib/alignmentColors";
+import { photoUrlForUser } from "@/lib/avatarPhoto";
 import { filterRelevantJobs } from "@/lib/relevance";
 import { getSharedContext } from "@/lib/sharedContext";
 import { LI, SIDEBAR_WIDTH } from "@/lib/linkedinTokens";
@@ -26,6 +27,10 @@ interface NodeSidebarProps {
   pinned?: boolean;
   /** Pins the open node to the canvas across snapshot rebuilds; receives its graph id. */
   onPin?: (nodeId: string) => void;
+  /** Logs a real-world meetup with this node; receives its graph id (strengthens the edge). */
+  onLogMeetup?: (nodeId: string) => void;
+  /** True when board state says the selected node's meetup has already been logged. */
+  metUpLogged?: boolean;
 }
 
 // Cache the AI tip per userId so re-opening the same node never re-calls the LLM.
@@ -54,6 +59,8 @@ export function NodeSidebar({
   onConnect,
   pinned,
   onPin,
+  onLogMeetup,
+  metUpLogged,
 }: NodeSidebarProps) {
   const goal = useWebStore((s) => s.goal);
   const parsedGoal = useWebStore((s) => s.parsedGoal);
@@ -196,6 +203,8 @@ export function NodeSidebar({
             <div
               data-testid="avatar-ring"
               style={{
+                position: "relative",
+                overflow: "hidden",
                 width: 64,
                 height: 64,
                 borderRadius: "50%",
@@ -209,6 +218,18 @@ export function NodeSidebar({
               }}
             >
               {node.avatarInitials}
+              {/* Photo overlays the initials; a failed load stays transparent so
+                  the initials behind it remain visible as the fallback. */}
+              <span
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  backgroundImage: `url(${JSON.stringify(node.photo ?? user.photo ?? photoUrlForUser(node.userId))})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                }}
+              />
             </div>
             <div>
               <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>{user.name}</h2>
@@ -289,6 +310,9 @@ export function NodeSidebar({
             onConnect={() => onConnect?.(node.id)}
             pinned={pinned}
             onPin={() => onPin?.(node.id)}
+            nodeId={node.id}
+            metUpLogged={metUpLogged}
+            onLogMeetup={() => onLogMeetup?.(node.id)}
           />
         </div>
       )}
