@@ -119,13 +119,6 @@ export default function WebNodeMarker({
         </>
       )}
 
-      {/* 2nd-degree badge */}
-      {node.degree === 2 && (
-        <text x={r + 4} y={-r + 2} fontSize={10} fontWeight={600} fill="#8a94a6">
-          2nd
-        </text>
-      )}
-
       {/* Name */}
       <text
         textAnchor="middle"
