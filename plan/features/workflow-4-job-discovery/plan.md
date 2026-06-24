@@ -31,7 +31,7 @@ Transform the relationship web from a pure networking tool into a job-hunting ac
 
 ## Global rules
 - Datasets are static → `force-cache`, **no revalidation**.
-- **W4 owns `src/lib/scoring.ts`** (the shared scoring engine, pure functions). `main` currently contains a clearly-labeled MOCK placeholder; Step 2 / PR #18 replaces it with the real implementation. Do **not** invent a parallel scoring system.
+- **W4 owns `src/lib/scoring.ts`** (the shared scoring engine, pure functions). ✅ Implemented on `main` via Step 2 / PR #18 — do **not** invent a parallel scoring system.
 - W4 builds **pure logic only** — no API routes, no LLM calls. The thin `/api/jobs/matches` route wrapper is W2's (data-fetching layer); see the message to W2 below.
 - Timeline date ranges are **approximate** — anchor on `graduation_year`, label `~[year]`, never fabricate exact dates.
 - **Salary data must never be rendered**, even though `salary_range` exists on job records.
