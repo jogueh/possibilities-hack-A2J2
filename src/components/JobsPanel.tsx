@@ -284,6 +284,7 @@ function JobCard({ match, expanded, onToggle, onOpenConnection }: JobCardProps) 
                 <button
                   key={c.userId}
                   type="button"
+                  disabled={!onOpenConnection}
                   onClick={() => onOpenConnection?.(c.userId)}
                   title={`${c.name} — ${c.role}`}
                   aria-label={`Open ${c.name}'s profile`}
@@ -295,7 +296,8 @@ function JobCard({ match, expanded, onToggle, onOpenConnection }: JobCardProps) 
                     background: LI.surface,
                     borderRadius: 14,
                     padding: "2px 8px 2px 2px",
-                    cursor: onOpenConnection ? "pointer" : "default",
+                    cursor: onOpenConnection ? "pointer" : "not-allowed",
+                    opacity: onOpenConnection ? 1 : 0.7,
                   }}
                 >
                   <span
