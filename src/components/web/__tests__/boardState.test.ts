@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   boardReducer,
   createInitialBoardState,
+  STAGE_STRENGTH,
   type BoardConfig,
 } from '@/components/web/boardState'
 import type { PersonInput } from '@/lib/web/snapshot'
@@ -217,18 +218,63 @@ describe('boardReducer', () => {
     expect(cToD.isDotted).toBe(true) // bridge to UNCONNECTED person stays dotted
   })
 
-  it('logMeetup strengthens the edge to a 1st-degree person to full strength', () => {
+  it('setStage(met) strengthens the edge to a 1st-degree person to the met tier', () => {
     let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
     s = reduce(s, { type: 'submitGoal' })
     const selfEdgeId = 'self_1__a'
-    expect(s.snapshot.edges.find((e) => e.id === selfEdgeId)!.strength).toBeLessThan(1)
+    // Un-staged edges start at the compressed faint baseline.
+    expect(s.snapshot.edges.find((e) => e.id === selfEdgeId)!.strength).toBeLessThan(
+      STAGE_STRENGTH.met,
+    )
 
-    s = reduce(s, { type: 'logMeetup', id: 'a' })
-    expect(s.metUpIds).toContain('a')
-    expect(s.snapshot.edges.find((e) => e.id === selfEdgeId)!.strength).toBe(1)
+    s = reduce(s, { type: 'setStage', id: 'a', stage: 'met' })
+    expect(s.stages.a).toBe('met')
+    expect(s.snapshot.edges.find((e) => e.id === selfEdgeId)!.strength).toBe(STAGE_STRENGTH.met)
   })
 
-  it('logMeetup does not strengthen non-viewer edges touching the met-up person', () => {
+  it('advancing the stage steps the edge strength up the ladder (met -> collaborated -> advocate)', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    const selfEdgeId = 'self_1__a'
+
+    s = reduce(s, { type: 'setStage', id: 'a', stage: 'met' })
+    expect(s.snapshot.edges.find((e) => e.id === selfEdgeId)!.strength).toBe(STAGE_STRENGTH.met)
+    s = reduce(s, { type: 'setStage', id: 'a', stage: 'collaborated' })
+    expect(s.stages.a).toBe('collaborated')
+    expect(s.snapshot.edges.find((e) => e.id === selfEdgeId)!.strength).toBe(
+      STAGE_STRENGTH.collaborated,
+    )
+    s = reduce(s, { type: 'setStage', id: 'a', stage: 'advocate' })
+    expect(s.stages.a).toBe('advocate')
+    expect(s.snapshot.edges.find((e) => e.id === selfEdgeId)!.strength).toBe(
+      STAGE_STRENGTH.advocate,
+    )
+  })
+
+  it('setStage is forward-only — a lower stage request does not downgrade', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'setStage', id: 'a', stage: 'advocate' })
+    s = reduce(s, { type: 'setStage', id: 'a', stage: 'met' })
+    expect(s.stages.a).toBe('advocate')
+  })
+
+  it('setStage records optional helpfulness tags (deduped) and is skippable', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    // Advance with no tags — helpfulness stays empty.
+    s = reduce(s, { type: 'setStage', id: 'a', stage: 'met' })
+    expect(s.helpfulness.a).toBeUndefined()
+    // Advance with tags — recorded.
+    s = reduce(s, { type: 'setStage', id: 'a', stage: 'collaborated', tags: ['intro', 'advice'] })
+    expect(s.helpfulness.a).toEqual(['intro', 'advice'])
+    // Re-tag at the same stage merges + dedupes without downgrading.
+    s = reduce(s, { type: 'setStage', id: 'a', stage: 'collaborated', tags: ['advice', 'mentor'] })
+    expect(s.helpfulness.a).toEqual(['intro', 'advice', 'mentor'])
+    expect(s.stages.a).toBe('collaborated')
+  })
+
+  it('setStage does not strengthen non-viewer edges touching the staged person', () => {
     let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
     s = reduce(s, { type: 'submitGoal' })
     s = reduce(s, { type: 'selectNode', id: 'a' })
@@ -236,10 +282,11 @@ describe('boardReducer', () => {
 
     const bridgeBefore = s.snapshot.edges.find((e) => e.id === 'a__c')!
     expect(bridgeBefore.isDotted).toBe(false)
-    expect(bridgeBefore.strength).toBeLessThan(1)
 
-    s = reduce(s, { type: 'logMeetup', id: 'a' })
-    expect(s.snapshot.edges.find((e) => e.id === 'self_1__a')!.strength).toBe(1)
+    s = reduce(s, { type: 'setStage', id: 'a', stage: 'advocate' })
+    expect(s.snapshot.edges.find((e) => e.id === 'self_1__a')!.strength).toBe(
+      STAGE_STRENGTH.advocate,
+    )
     expect(s.snapshot.edges.find((e) => e.id === 'a__c')!.strength).toBe(bridgeBefore.strength)
   })
 
@@ -323,25 +370,28 @@ describe('boardReducer', () => {
     expect(s.pinnedIds).toEqual([])
   })
 
-  it('keeps a meetup-strengthened edge after the web is re-expanded', () => {
+  it('keeps a stage-strengthened edge after the web is re-expanded', () => {
     let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
     s = reduce(s, { type: 'submitGoal' })
-    s = reduce(s, { type: 'logMeetup', id: 'a' })
+    s = reduce(s, { type: 'setStage', id: 'a', stage: 'advocate' })
     // Visit b (rebuilds the seeded snapshot) then return to a.
     s = reduce(s, { type: 'selectNode', id: 'b' })
     s = reduce(s, { type: 'selectNode', id: 'a' })
-    expect(s.snapshot.edges.find((e) => e.id === 'self_1__a')!.strength).toBe(1)
+    expect(s.snapshot.edges.find((e) => e.id === 'self_1__a')!.strength).toBe(
+      STAGE_STRENGTH.advocate,
+    )
   })
 
-  it('logMeetup is idempotent and resets on a new goal', () => {
+  it('setStage is idempotent and resets on a new goal', () => {
     let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
     s = reduce(s, { type: 'submitGoal' })
-    s = reduce(s, { type: 'logMeetup', id: 'a' })
-    s = reduce(s, { type: 'logMeetup', id: 'a' })
-    expect(s.metUpIds).toEqual(['a'])
+    s = reduce(s, { type: 'setStage', id: 'a', stage: 'met' })
+    s = reduce(s, { type: 'setStage', id: 'a', stage: 'met' })
+    expect(s.stages).toEqual({ a: 'met' })
     s = reduce(s, { type: 'setGoalText', value: 'New goal' })
     s = reduce(s, { type: 'submitGoal' })
-    expect(s.metUpIds).toEqual([])
+    expect(s.stages).toEqual({})
+    expect(s.helpfulness).toEqual({})
   })
 
   it('keeps outgoing warm-path bridges from a connected node dotted until that further person also connects', () => {
@@ -362,31 +412,33 @@ describe('boardReducer', () => {
     expect(cToD?.isDotted).toBe(true)
   })
 
-  it('logMeetup flags the connection line into a met-up person as purple (isMetUp)', () => {
+  it('setStage flags the connection line into a staged person as tier-coloured (stage/isMetUp)', () => {
     let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
     s = reduce(s, { type: 'submitGoal' })
-    // Reveal c through a, connect with c, then log a meetup with c.
+    // Reveal c through a, connect with c, then advance c's stage.
     s = reduce(s, { type: 'selectNode', id: 'a' })
     s = reduce(s, { type: 'connectNode', id: 'c' })
-    s = reduce(s, { type: 'logMeetup', id: 'c' })
-    // The line INTO c (its warm-path bridge) is flagged met-up and solid.
+    s = reduce(s, { type: 'setStage', id: 'c', stage: 'collaborated' })
+    // The line INTO c (its warm-path bridge) is flagged with the stage and solid.
     const intoC = s.snapshot.edges.find((e) => e.id === 'a__c')!
     expect(intoC.isMetUp).toBe(true)
+    expect(intoC.stage).toBe('collaborated')
     expect(intoC.isDotted).toBe(false)
-    // A normal (not-met-up) connection line stays unflagged (renders blue).
+    // An un-staged connection line stays unflagged (renders normal blue).
     const intoA = s.snapshot.edges.find((e) => e.id === 'self_1__a')!
     expect(intoA.isMetUp).toBeFalsy()
+    expect(intoA.stage).toBeUndefined()
   })
 
-  it('logMeetup does not flag outgoing edges FROM a met-up person', () => {
+  it('setStage does not flag outgoing edges FROM a staged person', () => {
     let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
     s = reduce(s, { type: 'submitGoal' })
     s = reduce(s, { type: 'selectNode', id: 'a' })
-    s = reduce(s, { type: 'logMeetup', id: 'a' })
-    // a__c has a (met-up) as its source, not target — it must not turn purple.
+    s = reduce(s, { type: 'setStage', id: 'a', stage: 'met' })
+    // a__c has a (staged) as its source, not target — it must not be flagged.
     const outFromA = s.snapshot.edges.find((e) => e.id === 'a__c')
     expect(outFromA?.isMetUp).toBeFalsy()
-    // a's own connection line (self -> a) is the one that turns purple.
+    // a's own connection line (self -> a) is the one that gets flagged.
     expect(s.snapshot.edges.find((e) => e.id === 'self_1__a')!.isMetUp).toBe(true)
   })
 })

@@ -1,4 +1,4 @@
-import type { GoalQuery, WebSnapshot } from '@/types/web'
+import type { GoalQuery, WebSnapshot, ConnectionStage, HelpfulnessTag } from '@/types/web'
 import type { LayoutOptions } from '@/lib/web/layout'
 import {
   buildSnapshot,
@@ -14,10 +14,20 @@ import {
 // 2nd-degree person it reaches, so the (now solid) line reads as a strong link.
 const CONNECTED_STRENGTH = 0.9
 
-// Tie strength applied to a node's solid edge once the viewer logs a real-world
-// meetup ("I met up with this person"). Meeting in person is the strongest
-// signal, so the edge jumps to full strength (vibrant) via the s12 visuals.
-const MET_UP_STRENGTH = 1
+// Tie strength applied to a node's solid edge for each relationship-depth stage
+// ("Connection Depth"). The values are chosen to land each stage in a distinct
+// edge-strength visual tier (see src/lib/edgeStrength.ts): met → steady (blue),
+// collaborated → strong (indigo), advocate → vibrant (purple gradient + pulse).
+// Advancing a connection therefore visibly strengthens its edge. `met` subsumes
+// the old "I met up with this person" action (the first rung of the ladder).
+export const STAGE_STRENGTH: Record<ConnectionStage, number> = {
+  met: 0.4,
+  collaborated: 0.65,
+  advocate: 0.9,
+}
+
+// Forward-only order of the depth ladder, used to validate/compare advances.
+export const STAGE_ORDER: ConnectionStage[] = ['met', 'collaborated', 'advocate']
 
 // Free-tier cap on how many people the viewer can connect with before the
 // "Upgrade to Premium" prompt appears. Premium is intentionally always off in
@@ -37,8 +47,18 @@ export interface BoardState {
   goalText: string
   /** Ids of people the viewer has connected with (dotted bridge -> solid link). */
   connectedIds: string[]
-  /** Ids of people the viewer has logged a real-world meetup with (edge -> full strength). */
-  metUpIds: string[]
+  /**
+   * Relationship-depth stage per person ("Connection Depth"). Absent key = no
+   * stage yet. The viewer self-advances connections up the ladder; `applyStages`
+   * strengthens each staged person's solid edge to `STAGE_STRENGTH[stage]`.
+   * `met` subsumes the old "I met up" action. Resets on a new goal.
+   */
+  stages: Record<string, ConnectionStage>
+  /**
+   * Optional helpfulness tags per person, attached when advancing a stage
+   * (skippable). Session-only, resets on a new goal.
+   */
+  helpfulness: Record<string, HelpfulnessTag[]>
   /**
    * Ids of people the viewer has explicitly pinned to the canvas via
    * "Add to web". Their warm-path chain back to the viewer is re-applied
@@ -74,7 +94,7 @@ export type BoardAction =
   | { type: 'selectNode'; id: string }
   | { type: 'connectNode'; id: string }
   | { type: 'pinNode'; id: string }
-  | { type: 'logMeetup'; id: string }
+  | { type: 'setStage'; id: string; stage: ConnectionStage; tags?: HelpfulnessTag[] }
   | { type: 'showUpgrade'; reason: UpgradeReason }
   | { type: 'dismissUpgrade' }
   | { type: 'clearSelection' }
@@ -93,7 +113,8 @@ export function createInitialBoardState(): BoardState {
     goalText: '',
     connectedIds: [],
     pinnedIds: [],
-    metUpIds: [],
+    stages: {},
+    helpfulness: {},
     people: [],
     status: 'idle',
     error: null,
@@ -184,27 +205,34 @@ function walkViaChain(
 }
 
 /**
- * Marks the connection line INTO each person the viewer has logged a meetup with
- * (the edge whose target is that person — their self-edge for a 1st-degree
- * connection, or the warm-path bridge for a deeper one). That line is solidified,
- * bumped to full strength, and flagged `isMetUp` so the canvas renders it purple
- * instead of the normal blue. Outgoing edges FROM a met-up person (introductions
- * to others) are left untouched. Idempotent (uses `Math.max`) so it survives a
- * snapshot rebuild without over-accumulating.
+ * Strengthens the connection line INTO each person the viewer has advanced to a
+ * relationship-depth stage (the edge whose target is that person — their
+ * self-edge for a 1st-degree connection, or the warm-path bridge for a deeper
+ * one). The line is solidified, its strength set to `STAGE_STRENGTH[stage]`
+ * (so it renders in a distinct tier per stage — blue/indigo/purple), and it is
+ * flagged `stage`/`isMetUp` so the canvas colours it by tier rather than as a
+ * normal blue link. Outgoing edges FROM a staged person (introductions to
+ * others) are left untouched. Idempotent and safe to re-apply after a rebuild.
+ *
+ * Strength is set directly (not `Math.max`) so advancing is authoritative — the
+ * stage is the source of truth for a staged edge's strength, including after the
+ * baseline is compressed in `snapshot.ts`.
  */
-function applyMeetups(
+function applyStages(
   snapshot: WebSnapshot,
-  metUpIds: string[],
+  stages: Record<string, ConnectionStage>,
 ): WebSnapshot {
-  if (metUpIds.length === 0) return snapshot
-  const metUp = new Set(metUpIds)
+  const ids = Object.keys(stages)
+  if (ids.length === 0) return snapshot
+  const staged = new Set(ids)
   const edges = snapshot.edges.map((e) =>
-    metUp.has(e.target)
+    staged.has(e.target)
       ? {
           ...e,
           isDotted: false,
           isMetUp: true,
-          strength: Math.max(e.strength, MET_UP_STRENGTH),
+          stage: stages[e.target],
+          strength: STAGE_STRENGTH[stages[e.target]],
         }
       : e,
   )
@@ -239,7 +267,8 @@ export function boardReducer(
         selectedId: null,
         connectedIds: [],
         pinnedIds: [],
-        metUpIds: [],
+        stages: {},
+        helpfulness: {},
         status: 'idle',
         error: null,
         upgradePrompt: null,
@@ -259,7 +288,8 @@ export function boardReducer(
         selectedId: null,
         connectedIds: [],
         pinnedIds: [],
-        metUpIds: [],
+        stages: {},
+        helpfulness: {},
         people: action.people,
         status: 'idle',
         error: null,
@@ -315,9 +345,9 @@ export function boardReducer(
       )
       return {
         ...state,
-        snapshot: applyMeetups(
+        snapshot: applyStages(
           applyConnections(snapshot, state.connectedIds),
-          state.metUpIds,
+          state.stages,
         ),
         selectedId: action.id,
       }
@@ -342,23 +372,47 @@ export function boardReducer(
       return {
         ...state,
         connectedIds,
-        snapshot: applyMeetups(
+        snapshot: applyStages(
           applyConnections(state.snapshot, connectedIds),
-          state.metUpIds,
+          state.stages,
         ),
       }
     }
 
-    case 'logMeetup': {
-      // Logging a real-world meetup strengthens the solid edge to this person to
-      // full strength, so it renders thick/vibrant (s12 visuals). Idempotent —
-      // logging again is a no-op.
-      if (state.metUpIds.includes(action.id)) return state
-      const metUpIds = [...state.metUpIds, action.id]
+    case 'setStage': {
+      // Advances a connection up the relationship-depth ladder ("Connection
+      // Depth"). The stage authoritatively sets the strength of the solid edge
+      // into this person (blue → indigo → purple by tier), so advancing visibly
+      // strengthens the web. `met` subsumes the old "I met up" action. Forward-
+      // only: a request that doesn't advance past the current stage is a no-op
+      // (so re-clicking the current rung doesn't churn state). Optional
+      // helpfulness `tags` are recorded (skippable) and merged, deduped.
+      const current = state.stages[action.id]
+      const advances =
+        current === undefined ||
+        STAGE_ORDER.indexOf(action.stage) > STAGE_ORDER.indexOf(current)
+      const tags = action.tags ?? []
+      const noTagChange =
+        tags.length === 0 ||
+        tags.every((t) => state.helpfulness[action.id]?.includes(t))
+      if (!advances && noTagChange) return state
+      const stages = advances
+        ? { ...state.stages, [action.id]: action.stage }
+        : state.stages
+      const helpfulness =
+        tags.length === 0
+          ? state.helpfulness
+          : {
+              ...state.helpfulness,
+              [action.id]: [
+                ...new Set([...(state.helpfulness[action.id] ?? []), ...tags]),
+              ],
+            }
       return {
         ...state,
-        metUpIds,
-        snapshot: applyMeetups(state.snapshot, metUpIds),
+        stages,
+        helpfulness,
+        snapshot: applyStages(state.snapshot, stages),
       }
     }
 
