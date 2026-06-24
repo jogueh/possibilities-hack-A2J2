@@ -11,6 +11,9 @@ const people: PersonInput[] = [
   { id: 'b', name: 'Bob Smith', degree: 1 },
   { id: 'c', name: 'Carol Danvers', degree: 2, via: 'a' },
   { id: 'e', name: 'Eve Polastri', degree: 2, via: 'b' },
+  // 3rd-degree people reachable through 2nd-degree connectors.
+  { id: 'd', name: 'Diana Prince', degree: 3, via: 'c' },
+  { id: 'f', name: 'Fiona Glenanne', degree: 3, via: 'e' },
 ]
 
 const config: BoardConfig = {
@@ -63,15 +66,49 @@ describe('boardReducer', () => {
     expect(s.snapshot.nodes.some((n) => n.id === 'c')).toBe(false)
   })
 
-  it('selecting a 2nd-degree node keeps the web and just updates selection', () => {
+  it('selecting an UNCONNECTED 2nd-degree node keeps the web and does NOT reveal 3rd-degree', () => {
     let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
     s = reduce(s, { type: 'submitGoal' })
     s = reduce(s, { type: 'selectNode', id: 'a' })
+    // 'c' is a 2nd-degree suggestion of 'a'. The viewer has NOT yet connected
+    // with 'c', so clicking it should open the sidebar but the 3rd-degree
+    // node 'd' (which would otherwise sit behind 'c') must stay hidden.
     s = reduce(s, { type: 'selectNode', id: 'c' })
     expect(s.selectedId).toBe('c')
-    // The connector and its 2nd-degree node both remain on the canvas.
     expect(s.snapshot.nodes.some((n) => n.id === 'a')).toBe(true)
     expect(s.snapshot.nodes.some((n) => n.id === 'c')).toBe(true)
+    expect(s.snapshot.nodes.some((n) => n.id === 'd')).toBe(false)
+  })
+
+  it('selecting a CONNECTED 2nd-degree node reveals its 3rd-degree suggestions', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    // Connect to 'c' (lazy: snapshot does not yet show 3rd-degree).
+    s = reduce(s, { type: 'connectNode', id: 'c' })
+    expect(s.snapshot.nodes.some((n) => n.id === 'd')).toBe(false)
+    // Now clicking 'c' should unlock its 3rd-degree connections.
+    s = reduce(s, { type: 'selectNode', id: 'c' })
+    expect(s.selectedId).toBe('c')
+    expect(s.snapshot.nodes.some((n) => n.id === 'd')).toBe(true)
+  })
+
+  it('a deeper-ring click without connection only updates selection (gating is recursive)', () => {
+    // Build a 1 -> 2 -> 3 chain by connecting to 'c', then clicking 'c' to
+    // reveal 'd'. 'd' is now visible as a 3rd-degree suggestion. Clicking it
+    // without first connecting must not reveal a hypothetical 4th-degree.
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    s = reduce(s, { type: 'connectNode', id: 'c' })
+    s = reduce(s, { type: 'selectNode', id: 'c' }) // reveals 'd' at depth 3
+    expect(s.snapshot.nodes.some((n) => n.id === 'd')).toBe(true)
+    // Click 'd' without connecting. No deeper ring exists in fixtures, but the
+    // assertion that matters: snapshot is identical (no rebuild, no removal).
+    const nodesBefore = s.snapshot.nodes
+    s = reduce(s, { type: 'selectNode', id: 'd' })
+    expect(s.selectedId).toBe('d')
+    expect(s.snapshot.nodes).toEqual(nodesBefore)
   })
 
   it('clears selection and resets', () => {
