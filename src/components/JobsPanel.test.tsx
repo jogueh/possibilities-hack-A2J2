@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/react";
 import { JobsPanel } from "@/components/JobsPanel";
-import { __setMockWebState, __resetMockWebState } from "@/mocks/useWebStore";
-import type { WebNode } from "@/mocks/web";
+import { __setMockWebState, __resetMockWebState } from "@/store/useWebStore";
+import type { WebNode } from "@/types/web";
 import type { Job } from "@/types/data";
 import type { JobMatch } from "@/types/job";
 
@@ -110,6 +110,29 @@ describe("JobsPanel", () => {
 
     screen.getByRole("button", { name: "Open Bob Smith's profile" }).click();
     expect(openSpy).toHaveBeenCalledWith("user_4579");
+  });
+
+  it("shows the 'Recently in your field' badge only when a connection is recently in field", async () => {
+    state.matches = [
+      {
+        job: job({ id: "fresh" }),
+        relevanceScore: 90,
+        webConnections: [
+          { userId: "u1", name: "Fresh Grad", role: "Engineer", recentlyInField: true },
+        ],
+      },
+      {
+        job: job({ id: "stale" }),
+        relevanceScore: 80,
+        webConnections: [
+          { userId: "u2", name: "Veteran", role: "Engineer", recentlyInField: false },
+        ],
+      },
+    ];
+    render(<JobsPanel open onClose={() => {}} />);
+    await screen.findAllByTestId("job-card");
+    expect(screen.getAllByTestId("recently-in-field-badge")).toHaveLength(1);
+    expect(screen.getByText("Recently in your field")).toBeTruthy();
   });
 
   it("never renders salary data", async () => {

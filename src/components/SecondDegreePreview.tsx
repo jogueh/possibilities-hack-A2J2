@@ -2,9 +2,9 @@
 // W3-OWNED. 2nd-degree preview inside the node sidebar. Lists pre-loaded 2nd-degree nodes
 // connected to the open 1st-degree node and lets the viewer add them to the web. See plan.md
 import { useState } from "react";
-import type { WebNode } from "@/mocks/web";
-import { useWebStore } from "@/mocks/useWebStore";
-import { ALIGNMENT_LABELS, alignmentColor } from "@/mocks/alignmentColors";
+import type { WebNode } from "@/types/web";
+import { useWebStore } from "@/store/useWebStore";
+import { ALIGNMENT_LABELS, alignmentColor } from "@/lib/alignmentColors";
 import { LI } from "@/lib/linkedinTokens";
 
 interface SecondDegreePreviewProps {

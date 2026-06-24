@@ -1,24 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, act, waitFor } from "@testing-library/react";
 import { NodeSidebar, __resetNodeSidebarTipCache } from "@/components/NodeSidebar";
-import { __setMockWebState, __resetMockWebState } from "@/mocks/useWebStore";
-import type { WebNode } from "@/mocks/web";
-import type { Job, UserWithJobs } from "@/mocks/data";
+import { __setMockWebState, __resetMockWebState } from "@/store/useWebStore";
+import type { WebNode } from "@/types/web";
+import type { Job, UserWithJobs } from "@/types/data";
 
 // Controllable deferred for the profile fetch so we can assert the loading skeleton.
 const deferred = vi.hoisted(() => {
   const d: { resolve?: (v: UserWithJobs | null) => void } = {};
   return d;
 });
-
-vi.mock("@/mocks/userApi", () => ({
-  fetchUserWithJobs: vi.fn(
-    () =>
-      new Promise<UserWithJobs | null>((res) => {
-        deferred.resolve = res;
-      }),
-  ),
-}));
 
 function job(company: string, position: string): Job {
   return {
@@ -42,6 +33,7 @@ function userWith(p: Partial<UserWithJobs> & { id: string; name: string }): User
     posts_activity: [],
     skills: [],
     courses: [],
+    connections: [],
     ...p,
   };
 }
@@ -70,9 +62,35 @@ beforeEach(() => {
   __resetNodeSidebarTipCache();
   __resetMockWebState();
   deferred.resolve = undefined;
+  // Unified fetch stub: NodeSidebar's profile fetch is deferred for skeleton
+  // assertions; the talking-point fetch returns a fixed tip immediately.
   vi.stubGlobal(
     "fetch",
-    vi.fn(() => Promise.resolve({ json: () => Promise.resolve({ tip: "Say hi!" }) })),
+    vi.fn((url: string) => {
+      if (typeof url === "string" && url.startsWith("/api/user/")) {
+        return new Promise<Response>((resolve) => {
+          deferred.resolve = (user) => {
+            if (user === null) {
+              resolve(new Response(null, { status: 404 }));
+            } else {
+              resolve(
+                new Response(JSON.stringify(user), {
+                  status: 200,
+                  headers: { "Content-Type": "application/json" },
+                }),
+              );
+            }
+          };
+        });
+      }
+      // Talking-point endpoint (and any other JSON endpoint NodeSidebar hits).
+      return Promise.resolve(
+        new Response(JSON.stringify({ tip: "Say hi!" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    }),
   );
   __setMockWebState({
     goal: { raw: "Break into software engineering", userId: "user_4579" },
@@ -118,17 +136,24 @@ describe("NodeSidebar", () => {
 
   it("caches the AI talking point per userId across re-opens", async () => {
     const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>;
+    const tipCalls = () =>
+      fetchMock.mock.calls.filter(
+        ([url]) =>
+          typeof url === "string" && url.includes("/api/node/talking-points"),
+      ).length;
+
     const { rerender } = render(<NodeSidebar node={node} onClose={() => {}} />);
     await act(async () => deferred.resolve!(target));
     await waitFor(() => expect(screen.getByTestId("talking-point")).toBeInTheDocument());
-    const callsAfterFirst = fetchMock.mock.calls.length;
+    const tipCallsAfterFirst = tipCalls();
 
-    // Close then re-open the same node.
+    // Close then re-open the same node — the talking-point cache should
+    // suppress the second LLM call (the profile fetch is allowed to repeat).
     rerender(<NodeSidebar node={null} onClose={() => {}} />);
     rerender(<NodeSidebar node={node} onClose={() => {}} />);
     await act(async () => deferred.resolve!(target));
     await screen.findByText("Alice Nguyen");
 
-    expect(fetchMock.mock.calls.length).toBe(callsAfterFirst); // no extra talking-point call
+    expect(tipCalls()).toBe(tipCallsAfterFirst);
   });
 });

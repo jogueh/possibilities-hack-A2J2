@@ -1,3 +1,5 @@
+// Client-side wrapper around the real `POST /api/jobs/matches` route.
+// Returns the ranked `JobMatch[]` for the given goal + web membership.
 import type { JobMatch } from "@/types/job";
 
 export async function fetchJobMatches(

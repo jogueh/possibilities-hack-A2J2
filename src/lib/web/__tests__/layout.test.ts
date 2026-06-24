@@ -5,6 +5,7 @@ import {
   placeNearParent,
   tierColor,
   tierRadius,
+  truncateLabel,
   edgeStrokeWidth,
   edgeStrokeDasharray,
   TIER_COLORS,
@@ -54,6 +55,23 @@ describe('edge styling', () => {
   it('only dotted edges get a dash array', () => {
     expect(edgeStrokeDasharray(true)).toBe('4 4')
     expect(edgeStrokeDasharray(false)).toBeUndefined()
+  })
+})
+
+describe('truncateLabel', () => {
+  it('returns short text unchanged', () => {
+    expect(truncateLabel('Bob Smith', 18)).toBe('Bob Smith')
+  })
+
+  it('truncates long text with a trailing ellipsis within the limit', () => {
+    const out = truncateLabel('Product Manager at Tech Innovators Inc.', 22)
+    expect(out.length).toBeLessThanOrEqual(22)
+    expect(out.endsWith('…')).toBe(true)
+  })
+
+  it('handles degenerate limits', () => {
+    expect(truncateLabel('anything', 0)).toBe('')
+    expect(truncateLabel('anything', 1)).toBe('…')
   })
 })
 

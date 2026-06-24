@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { resolveUserWithJobs } from '@/lib/data'
+import { fetchJobs, resolveUserWithJobs } from '@/lib/data'
 import { parseGoal } from '@/lib/goalParser'
 import { buildJobMatches } from '@/lib/jobMatches'
-import type { Job, UserWithJobs } from '@/types/data'
+import type { UserWithJobs } from '@/types/data'
 import type { JobMatch } from '@/types/job'
 
 // POST /api/jobs/matches
@@ -15,15 +15,6 @@ const requestSchema = z.object({
   goal: z.string().min(1, 'goal is required'),
   userIds: z.array(z.string().min(1)),
 })
-
-let jobsCache: Job[] | null = null
-
-async function getJobs(): Promise<Job[]> {
-  if (jobsCache) return jobsCache
-  const { default: jobsData } = await import('@/data/jobs_data.json')
-  jobsCache = jobsData as Job[]
-  return jobsCache
-}
 
 export async function POST(request: Request): Promise<Response> {
   let body: unknown
@@ -45,10 +36,13 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const { goal, userIds } = parsed.data
+  // `fetchJobs` is the single shared jobs cache also used by
+  // `resolveUserWithJobs` -> `resolveJobs`, so the jobs surfacing in matches
+  // come from the same dataset as the ones populating `user.job_history`.
   const [parsedGoal, resolvedUsers, jobs] = await Promise.all([
     parseGoal(goal),
     Promise.all(userIds.map((id) => resolveUserWithJobs(id))),
-    getJobs(),
+    fetchJobs(),
   ])
   const webUsers: UserWithJobs[] = resolvedUsers.filter(
     (u): u is UserWithJobs => u !== null,

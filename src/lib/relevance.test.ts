@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { filterRelevantJobs } from "@/lib/relevance";
-import type { Job, ParsedGoal } from "@/mocks/data";
+import type { Job } from "@/types/data";
+import type { ParsedGoal } from "@/types/goal";
 
 function job(partial: Partial<Job> & { id: string }): Job {
   return {

@@ -4,11 +4,11 @@ import { renderHook, waitFor, act } from "@testing-library/react";
 // Module mocks MUST be declared before importing the hook under test
 // (repo convention — see src/lib/goalParser.test.ts).
 const fetchJobMatchesMock = vi.fn();
-vi.mock("@/mocks/jobsApi", () => ({
+vi.mock("@/lib/jobMatchesClient", () => ({
   fetchJobMatches: (...args: unknown[]) => fetchJobMatchesMock(...args),
 }));
-vi.mock("@/mocks/goalParser", () => ({
-  parseGoalRaw: (raw: string) => ({ intent: raw }),
+vi.mock("@/lib/goalParser", () => ({
+  parseGoalFallback: (raw: string) => ({ intent: raw }),
 }));
 
 import { useJobOverlapDecorations } from "./useJobOverlapDecorations";
