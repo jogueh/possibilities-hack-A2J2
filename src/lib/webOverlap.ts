@@ -8,7 +8,12 @@ import type { WebNode } from "@/types/web";
  *
  * Cross-references a job posting against the users currently in the web to find
  * connections who have worked at that job's company — the "N people in your web
- * worked here" differentiator. No I/O, no LLM, fully deterministic.
+ * worked here" differentiator. No I/O, no LLM.
+ *
+ * Deterministic given its inputs, with one caveat: the recency helpers
+ * (`isRecentlyInField`, and `findWebOverlap` via it) default `currentYear` to
+ * `new Date().getFullYear()`, so results are time-dependent unless `currentYear`
+ * is injected. Inject it (e.g. in tests) for fully reproducible output.
  *
  * NOTE: the dataset has no per-job dates, so `overlapYears` cannot be known
  * exactly. It is left undefined here (it remains optional on WebConnectionRef);
