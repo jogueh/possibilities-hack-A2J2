@@ -25,7 +25,7 @@ export const EDGE_TIER_THRESHOLDS = {
   faint: 25,
   steady: 50,
   strong: 75,
-  // vibrant: 76–100 (everything above `strong`).
+  vibrant: EDGE_STRENGTH_MAX,
 } as const;
 
 export interface EdgeGradient {
