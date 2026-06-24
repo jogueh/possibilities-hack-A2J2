@@ -91,13 +91,15 @@ describe('parseGoal (LLM path with mocked generateObject)', () => {
   })
 
   it('uses the configured free OpenRouter model', async () => {
-    expect(GOAL_PARSER_MODEL).toMatch(/:free$/)
+    // Accept either a pinned ':free' variant (e.g. 'meta-llama/llama-3.3-70b-instruct:free')
+    // or the 'openrouter/free' auto-router. Both keep us on the free tier.
+    expect(GOAL_PARSER_MODEL).toMatch(/(?::|\/)free$/)
     generateObjectMock.mockResolvedValueOnce({
       object: {},
     } as unknown as Awaited<ReturnType<typeof generateObject>>)
     await parseGoal('any goal')
     const call = generateObjectMock.mock.calls[0]?.[0] as { model: unknown }
-    expect((call.model as { __mockModel: string }).__mockModel).toMatch(/:free$/)
+    expect((call.model as { __mockModel: string }).__mockModel).toMatch(/(?::|\/)free$/)
   })
 
   it('falls back to keyword extractor on LLM error', async () => {
