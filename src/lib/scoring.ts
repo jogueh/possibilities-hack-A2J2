@@ -41,6 +41,43 @@ function keywordOverlap(haystack: string, needle?: string): boolean {
   return tokens(needle).some((t) => hay.includes(t));
 }
 
+const GENERIC_ROLE_TOKENS = new Set([
+  "manager",
+  "engineer",
+  "analyst",
+  "specialist",
+  "coordinator",
+  "associate",
+  "lead",
+  "senior",
+  "junior",
+  "representative",
+  "rep",
+  "i",
+  "ii",
+  "iii",
+]);
+
+function roleTokens(value: string): string[] {
+  return normalize(value)
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
+function rolesOverlap(candidate: string, target: string): boolean {
+  const candidateTokens = new Set(roleTokens(candidate));
+  const targetTokens = roleTokens(target);
+  const specificTargetTokens = targetTokens.filter(
+    (t) => !GENERIC_ROLE_TOKENS.has(t),
+  );
+
+  if (specificTargetTokens.length > 0) {
+    return specificTargetTokens.some((t) => candidateTokens.has(t));
+  }
+
+  return targetTokens.some((t) => candidateTokens.has(t));
+}
+
 // ---------------------------------------------------------------------------
 // Array-aware accessors. The LLM emits the plural fields; we fall back to the
 // singular ones for backwards-compat with older callers and the keyword
@@ -72,23 +109,122 @@ function targetLocations(goal: ParsedGoal): string[] {
     : [];
 }
 
-/**
- * Tokenize a location string into a set; a match exists if ANY token overlaps.
- * Used by both the target and the exclude paths so "Bay Area" / "San Francisco"
- * / "Mountain View, CA" all interact predictably through the shared token
- * vocabulary (san, francisco, ca, ...).
- */
+const US_STATE_ALIASES = new Map([
+  ["al", "al"],
+  ["alabama", "al"],
+  ["ak", "ak"],
+  ["alaska", "ak"],
+  ["az", "az"],
+  ["arizona", "az"],
+  ["ar", "ar"],
+  ["arkansas", "ar"],
+  ["ca", "ca"],
+  ["california", "ca"],
+  ["co", "co"],
+  ["colorado", "co"],
+  ["ct", "ct"],
+  ["connecticut", "ct"],
+  ["de", "de"],
+  ["delaware", "de"],
+  ["fl", "fl"],
+  ["florida", "fl"],
+  ["ga", "ga"],
+  ["georgia", "ga"],
+  ["hi", "hi"],
+  ["hawaii", "hi"],
+  ["id", "id"],
+  ["idaho", "id"],
+  ["il", "il"],
+  ["illinois", "il"],
+  ["in", "in"],
+  ["indiana", "in"],
+  ["ia", "ia"],
+  ["iowa", "ia"],
+  ["ks", "ks"],
+  ["kansas", "ks"],
+  ["ky", "ky"],
+  ["kentucky", "ky"],
+  ["la", "la"],
+  ["louisiana", "la"],
+  ["me", "me"],
+  ["maine", "me"],
+  ["md", "md"],
+  ["maryland", "md"],
+  ["ma", "ma"],
+  ["massachusetts", "ma"],
+  ["mi", "mi"],
+  ["michigan", "mi"],
+  ["mn", "mn"],
+  ["minnesota", "mn"],
+  ["ms", "ms"],
+  ["mississippi", "ms"],
+  ["mo", "mo"],
+  ["missouri", "mo"],
+  ["mt", "mt"],
+  ["montana", "mt"],
+  ["ne", "ne"],
+  ["nebraska", "ne"],
+  ["nv", "nv"],
+  ["nevada", "nv"],
+  ["nh", "nh"],
+  ["nj", "nj"],
+  ["nm", "nm"],
+  ["oh", "oh"],
+  ["ohio", "oh"],
+  ["ok", "ok"],
+  ["oklahoma", "ok"],
+  ["or", "or"],
+  ["oregon", "or"],
+  ["pa", "pa"],
+  ["pennsylvania", "pa"],
+  ["ri", "ri"],
+  ["sc", "sc"],
+  ["sd", "sd"],
+  ["tn", "tn"],
+  ["tennessee", "tn"],
+  ["tx", "tx"],
+  ["texas", "tx"],
+  ["ut", "ut"],
+  ["utah", "ut"],
+  ["vt", "vt"],
+  ["vermont", "vt"],
+  ["va", "va"],
+  ["virginia", "va"],
+  ["wa", "wa"],
+  ["wi", "wi"],
+  ["wisconsin", "wi"],
+  ["wy", "wy"],
+  ["wyoming", "wy"],
+]);
+
+function locationParts(location: string): string[] {
+  return normalize(location)
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length > 1);
+}
+
 function locationTokenSet(location: string): Set<string> {
+  return new Set(locationParts(location).filter((t) => !US_STATE_ALIASES.has(t)));
+}
+
+function stateTokenSet(location: string): Set<string> {
   return new Set(
-    normalize(location)
-      .split(/[^a-z0-9]+/)
-      .filter((t) => t.length > 1),
+    locationParts(location)
+      .map((t) => US_STATE_ALIASES.get(t))
+      .filter((t): t is string => Boolean(t)),
   );
 }
 
 function locationOverlaps(candidate: string, target: string): boolean {
   const candidateTokens = locationTokenSet(candidate);
-  return [...locationTokenSet(target)].some((t) => candidateTokens.has(t));
+  const targetTokens = locationTokenSet(target);
+
+  if (targetTokens.size > 0) {
+    return [...targetTokens].some((t) => candidateTokens.has(t));
+  }
+
+  const candidateStates = stateTokenSet(candidate);
+  return [...stateTokenSet(target)].some((t) => candidateStates.has(t));
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +232,7 @@ function locationOverlaps(candidate: string, target: string): boolean {
 // ---------------------------------------------------------------------------
 
 export function matchesRole(text: string, goal: ParsedGoal): boolean {
-  return targetRoles(goal).some((role) => keywordOverlap(text, role));
+  return targetRoles(goal).some((role) => rolesOverlap(text, role));
 }
 
 export function matchesIndustry(industry: string, goal: ParsedGoal): boolean {
@@ -141,6 +277,8 @@ export const WEIGHTS = {
   skills: 15,
   activity: 10,
 } as const;
+
+const ROLE_MISMATCH_MAX_SCORE = 39;
 
 /**
  * Structural shape of the scoring weights. `typeof WEIGHTS` would be a tuple
@@ -221,8 +359,12 @@ export function scoreUserAgainstGoal(
 ): number {
   const w = effectiveWeights(parsedGoal);
   let score = 0;
+  const hasTargetRole = targetRoles(parsedGoal).length > 0;
+  const roleMatched = user.job_history.some((j) =>
+    matchesRole(j.position, parsedGoal),
+  );
 
-  if (user.job_history.some((j) => matchesRole(j.position, parsedGoal))) {
+  if (roleMatched) {
     score += w.role;
   }
   if (user.job_history.some((j) => matchesIndustry(j.industry, parsedGoal))) {
@@ -253,7 +395,10 @@ export function scoreUserAgainstGoal(
     score -= w.location;
   }
 
-  return clamp(score);
+  const finalScore = clamp(score);
+  return hasTargetRole && !roleMatched
+    ? Math.min(finalScore, ROLE_MISMATCH_MAX_SCORE)
+    : finalScore;
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +421,9 @@ export function scoreJobAgainstGoal(job: Job, goal: ParsedGoal): number {
   const scale = 100 / total;
 
   let score = 0;
-  if (matchesRole(job.position, goal)) score += w.role;
+  const hasTargetRole = targetRoles(goal).length > 0;
+  const roleMatched = matchesRole(job.position, goal);
+  if (roleMatched) score += w.role;
   if (matchesIndustry(job.industry, goal)) score += w.industry;
   if (matchesLocation(job.location, goal)) score += w.location;
 
@@ -285,5 +432,8 @@ export function scoreJobAgainstGoal(job: Job, goal: ParsedGoal): number {
   if (excludedByIndustry(job.industry, goal)) score -= w.industry;
   if (excludedByLocation(job.location, goal)) score -= w.location;
 
-  return clamp(score * scale);
+  const finalScore = clamp(score * scale);
+  return hasTargetRole && !roleMatched
+    ? Math.min(finalScore, ROLE_MISMATCH_MAX_SCORE)
+    : finalScore;
 }

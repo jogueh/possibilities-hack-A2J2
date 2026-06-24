@@ -59,6 +59,12 @@ describe('parseGoalFallback (deterministic keyword extractor)', () => {
     expect(r.targetRole).toBe('Software Engineer')
     expect(r.targetIndustry).toBe('Technology')
   })
+
+  it('maps design job fallback phrasing to UX Designer', () => {
+    const r = parseGoalFallback('looking for a design job')
+    expect(r.targetRole).toBe('UX Designer')
+    expect(r.targetRoles).toEqual(['UX Designer'])
+  })
 })
 
 describe('parseGoal (LLM path with mocked generateObject)', () => {
