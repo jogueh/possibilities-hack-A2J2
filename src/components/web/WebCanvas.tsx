@@ -6,9 +6,10 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import type { WebSnapshot } from '@/types/web'
-import { edgeStrokeDasharray, edgeStrokeWidth } from '@/lib/web/layout'
+import { edgeStrokeDasharray } from '@/lib/web/layout'
+import { edgeStrengthStyleUnit } from '@/lib/edgeStrength'
 import WebNodeMarker, { type NodeDecoration } from './WebNodeMarker'
 
 export type { NodeDecoration }
@@ -19,12 +20,6 @@ export interface WebCanvasProps {
   height?: number
   selectedId?: string | null
   onNodeSelect?: (id: string) => void
-  /**
-   * Renders the central "You" node even before a goal is mapped (empty state),
-   * so the blank view shows the viewer at the centre of their (yet-to-grow) web
-   * instead of an empty placeholder.
-   */
-  alwaysShowSelf?: boolean
   /**
    * Per-node decorations keyed by `WebNode.id`, injected by sibling workflows
    * (e.g. Workflow 4 sets `{ hasJobOverlap: true }` for connections that match
@@ -57,7 +52,6 @@ export default function WebCanvas({
   height = 520,
   selectedId = null,
   onNodeSelect,
-  alwaysShowSelf = false,
   nodeDecorations,
 }: WebCanvasProps) {
   const center = { x: width / 2, y: height / 2 }
@@ -65,6 +59,7 @@ export default function WebCanvas({
   const [view, setView] = useState<ViewTransform>({ tx: 0, ty: 0, k: 1 })
   const [panning, setPanning] = useState(false)
   const drag = useRef<{ x: number; y: number } | null>(null)
+  const reduceMotion = useReducedMotion()
 
   // Resolve any edge endpoint (a node id, or the self/goal id) to a point.
   const positionById = new Map<string, { x: number; y: number }>(
@@ -168,11 +163,42 @@ export default function WebCanvas({
           data-testid="web-viewport"
           transform={`translate(${view.tx} ${view.ty}) scale(${view.k})`}
         >
+          <defs>
+            {snapshot.edges.map((edge) => {
+              const g = edgeStrengthStyleUnit(edge.strength).gradient
+              if (g === undefined || edge.isDotted) return null
+              const a = positionById.get(edge.source)
+              const b = positionById.get(edge.target)
+              if (!a || !b) return null
+              return (
+                <linearGradient
+                  key={`edge-grad-${edge.id}`}
+                  id={`edge-grad-${edge.id}`}
+                  gradientUnits="userSpaceOnUse"
+                  x1={a.x}
+                  y1={a.y}
+                  x2={b.x}
+                  y2={b.y}
+                >
+                  <stop offset="0%" stopColor={g.from} />
+                  <stop offset="100%" stopColor={g.to} />
+                </linearGradient>
+              )
+            })}
+          </defs>
+
           <g data-testid="web-edges">
             {snapshot.edges.map((edge) => {
               const a = positionById.get(edge.source)
               const b = positionById.get(edge.target)
               if (!a || !b) return null
+              const style = edgeStrengthStyleUnit(edge.strength)
+              const stroke = edge.isDotted
+                ? '#b9c2cc'
+                : style.gradient
+                  ? `url(#edge-grad-${edge.id})`
+                  : style.color
+              const pulse = style.pulse && !edge.isDotted && !reduceMotion
               return (
                 <motion.line
                   key={edge.id}
@@ -181,19 +207,23 @@ export default function WebCanvas({
                   y1={a.y}
                   x2={b.x}
                   y2={b.y}
-                  stroke={edge.isDotted ? '#b9c2cc' : '#4a90d9'}
-                  strokeWidth={edgeStrokeWidth(edge.strength)}
+                  stroke={stroke}
+                  strokeWidth={style.width}
                   strokeDasharray={edgeStrokeDasharray(edge.isDotted)}
                   strokeLinecap="round"
                   initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.3 }}
+                  animate={pulse ? { opacity: [0.55, 1, 0.55] } : { opacity: 1 }}
+                  transition={
+                    pulse
+                      ? { duration: 1.6, repeat: Infinity, ease: 'easeInOut' }
+                      : { duration: 0.3 }
+                  }
                 />
               )
             })}
           </g>
 
-          {(snapshot.goal || alwaysShowSelf) && (
+          {snapshot.goal && (
             <motion.g
               data-testid="web-self"
               initial={{ opacity: 0, x: center.x, y: center.y, scale: 0.7 }}

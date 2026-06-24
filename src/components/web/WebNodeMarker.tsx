@@ -3,7 +3,7 @@
 import type { KeyboardEvent } from 'react'
 import { motion } from 'framer-motion'
 import type { WebNode } from '@/types/web'
-import { tierColor, tierRadius, truncateLabel, wrapWords, activityRingColor, activityRingLabel } from '@/lib/web/layout'
+import { tierColor, tierRadius, truncateLabel, wrapLabel, activityRingColor, activityRingLabel } from '@/lib/web/layout'
 
 /**
  * Per-node visual decorations injected by sibling workflows. Workflow 1 owns the
@@ -23,10 +23,10 @@ export interface WebNodeMarkerProps {
   decoration?: NodeDecoration
 }
 
-// The name caption stays on one line (capped width). The headline wraps two
-// words per line so the full role is shown under the node without overflowing.
+// The name caption stays on one line (capped width). The headline wraps across
+// lines so the full role is shown without overflowing the node's width.
 const NAME_MAX = 18
-const HEADLINE_WORDS_PER_LINE = 2
+const HEADLINE_WRAP = 16
 const HEADLINE_LINE_HEIGHT = 13
 
 // Presentational SVG marker for a single person node.
@@ -89,6 +89,7 @@ export default function WebNodeMarker({
 
       {/* Avatar disc + activity-status ring (falls back to alignment-tier colour) */}
       <circle r={r} fill="#eef3f8" stroke={ring} strokeWidth={selected ? 4 : 3} />
+      {/* Initials are the fallback shown when there's no photo (or it fails to load). */}
       <text
         textAnchor="middle"
         dominantBaseline="central"
@@ -98,11 +99,29 @@ export default function WebNodeMarker({
       >
         {node.avatarInitials}
       </text>
+      {/* Avatar photo clipped to the disc, drawn over the initials fallback. */}
+      {node.photo && (
+        <>
+          <clipPath id={`avatar-clip-${node.id}`}>
+            <circle r={r} />
+          </clipPath>
+          <image
+            href={node.photo}
+            x={-r}
+            y={-r}
+            width={r * 2}
+            height={r * 2}
+            preserveAspectRatio="xMidYMid slice"
+            clipPath={`url(#avatar-clip-${node.id})`}
+            style={{ pointerEvents: 'none' }}
+          />
+        </>
+      )}
 
-      {/* Warm-path degree badge (2nd / 3rd) */}
-      {node.degree >= 2 && (
+      {/* 2nd-degree badge */}
+      {node.degree === 2 && (
         <text x={r + 4} y={-r + 2} fontSize={10} fontWeight={600} fill="#8a94a6">
-          {node.degree === 2 ? '2nd' : '3rd'}
+          2nd
         </text>
       )}
 
@@ -117,10 +136,10 @@ export default function WebNodeMarker({
         {truncateLabel(node.label, NAME_MAX)}
       </text>
 
-      {/* Headline — width-constrained: wraps two words per line so the full
-          role (e.g. "Product Manager at Tech Innovators Inc.") is always shown. */}
+      {/* Headline — width-constrained: wraps across lines so the full role
+          (e.g. "Product Manager at Tech Innovators Inc.") is always shown. */}
       {node.headline &&
-        wrapWords(node.headline, HEADLINE_WORDS_PER_LINE).map((line, i) => (
+        wrapLabel(node.headline, HEADLINE_WRAP).map((line, i) => (
           <text
             key={i}
             textAnchor="middle"

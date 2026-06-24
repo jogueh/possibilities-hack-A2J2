@@ -4,32 +4,39 @@
 import { useEffect, useState } from "react";
 import type { DegreeLevel } from "@/types/web";
 import { LI } from "@/lib/linkedinTokens";
+import { MetUpButton } from "@/components/MetUpButton";
 
 interface ActionsBarProps {
   targetName: string;
+  tip?: string | null; // AI talking point used to pre-fill the message subject
   /** Degree of the open node. 1st-degree people are already connected, so the
    *  Connect button is hidden for them. */
   degree?: DegreeLevel;
   /** True once the viewer has connected with this (2nd-degree) person. */
   connected?: boolean;
-  /** True when the viewer has hit the free-tier connection cap (premium gate). */
-  atConnectionLimit?: boolean;
   /** Called when a connection request is confirmed; promotes the person on the web. */
   onConnect?: () => void;
-  /** Surfaces an "Upgrade to Premium" prompt (InMail is premium; cap is reached). */
-  onUpgrade?: (reason: "connection" | "inmail") => void;
+  /** Graph id of the open node — passed to the "I met up" button as its key. */
+  nodeId?: string;
+  /** True when board state says the meetup has already been logged for this node. */
+  metUpLogged?: boolean;
+  /** Called when the viewer logs a real-world meetup (strengthens the edge). */
+  onLogMeetup?: () => void;
 }
 
-export function ActionsBar({
-  targetName,
-  degree,
-  connected,
-  atConnectionLimit,
-  onConnect,
-  onUpgrade,
-}: ActionsBarProps) {
+export function ActionsBar({ targetName, tip, degree, connected, onConnect, nodeId, metUpLogged, onLogMeetup }: ActionsBarProps) {
   const [connectOpen, setConnectOpen] = useState(false);
+  const [messageOpen, setMessageOpen] = useState(false);
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+
+  // Pre-fill the subject from the AI talking point and clear the body when opening the composer.
+  const openMessage = () => {
+    setSubject(tip ? tip : `Connecting with you, ${targetName}`);
+    setBody("");
+    setMessageOpen(true);
+  };
 
   // Auto-dismiss the toast.
   useEffect(() => {
@@ -44,16 +51,6 @@ export function ActionsBar({
     padding: "8px 0",
     fontWeight: 600,
     cursor: "pointer",
-  };
-
-  // Connect is gated by the free-tier connection cap: past the limit the button
-  // prompts an upgrade instead of opening the confirmation dialog.
-  const handleConnectClick = () => {
-    if (atConnectionLimit) {
-      onUpgrade?.("connection");
-      return;
-    }
-    setConnectOpen(true);
   };
 
   return (
@@ -72,21 +69,36 @@ export function ActionsBar({
           ) : (
             <button
               type="button"
-              onClick={handleConnectClick}
+              onClick={() => setConnectOpen(true)}
               style={{ ...btn, background: LI.blue, color: "#fff", border: "none" }}
             >
               Connect
             </button>
           ))}
-        {/* InMail is a LinkedIn Premium feature — always gated behind upgrade. */}
         <button
           type="button"
-          onClick={() => onUpgrade?.("inmail")}
-          style={{ ...btn, background: "transparent", color: LI.blue, border: `1px solid ${LI.blue}` }}
+          onClick={openMessage}
+          style={{
+            ...btn,
+            background: "transparent",
+            color: LI.blue,
+            border: `1px solid ${LI.blue}`,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+          }}
         >
-          <span aria-hidden="true">🔒</span> InMail
+          <img src="/premiumin.svg" alt="" aria-hidden="true" width={16} height={16} style={{ display: "block" }} />
+          InMail
         </button>
       </div>
+
+      {/* 1st-degree people are existing connections — logging a real-world meetup
+          with them strengthens the edge on the web (W4 stretch s11). */}
+      {degree === 1 && nodeId && onLogMeetup && (
+        <MetUpButton edgeId={nodeId} logged={metUpLogged} onLog={onLogMeetup} />
+      )}
 
       {connectOpen && (
         <Modal title="Connect" onClose={() => setConnectOpen(false)}>
@@ -99,6 +111,39 @@ export function ActionsBar({
                 onConnect?.();
                 setToast(`Connection request sent to ${targetName}`);
                 setConnectOpen(false);
+              }}
+              style={{ background: LI.blue, color: "#fff", border: "none", borderRadius: 16, padding: "4px 14px", fontWeight: 600 }}
+            >
+              Send
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {messageOpen && (
+        <Modal title={`Message ${targetName}`} onClose={() => setMessageOpen(false)}>
+          <label style={{ display: "block", fontSize: 12, color: LI.textSecondary }}>Subject</label>
+          <input
+            aria-label="Subject"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            style={{ width: "100%", marginBottom: 8, padding: 6 }}
+          />
+          <label style={{ display: "block", fontSize: 12, color: LI.textSecondary }}>Message</label>
+          <textarea
+            aria-label="Message body"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={4}
+            style={{ width: "100%", marginBottom: 8, padding: 6 }}
+          />
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button type="button" onClick={() => setMessageOpen(false)}>Cancel</button>
+            <button
+              type="button"
+              onClick={() => {
+                setToast(`Message sent to ${targetName}`);
+                setMessageOpen(false);
               }}
               style={{ background: LI.blue, color: "#fff", border: "none", borderRadius: 16, padding: "4px 14px", fontWeight: 600 }}
             >

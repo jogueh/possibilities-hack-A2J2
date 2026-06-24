@@ -3,13 +3,10 @@ import {
   layoutNodes,
   deriveEdges,
   placeNearParent,
-  resolveCollisions,
-  NODE_MIN_DISTANCE,
   tierColor,
   tierRadius,
   truncateLabel,
   wrapLabel,
-  wrapWords,
   edgeStrokeWidth,
   edgeStrokeDasharray,
   TIER_COLORS,
@@ -106,82 +103,6 @@ describe('wrapLabel', () => {
 
   it('returns an empty list for blank text', () => {
     expect(wrapLabel('   ', 16)).toEqual([])
-  })
-})
-
-describe('wrapWords', () => {
-  it('wraps a role two words per line, preserving order', () => {
-    expect(wrapWords('Product Manager at Tech Innovators Inc.', 2)).toEqual([
-      'Product Manager',
-      'at Tech',
-      'Innovators Inc.',
-    ])
-  })
-
-  it('keeps a short role on a single line', () => {
-    expect(wrapWords('Data Scientist', 2)).toEqual(['Data Scientist'])
-  })
-
-  it('handles an odd word count by leaving a single word on the last line', () => {
-    expect(wrapWords('Customer Service Manager', 2)).toEqual([
-      'Customer Service',
-      'Manager',
-    ])
-  })
-
-  it('returns an empty list for blank text', () => {
-    expect(wrapWords('   ', 2)).toEqual([])
-  })
-})
-
-describe('resolveCollisions', () => {
-  const minDist = NODE_MIN_DISTANCE
-
-  const tooClose = (
-    a: { x: number; y: number },
-    b: { x: number; y: number },
-  ) => Math.hypot(a.x - b.x, a.y - b.y) < minDist - 0.5
-
-  it('pushes a candidate off an overlapping fixed point', () => {
-    const fixed = [{ x: 100, y: 100 }]
-    const [pos] = resolveCollisions(fixed, [{ x: 110, y: 100 }], minDist)
-    expect(tooClose(pos, fixed[0])).toBe(false)
-  })
-
-  it('separates a cluster of candidates from each other and the obstacles', () => {
-    const center = { x: 400, y: 300 }
-    const fixed = [center, { x: 520, y: 300 }]
-    // Three candidates intentionally stacked on the same point.
-    const candidates = [
-      { x: 560, y: 300 },
-      { x: 560, y: 300 },
-      { x: 560, y: 300 },
-    ]
-    const resolved = resolveCollisions(fixed, candidates, minDist, center)
-    const all = [...fixed, ...resolved]
-    for (let i = 0; i < all.length; i++) {
-      for (let j = i + 1; j < all.length; j++) {
-        expect(tooClose(all[i], all[j])).toBe(false)
-      }
-    }
-  })
-
-  it('leaves already-separated candidates effectively in place', () => {
-    const fixed = [{ x: 0, y: 0 }]
-    const cand = { x: 500, y: 500 }
-    const [pos] = resolveCollisions(fixed, [cand], minDist)
-    expect(pos).toEqual(cand)
-  })
-
-  it('is deterministic for the same input', () => {
-    const fixed = [{ x: 400, y: 300 }]
-    const candidates = [
-      { x: 410, y: 300 },
-      { x: 410, y: 300 },
-    ]
-    expect(resolveCollisions(fixed, candidates, minDist)).toEqual(
-      resolveCollisions(fixed, candidates, minDist),
-    )
   })
 })
 

@@ -59,15 +59,17 @@ a {
   width: 34px;
   height: 34px;
   border-radius: 4px;
-  background: var(--linkedin-blue);
-  color: #ffffff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
-  font-size: 18px;
-  font-family: Georgia, serif;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.top-nav-logo img {
+  width: 34px;
+  height: 34px;
+  display: block;
 }
 
 .top-nav-search {

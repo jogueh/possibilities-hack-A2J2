@@ -11,9 +11,9 @@ const people: PersonInput[] = [
   { id: 'b', name: 'Bob Smith', degree: 1 },
   { id: 'c', name: 'Carol Danvers', degree: 2, via: 'a' },
   { id: 'e', name: 'Eve Polastri', degree: 2, via: 'b' },
-  { id: 'f', name: 'Frank Castle', degree: 2, via: 'a' },
-  { id: 'g', name: 'Gwen Stacy', degree: 2, via: 'a' },
-  { id: 'z', name: 'Zoe Washburne', degree: 3, via: 'c' },
+  // 3rd-degree people reachable through 2nd-degree connectors.
+  { id: 'd', name: 'Diana Prince', degree: 3, via: 'c' },
+  { id: 'f', name: 'Fiona Glenanne', degree: 3, via: 'e' },
 ]
 
 const config: BoardConfig = {
@@ -66,15 +66,49 @@ describe('boardReducer', () => {
     expect(s.snapshot.nodes.some((n) => n.id === 'c')).toBe(false)
   })
 
-  it('selecting a 2nd-degree node keeps the web and just updates selection', () => {
+  it('selecting an UNCONNECTED 2nd-degree node keeps the web and does NOT reveal 3rd-degree', () => {
     let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
     s = reduce(s, { type: 'submitGoal' })
     s = reduce(s, { type: 'selectNode', id: 'a' })
+    // 'c' is a 2nd-degree suggestion of 'a'. The viewer has NOT yet connected
+    // with 'c', so clicking it should open the sidebar but the 3rd-degree
+    // node 'd' (which would otherwise sit behind 'c') must stay hidden.
     s = reduce(s, { type: 'selectNode', id: 'c' })
     expect(s.selectedId).toBe('c')
-    // The connector and its 2nd-degree node both remain on the canvas.
     expect(s.snapshot.nodes.some((n) => n.id === 'a')).toBe(true)
     expect(s.snapshot.nodes.some((n) => n.id === 'c')).toBe(true)
+    expect(s.snapshot.nodes.some((n) => n.id === 'd')).toBe(false)
+  })
+
+  it('selecting a CONNECTED 2nd-degree node reveals its 3rd-degree suggestions', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    // Connect to 'c' (lazy: snapshot does not yet show 3rd-degree).
+    s = reduce(s, { type: 'connectNode', id: 'c' })
+    expect(s.snapshot.nodes.some((n) => n.id === 'd')).toBe(false)
+    // Now clicking 'c' should unlock its 3rd-degree connections.
+    s = reduce(s, { type: 'selectNode', id: 'c' })
+    expect(s.selectedId).toBe('c')
+    expect(s.snapshot.nodes.some((n) => n.id === 'd')).toBe(true)
+  })
+
+  it('a deeper-ring click without connection only updates selection (gating is recursive)', () => {
+    // Build a 1 -> 2 -> 3 chain by connecting to 'c', then clicking 'c' to
+    // reveal 'd'. 'd' is now visible as a 3rd-degree suggestion. Clicking it
+    // without first connecting must not reveal a hypothetical 4th-degree.
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    s = reduce(s, { type: 'connectNode', id: 'c' })
+    s = reduce(s, { type: 'selectNode', id: 'c' }) // reveals 'd' at depth 3
+    expect(s.snapshot.nodes.some((n) => n.id === 'd')).toBe(true)
+    // Click 'd' without connecting. No deeper ring exists in fixtures, but the
+    // assertion that matters: snapshot is identical (no rebuild, no removal).
+    const nodesBefore = s.snapshot.nodes
+    s = reduce(s, { type: 'selectNode', id: 'd' })
+    expect(s.selectedId).toBe('d')
+    expect(s.snapshot.nodes).toEqual(nodesBefore)
   })
 
   it('clears selection and resets', () => {
@@ -99,15 +133,62 @@ describe('boardReducer', () => {
     expect(bridge.strength).toBeGreaterThanOrEqual(0.9) // strengthened
   })
 
-  it('keeps a connection solid after the connector is re-expanded', () => {
+  it('promotes a connected 2nd-degree person to a permanent 1st-degree connection', () => {
     let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
     s = reduce(s, { type: 'submitGoal' })
     s = reduce(s, { type: 'selectNode', id: 'a' })
     s = reduce(s, { type: 'connectNode', id: 'c' })
-    // Visit b, then return to a (rebuilds a's expansion from scratch).
+    // Visiting another connector rebuilds the web; the connection must survive.
     s = reduce(s, { type: 'selectNode', id: 'b' })
+    const c = s.snapshot.nodes.find((n) => n.id === 'c')
+    expect(c).toBeTruthy()
+    // c is now a direct (1st-degree) connection with a solid self-edge, not a
+    // dotted warm-path bridge through a.
+    expect(c?.degree).toBe(1)
+    expect(s.snapshot.edges.find((e) => e.id === 'self_1__c')?.isDotted).toBe(false)
+    expect(s.snapshot.edges.some((e) => e.id === 'a__c')).toBe(false)
+  })
+
+  it('converts a connected node to a 1st-degree connection on clearSelection', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
     s = reduce(s, { type: 'selectNode', id: 'a' })
-    expect(s.snapshot.edges.find((e) => e.id === 'a__c')?.isDotted).toBe(false)
+    s = reduce(s, { type: 'connectNode', id: 'c' })
+    // While still selected, c stays the 2nd-degree node (now with a solid bridge).
+    expect(s.snapshot.nodes.find((n) => n.id === 'c')?.degree).toBe(2)
+    // Clicking off promotes it to a permanent 1st-degree connection.
+    s = reduce(s, { type: 'clearSelection' })
+    expect(s.selectedId).toBeNull()
+    const c = s.snapshot.nodes.find((n) => n.id === 'c')
+    expect(c?.degree).toBe(1)
+    expect(s.snapshot.edges.find((e) => e.id === 'self_1__c')?.isDotted).toBe(false)
+  })
+
+  it('keeps a promoted node navigable: its former 3rd-degree becomes a 2nd-degree suggestion', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    s = reduce(s, { type: 'connectNode', id: 'c' })
+    s = reduce(s, { type: 'clearSelection' }) // c promoted to 1st-degree
+    // d used to sit at depth 3 behind c. Now that c is a direct connection, d is
+    // a 2nd-degree suggestion revealed by selecting c.
+    s = reduce(s, { type: 'selectNode', id: 'c' })
+    expect(s.snapshot.nodes.find((n) => n.id === 'd')?.degree).toBe(2)
+  })
+
+  it('a new goal clears the promotion', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    s = reduce(s, { type: 'connectNode', id: 'c' })
+    s = reduce(s, { type: 'clearSelection' })
+    expect(s.snapshot.nodes.find((n) => n.id === 'c')?.degree).toBe(1)
+    // Mapping a new goal resets connections; c is a warm-path 2nd-degree node again.
+    s = reduce(s, { type: 'setGoalText', value: 'New goal' })
+    s = reduce(s, { type: 'submitGoal' })
+    expect(s.connectedIds).toEqual([])
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    expect(s.snapshot.nodes.find((n) => n.id === 'c')?.degree).toBe(2)
   })
 
   it('connectNode is idempotent and resets on a new goal', () => {
@@ -123,58 +204,49 @@ describe('boardReducer', () => {
     expect(s.connectedIds).toEqual([])
   })
 
-  it('expands a connected 2nd-degree node to reveal its 3rd-degree connections', () => {
+  it('logMeetup strengthens the edge to a 1st-degree person to full strength', () => {
     let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
     s = reduce(s, { type: 'submitGoal' })
-    s = reduce(s, { type: 'selectNode', id: 'a' }) // reveals c (2nd)
-    s = reduce(s, { type: 'connectNode', id: 'c' }) // connect c
-    s = reduce(s, { type: 'selectNode', id: 'c' }) // keep going: reveal z (3rd)
-    expect(s.snapshot.nodes.some((n) => n.id === 'z')).toBe(true)
-    expect(s.selectedId).toBe('c')
-    expect(s.upgradePrompt).toBeNull()
-    // Additive: the connector and its 2nd-degree node stay on the canvas.
-    expect(s.snapshot.nodes.some((n) => n.id === 'a')).toBe(true)
-    expect(s.snapshot.nodes.some((n) => n.id === 'c')).toBe(true)
+    const selfEdgeId = 'self_1__a'
+    expect(s.snapshot.edges.find((e) => e.id === selfEdgeId)!.strength).toBeLessThan(1)
+
+    s = reduce(s, { type: 'logMeetup', id: 'a' })
+    expect(s.metUpIds).toContain('a')
+    expect(s.snapshot.edges.find((e) => e.id === selfEdgeId)!.strength).toBe(1)
   })
 
-  it('does not expand a 2nd-degree node until the viewer connects with it', () => {
-    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
-    s = reduce(s, { type: 'submitGoal' })
-    s = reduce(s, { type: 'selectNode', id: 'a' })
-    s = reduce(s, { type: 'selectNode', id: 'c' }) // not connected -> no expansion
-    expect(s.snapshot.nodes.some((n) => n.id === 'z')).toBe(false)
-    expect(s.selectedId).toBe('c')
-    expect(s.upgradePrompt).toBeNull()
-  })
-
-  it('prompts to upgrade when expanding past the 3rd degree', () => {
+  it('logMeetup does not strengthen non-viewer edges touching the met-up person', () => {
     let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
     s = reduce(s, { type: 'submitGoal' })
     s = reduce(s, { type: 'selectNode', id: 'a' })
     s = reduce(s, { type: 'connectNode', id: 'c' })
-    s = reduce(s, { type: 'selectNode', id: 'c' }) // reveal z (3rd)
-    s = reduce(s, { type: 'connectNode', id: 'z' })
-    s = reduce(s, { type: 'selectNode', id: 'z' }) // 3rd -> would reveal 4th: blocked
-    expect(s.upgradePrompt).toBe('depth')
-    expect(s.selectedId).toBe('z')
+    const bridgeBefore = s.snapshot.edges.find((e) => e.id === 'a__c')!
+    expect(bridgeBefore.isDotted).toBe(false)
+    expect(bridgeBefore.strength).toBeLessThan(1)
+
+    s = reduce(s, { type: 'logMeetup', id: 'a' })
+    expect(s.snapshot.edges.find((e) => e.id === 'self_1__a')!.strength).toBe(1)
+    expect(s.snapshot.edges.find((e) => e.id === 'a__c')!.strength).toBe(bridgeBefore.strength)
   })
 
-  it('caps connections at the free-tier limit and prompts to upgrade', () => {
+  it('keeps a meetup-strengthened edge after the web is re-expanded', () => {
     let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
     s = reduce(s, { type: 'submitGoal' })
-    s = reduce(s, { type: 'connectNode', id: 'c' })
-    s = reduce(s, { type: 'connectNode', id: 'f' })
-    s = reduce(s, { type: 'connectNode', id: 'g' })
-    // 4th connection is blocked on the free tier.
-    s = reduce(s, { type: 'connectNode', id: 'e' })
-    expect(s.connectedIds).toEqual(['c', 'f', 'g'])
-    expect(s.upgradePrompt).toBe('connection')
+    s = reduce(s, { type: 'logMeetup', id: 'a' })
+    // Visit b (rebuilds the seeded snapshot) then return to a.
+    s = reduce(s, { type: 'selectNode', id: 'b' })
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    expect(s.snapshot.edges.find((e) => e.id === 'self_1__a')!.strength).toBe(1)
   })
 
-  it('dismisses the upgrade prompt', () => {
-    let s = reduce(createInitialBoardState(), { type: 'showUpgrade', reason: 'inmail' })
-    expect(s.upgradePrompt).toBe('inmail')
-    s = reduce(s, { type: 'dismissUpgrade' })
-    expect(s.upgradePrompt).toBeNull()
+  it('logMeetup is idempotent and resets on a new goal', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'logMeetup', id: 'a' })
+    s = reduce(s, { type: 'logMeetup', id: 'a' })
+    expect(s.metUpIds).toEqual(['a'])
+    s = reduce(s, { type: 'setGoalText', value: 'New goal' })
+    s = reduce(s, { type: 'submitGoal' })
+    expect(s.metUpIds).toEqual([])
   })
 })

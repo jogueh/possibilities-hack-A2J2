@@ -11,10 +11,10 @@ import {
   deriveEdges,
   layoutNodes,
   placeNearParent,
-  resolveCollisions,
   type LayoutOptions,
   type Relationship,
 } from '@/lib/web/layout'
+import { photoUrlForUser } from '@/lib/avatarPhoto'
 
 // Snapshot builder: turns shaped people + a goal into a WebSnapshot and walks
 // the empty -> seeded -> expanded state machine. Pure and deterministic.
@@ -30,6 +30,11 @@ export interface PersonInput {
   headline?: string
   /** Optional outreach-activity status driving the activity-ring colour. */
   activityStatus?: ActivityStatus
+  /**
+   * Optional avatar photo URL. When omitted, the snapshot derives a stable
+   * portrait from the member id via `photoUrlForUser`.
+   */
+  photo?: string
   /**
    * Real member id in `user_data.json`, used by the node sidebar to fetch the
    * full profile. Defaults to `id` (the graph/layout id) when omitted.
@@ -69,6 +74,7 @@ function toNode(p: PersonInput): WebNode {
     interactionScore: p.interactionScore ?? DEFAULT_INTERACTION,
     relevanceScore,
     position: { x: 0, y: 0 },
+    photo: p.photo ?? photoUrlForUser(p.userId ?? p.id),
     ...(p.headline ? { headline: p.headline } : {}),
     ...(p.activityStatus ? { activityStatus: p.activityStatus } : {}),
   }
@@ -116,14 +122,16 @@ export function buildSnapshot(
 }
 
 /**
- * Expands a node, revealing the next-degree people that reach the user through
- * it. Works for any parent degree (1st reveals 2nd, a connected 2nd reveals 3rd,
- * …) so the viewer can keep drilling along a warm path. Returns an `expanded`
- * snapshot with dotted bridge edges. The new nodes are clustered next to their
- * connector (not on a global outer ring) so the warm path reads clearly.
- * Existing nodes keep their positions, so expanding one node never reshuffles
- * the rest of the web. Calling it for an unknown / already-expanded node is a
- * no-op (idempotent).
+ * Expands a node, revealing the next-ring people that reach the user through
+ * it. Returns an `expanded` snapshot with dotted bridge edges. The new nodes
+ * are clustered next to their connector (not on a global outer ring) so the
+ * warm path reads clearly. Existing nodes keep their positions, so expanding
+ * one node never reshuffles the rest of the web. Calling it for an unknown /
+ * already-expanded node — or a node with no further children — is a no-op
+ * (idempotent).
+ *
+ * Works at any depth: clicking a degree-N node reveals its degree-(N+1)
+ * children whose `via` matches, one warm-path hop further out.
  */
 export function expandNode(
   snapshot: WebSnapshot,
@@ -136,9 +144,11 @@ export function expandNode(
   const parent = snapshot.nodes.find((n) => n.id === nodeId)
   if (!parent) return snapshot
 
+  // Children sit one ring further out than their parent.
+  const childDegree: DegreeLevel = parent.degree + 1
   const existingIds = new Set(snapshot.nodes.map((n) => n.id))
   const newPeople = people.filter(
-    (p) => p.via === nodeId && !existingIds.has(p.id),
+    (p) => p.degree === childDegree && p.via === nodeId && !existingIds.has(p.id),
   )
   if (newPeople.length === 0) {
     return snapshot
@@ -153,18 +163,9 @@ export function expandNode(
   )
 
   const center = { x: options.width / 2, y: options.height / 2 }
-  // Initial fanned-out cluster positions next to the parent…
-  const clustered = ordered.map((p, i) =>
-    placeNearParent(parent.position, center, i, ordered.length, options),
-  )
-  // …then push them apart from everything already on the canvas (and the self
-  // centre + each other) so freshly-revealed connections never physically
-  // overlap existing people.
-  const obstacles = [center, ...snapshot.nodes.map((n) => n.position)]
-  const resolved = resolveCollisions(obstacles, clustered, undefined, center)
   const newNodes: WebNode[] = ordered.map((p, i) => ({
     ...toNode(p),
-    position: resolved[i],
+    position: placeNearParent(parent.position, center, i, ordered.length, options),
   }))
   const nodes = [...snapshot.nodes, ...newNodes]
 

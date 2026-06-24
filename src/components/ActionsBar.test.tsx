@@ -1,6 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { ActionsBar } from "@/components/ActionsBar";
+import { __resetMetUpLog } from "@/components/MetUpButton";
+
+beforeEach(() => __resetMetUpLog());
 
 describe("ActionsBar", () => {
   it("opens the connect confirmation modal on Connect click", () => {
@@ -17,19 +20,23 @@ describe("ActionsBar", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Connection request sent to Alice");
   });
 
-  it("prompts an upgrade when the premium InMail button is clicked", () => {
-    const onUpgrade = vi.fn();
-    render(<ActionsBar targetName="Alice" onUpgrade={onUpgrade} />);
-    fireEvent.click(screen.getByRole("button", { name: /InMail/ }));
-    expect(onUpgrade).toHaveBeenCalledWith("inmail");
+  it("pre-fills the message subject from the AI talking point", () => {
+    render(<ActionsBar targetName="Alice" tip="Ask about her time at Google" />);
+    fireEvent.click(screen.getByRole("button", { name: "InMail" }));
+    expect(screen.getByLabelText("Subject")).toHaveValue("Ask about her time at Google");
   });
 
-  it("prompts an upgrade (and skips the connect dialog) when at the connection limit", () => {
-    const onUpgrade = vi.fn();
-    render(<ActionsBar targetName="Alice" degree={2} atConnectionLimit onUpgrade={onUpgrade} />);
-    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
-    expect(onUpgrade).toHaveBeenCalledWith("connection");
-    expect(screen.queryByRole("dialog", { name: "Connect" })).not.toBeInTheDocument();
+  it("falls back to a default subject when no tip is provided", () => {
+    render(<ActionsBar targetName="Alice" tip={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "InMail" }));
+    expect(screen.getByLabelText("Subject")).toHaveValue("Connecting with you, Alice");
+  });
+
+  it("shows a success toast after sending a message", () => {
+    render(<ActionsBar targetName="Alice" tip="hi" />);
+    fireEvent.click(screen.getByRole("button", { name: "InMail" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Message sent to Alice");
   });
 
   it("closes a modal when Escape is pressed", () => {
@@ -40,17 +47,26 @@ describe("ActionsBar", () => {
     expect(screen.queryByRole("dialog", { name: "Connect" })).not.toBeInTheDocument();
   });
 
+  it("clears a previously typed message body when the composer is reopened", () => {
+    render(<ActionsBar targetName="Alice" tip="hi" />);
+    fireEvent.click(screen.getByRole("button", { name: "InMail" }));
+    fireEvent.change(screen.getByLabelText("Message body"), { target: { value: "draft text" } });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "InMail" }));
+    expect(screen.getByLabelText("Message body")).toHaveValue("");
+  });
+
   it("renders action buttons with explicit type=button", () => {
     render(<ActionsBar targetName="Alice" />);
     expect(screen.getByRole("button", { name: "Connect" })).toHaveAttribute("type", "button");
-    expect(screen.getByRole("button", { name: /InMail/ })).toHaveAttribute("type", "button");
+    expect(screen.getByRole("button", { name: "InMail" })).toHaveAttribute("type", "button");
   });
 
   it("hides the Connect button for 1st-degree connections", () => {
     render(<ActionsBar targetName="Alice" degree={1} />);
     expect(screen.queryByRole("button", { name: "Connect" })).not.toBeInTheDocument();
-    // InMail stays available for everyone.
-    expect(screen.getByRole("button", { name: /InMail/ })).toBeInTheDocument();
+    // Message stays available for everyone.
+    expect(screen.getByRole("button", { name: "InMail" })).toBeInTheDocument();
   });
 
   it("shows the Connect button for 2nd-degree connections", () => {
@@ -71,5 +87,48 @@ describe("ActionsBar", () => {
     expect(screen.queryByRole("button", { name: "Connect" })).not.toBeInTheDocument();
     const connected = screen.getByRole("button", { name: "Connected ✓" });
     expect(connected).toBeDisabled();
+  });
+
+  it("offers the 'I met up' button for 1st-degree people and logs the meetup", () => {
+    const onLogMeetup = vi.fn();
+    render(
+      <ActionsBar targetName="Alice" degree={1} nodeId="a" onLogMeetup={onLogMeetup} />,
+    );
+    const metUp = screen.getByRole("button", { name: /I met up with this person/ });
+    fireEvent.click(metUp);
+    expect(onLogMeetup).toHaveBeenCalledTimes(1);
+    // Disables itself once logged.
+    expect(screen.getByRole("button", { name: /Met up logged/ })).toBeDisabled();
+  });
+
+  it("uses board-controlled logged state for the meetup button", () => {
+    const first = render(
+      <ActionsBar targetName="Alice" degree={1} nodeId="a" onLogMeetup={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /I met up with this person/ }));
+    first.unmount();
+
+    const onLogMeetup = vi.fn();
+    const { rerender } = render(
+      <ActionsBar targetName="Alice" degree={1} nodeId="a" metUpLogged={false} onLogMeetup={onLogMeetup} />,
+    );
+    const enabled = screen.getByRole("button", { name: /I met up with this person/ });
+    expect(enabled).toBeEnabled();
+    fireEvent.click(enabled);
+    expect(onLogMeetup).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <ActionsBar targetName="Alice" degree={1} nodeId="a" metUpLogged onLogMeetup={onLogMeetup} />,
+    );
+    expect(screen.getByRole("button", { name: /Met up logged/ })).toBeDisabled();
+  });
+
+  it("does not offer the 'I met up' button for 2nd-degree people", () => {
+    render(
+      <ActionsBar targetName="Alice" degree={2} nodeId="c" onLogMeetup={vi.fn()} />,
+    );
+    expect(
+      screen.queryByRole("button", { name: /I met up with this person/ }),
+    ).not.toBeInTheDocument();
   });
 });

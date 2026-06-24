@@ -90,11 +90,9 @@ export function deriveAlignmentTier(score: number): AlignmentTier {
 }
 
 export function deriveActivityStatus(user: User | UserWithJobs): ActivityStatus {
-  // Post-count → outreach activity: 3+ posts = active (blue), 2 = moderate
-  // (amber), 0–1 = inactive (red).
   const n = user.posts_activity?.length ?? 0;
   if (n >= 3) return "active";
-  if (n >= 2) return "moderate";
+  if (n >= 1) return "moderate";
   return "inactive";
 }
 

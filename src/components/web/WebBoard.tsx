@@ -5,21 +5,17 @@ import {
   Alert,
   Button,
   Card,
+  Empty,
   Input,
-  Modal,
-  Progress,
-  Select,
   Space,
   Typography,
 } from 'antd'
-import { AimOutlined, ReloadOutlined, UpOutlined, DownOutlined, CrownOutlined } from '@ant-design/icons'
+import { AimOutlined, ReloadOutlined, UpOutlined, DownOutlined } from '@ant-design/icons'
 import WebCanvas from './WebCanvas'
 import {
   boardReducer,
   createInitialBoardState,
-  CONNECTION_LIMIT,
   type BoardConfig,
-  type UpgradeReason,
 } from './boardState'
 import { SELF_USER_ID, webPeople } from '@/data/web_people'
 import { NodeSidebar } from '@/components/NodeSidebar'
@@ -38,23 +34,6 @@ const SUGGESTIONS = [
   'Find short, actionable connection and outreach tips.',
   'Meet people who can introduce me to my target community.',
 ]
-
-// Presentational filter options. Real filtering is owned by sibling workflows
-// (W2 data / W4 jobs); these render the control surface from the design.
-const LOCATION_OPTIONS = ['San Francisco', 'New York', 'Remote']
-const INDUSTRY_OPTIONS = ['Software', 'Product', 'Design', 'Recruiting']
-const EVENT_OPTIONS = ['All events', 'Recently active', 'New connections']
-
-// Copy for the "Upgrade to Premium" prompt, keyed by which free-tier gate the
-// viewer hit. Premium is always off in the demo, so these never unlock.
-const UPGRADE_COPY: Record<UpgradeReason, string> = {
-  connection: `You've reached the ${CONNECTION_LIMIT}-connection limit on the free plan. Upgrade to Premium to keep growing your web.`,
-  depth: 'Reaching further than 3rd-degree connections is a Premium feature. Upgrade to explore deeper into your network.',
-  inmail: 'InMail lets you message people outside your network. Upgrade to Premium to send InMail.',
-}
-
-const round = (n: number) => Math.round(n)
-const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0)
 
 /**
  * Converts the `/api/web/generate` response (WebNode[] + WebEdge[], with
@@ -80,12 +59,13 @@ function apiResponseToPeople(
       relevanceScore: n.relevanceScore / 100,
       interactionScore: n.interactionScore,
     }
-    // Warm-path nodes (2nd-degree and deeper) reach the viewer through a dotted
-    // bridge; carry that connector so the canvas can cluster + expand them.
-    const via = viaByTarget.get(n.id)
-    if (via) person.via = via
-    if (n.activityStatus) person.activityStatus = n.activityStatus
-    if (n.headline) person.headline = n.headline
+    if (n.degree > 1) {
+      // For any non-1st-degree node the connector is the previous-ring node
+      // that introduces them (degree N-1). Derived from the dotted bridge
+      // edge the server emits for the cross-ring link.
+      const via = viaByTarget.get(n.id)
+      if (via) person.via = via
+    }
     return person
   })
 }
@@ -107,19 +87,15 @@ export default function WebBoard() {
     createInitialBoardState,
   )
 
-  const { snapshot, selectedId, goalText, status, error, upgradePrompt } = state
+  const { snapshot, selectedId, goalText, status, error } = state
   const selected = snapshot.nodes.find((n) => n.id === selectedId) ?? null
   const isEmpty = snapshot.state === 'empty'
   const selectedConnected = selected ? state.connectedIds.includes(selected.id) : false
-  // Free-tier cap: once the viewer has used all their connections, prompt to
-  // upgrade rather than letting them add more (premium is always off in the demo).
-  const atConnectionLimit =
-    !selectedConnected && state.connectedIds.length >= CONNECTION_LIMIT
+  const selectedMetUpLogged = selected ? state.metUpIds.includes(selected.id) : false
   const loading = status === 'loading'
 
   // Collapsible side cards (chevron toggles) — purely presentational.
   const [showSuggestions, setShowSuggestions] = useState(true)
-  const [showMetrics, setShowMetrics] = useState(true)
 
   // Wired-to-real-data submit: POST the goal + viewer id to /api/web/generate,
   // convert the server-returned graph into the layout's `PersonInput[]` shape,
@@ -176,15 +152,9 @@ export default function WebBoard() {
     }
   }, [goal])
 
-  // Presentational "metrics" derived from the seeded web. Real scoring is
-  // owned by Workflow 2; these are deterministic placeholders for the demo.
-  const degree1 = snapshot.nodes.filter((n) => n.degree === 1)
-  const goalProgress = isEmpty ? 0 : round(avg(degree1.map((n) => n.relevanceScore)) * 100)
-  const achievability = isEmpty ? 0 : round(avg(degree1.map((n) => n.interactionScore)) * 100)
-
   return (
     <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-      {/* ── Left column: goal, suggestions, metrics ─────────────────────── */}
+      {/* ── Left column: goal + suggestions ─────────────────────────────── */}
       <Space orientation="vertical" size="middle" style={{ width: 300, flexShrink: 0 }}>
         <Card>
           <Typography.Title level={4} style={{ marginTop: 0, marginBottom: 2 }}>
@@ -273,34 +243,6 @@ export default function WebBoard() {
             </Space>
           )}
         </Card>
-
-        <Card
-          title="Metrics"
-          size="small"
-          extra={
-            <Button
-              type="text"
-              size="small"
-              aria-label={showMetrics ? 'Collapse metrics' : 'Expand metrics'}
-              aria-expanded={showMetrics}
-              icon={showMetrics ? <UpOutlined /> : <DownOutlined />}
-              onClick={() => setShowMetrics((v) => !v)}
-            />
-          }
-        >
-          {showMetrics && (
-            <Space orientation="vertical" size={12} style={{ width: '100%' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <Progress type="circle" percent={goalProgress} size={72} strokeColor="#0a66c2" />
-                <Typography.Text strong>Goal Progress</Typography.Text>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                <Typography.Text type="secondary">Connection Achievability Metric</Typography.Text>
-                <Typography.Text strong>{achievability}%</Typography.Text>
-              </div>
-            </Space>
-          )}
-        </Card>
       </Space>
 
       {/* ── Center column: the network web ──────────────────────────────── */}
@@ -308,7 +250,7 @@ export default function WebBoard() {
         <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
           <div>
             <Typography.Title level={4} style={{ marginTop: 0, marginBottom: 4 }}>
-              Your Web
+              Your Network Web
             </Typography.Title>
             <Typography.Text type="secondary">
               Interactively re-rank your relationships.
@@ -328,12 +270,9 @@ export default function WebBoard() {
               }}
             >
               {isEmpty ? (
-                <WebCanvas
-                  snapshot={snapshot}
-                  width={CANVAS_WIDTH}
-                  height={CANVAS_HEIGHT}
-                  alwaysShowSelf
-                />
+                <div style={{ padding: 48 }}>
+                  <Empty description="No goal yet — tell us where you want to go and we'll map who can help." />
+                </div>
               ) : (
                 <WebCanvas
                   snapshot={snapshot}
@@ -348,60 +287,14 @@ export default function WebBoard() {
             <NodeSidebar
               node={selected}
               connected={selectedConnected}
-              atConnectionLimit={atConnectionLimit}
+              metUpLogged={selectedMetUpLogged}
               onConnect={(id) => dispatch({ type: 'connectNode', id })}
-              onUpgrade={(reason) => dispatch({ type: 'showUpgrade', reason })}
+              onLogMeetup={(id) => dispatch({ type: 'logMeetup', id })}
               onClose={() => dispatch({ type: 'clearSelection' })}
-            />
-          </div>
-
-          {/* Dynamic filters (presentational; filtering owned by W2/W4). */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <Typography.Text strong>Dynamic filters</Typography.Text>
-            <Select
-              size="small"
-              aria-label="Filter by location"
-              placeholder="Location"
-              style={{ width: 150 }}
-              options={LOCATION_OPTIONS.map((v) => ({ value: v, label: v }))}
-              allowClear
-            />
-            <Select
-              size="small"
-              aria-label="Filter by industry"
-              placeholder="Industry"
-              style={{ width: 150 }}
-              options={INDUSTRY_OPTIONS.map((v) => ({ value: v, label: v }))}
-              allowClear
-            />
-            <Select
-              size="small"
-              aria-label="Filter by event activity"
-              defaultValue="All events"
-              style={{ width: 150 }}
-              options={EVENT_OPTIONS.map((v) => ({ value: v, label: v }))}
             />
           </div>
         </Space>
       </Card>
-
-      <Modal
-        open={upgradePrompt !== null}
-        onCancel={() => dispatch({ type: 'dismissUpgrade' })}
-        title={
-          <span>
-            <CrownOutlined style={{ color: '#F59E0B', marginRight: 8 }} />
-            Upgrade to Premium
-          </span>
-        }
-        okText="Upgrade to Premium"
-        cancelText="Maybe later"
-        onOk={() => dispatch({ type: 'dismissUpgrade' })}
-      >
-        <Typography.Paragraph style={{ marginBottom: 0 }}>
-          {upgradePrompt ? UPGRADE_COPY[upgradePrompt] : ''}
-        </Typography.Paragraph>
-      </Modal>
     </div>
   )
 }

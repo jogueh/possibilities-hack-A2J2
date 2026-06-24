@@ -74,8 +74,9 @@
 - **Accessibility:** interactive controls get `aria-label`s; nav links set
   `aria-current="page"` when active.
 - **Presentational vs. owned logic is labelled.** Components that render a control
-  surface whose real behavior belongs to another workflow say so in a comment
-  (e.g. "Dynamic filters (presentational; filtering owned by W2/W4)").
+  surface or hook whose real behavior belongs to another workflow say so in a comment
+  (e.g. `WebCanvas`'s `nodeDecorations` prop: "the flag data and ring styling are
+  owned by the injecting workflow").
 
 ## 5. Mocks & Cross-Workflow Integration
 

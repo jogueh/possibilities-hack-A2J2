@@ -107,23 +107,6 @@ export function wrapLabel(text: string, maxChars: number): string[] {
   return lines
 }
 
-/**
- * Wraps a label into lines of at most `wordsPerLine` words each, preserving word
- * order. Used for node headlines so the full role (e.g. "Product Manager at Tech
- * Innovators Inc.") flows two words per line under the name instead of being
- * truncated. Pure and deterministic.
- */
-export function wrapWords(text: string, wordsPerLine: number): string[] {
-  const words = text.trim().split(/\s+/).filter(Boolean)
-  if (words.length === 0) return []
-  const per = Math.max(1, Math.floor(wordsPerLine))
-  const lines: string[] = []
-  for (let i = 0; i < words.length; i += per) {
-    lines.push(words.slice(i, i + per).join(' '))
-  }
-  return lines
-}
-
 const round2 = (n: number): number => Math.round(n * 100) / 100
 
 const clamp = (n: number, min: number, max: number): number =>
@@ -217,79 +200,10 @@ export function placeNearParent(
 }
 
 /**
- * Minimum centre-to-centre distance (px) enforced between any two node avatars
- * so freshly-revealed connections never physically overlap the people already
- * on the canvas (or each other). Tuned to clear the largest node radius (30) on
- * both sides plus padding for the caption underneath.
- */
-export const NODE_MIN_DISTANCE = 92
-
-/**
- * Nudges each candidate position so it sits at least `minDist` away from every
- * already-placed point (the `fixed` obstacles plus candidates resolved before
- * it). Candidates are pushed radially away from whatever they collide with, so
- * a cluster of newly-revealed nodes spreads out instead of stacking on top of
- * existing nodes. Pure and deterministic — coincident points fall back to a
- * stable per-index angle so the result never depends on iteration order luck.
- */
-export function resolveCollisions(
-  fixed: ReadonlyArray<{ x: number; y: number }>,
-  candidates: ReadonlyArray<{ x: number; y: number }>,
-  minDist: number = NODE_MIN_DISTANCE,
-  center: { x: number; y: number } = { x: 0, y: 0 },
-): { x: number; y: number }[] {
-  const placed: { x: number; y: number }[] = fixed.map((p) => ({ x: p.x, y: p.y }))
-  const out: { x: number; y: number }[] = []
-
-  candidates.forEach((cand, idx) => {
-    let x = cand.x
-    let y = cand.y
-    for (let iter = 0; iter < 60; iter++) {
-      // Resolve the single nearest violation each pass; repeat until clear.
-      let nearest: { x: number; y: number } | null = null
-      let nearestDist = minDist
-      for (const other of placed) {
-        const d = Math.hypot(x - other.x, y - other.y)
-        if (d < nearestDist) {
-          nearest = other
-          nearestDist = d
-        }
-      }
-      if (!nearest) break
-
-      const dx = x - nearest.x
-      const dy = y - nearest.y
-      const dist = Math.hypot(dx, dy)
-      let ux: number
-      let uy: number
-      if (dist > 1e-6) {
-        ux = dx / dist
-        uy = dy / dist
-      } else {
-        // Exactly coincident: pick a deterministic outward direction.
-        const fromCenter = Math.atan2(y - center.y, x - center.x)
-        const angle =
-          y !== center.y || x !== center.x
-            ? fromCenter
-            : (idx * 2 * Math.PI) / Math.max(candidates.length, 1)
-        ux = Math.cos(angle)
-        uy = Math.sin(angle)
-      }
-      x += ux * (minDist - dist)
-      y += uy * (minDist - dist)
-    }
-    const pos = { x: round2(x), y: round2(y) }
-    placed.push(pos)
-    out.push(pos)
-  })
-
-  return out
-}
-
-/**
- * Builds styled WebEdges from raw relationships. An edge is dotted when either
- * endpoint is a 2nd-degree node or deeper (i.e. it crosses into the warm-path
- * frontier). Unknown endpoints are skipped.
+ * Builds styled WebEdges from raw relationships. An edge is dotted when its
+ * endpoints sit on different rings (i.e. it crosses the warm-path frontier
+ * between two adjacent degree levels). Same-ring or self↔1st-degree edges are
+ * solid. Unknown endpoints are skipped.
  */
 export function deriveEdges(
   relationships: Relationship[],
@@ -300,7 +214,7 @@ export function deriveEdges(
     const source = byId.get(rel.source)
     const target = byId.get(rel.target)
     if (!source || !target) return []
-    const isDotted = Math.max(source.degree, target.degree) >= 2
+    const isDotted = source.degree !== target.degree
     return [
       {
         id: `${rel.source}__${rel.target}`,

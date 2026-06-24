@@ -13,15 +13,10 @@ import {
 // 2nd-degree person it reaches, so the (now solid) line reads as a strong link.
 const CONNECTED_STRENGTH = 0.9
 
-// Free-tier limits. The product is always non-premium in the demo, so hitting
-// either of these surfaces an "Upgrade to Premium" prompt with no way to unlock.
-/** Deepest degree the viewer can reach before a premium prompt blocks them. */
-export const FREE_MAX_DEGREE = 3
-/** Max number of new connections the viewer can add on the free tier. */
-export const CONNECTION_LIMIT = 3
-
-/** Why an upgrade prompt is showing: hit the depth limit, or the connection cap. */
-export type UpgradeReason = 'depth' | 'connection' | 'inmail'
+// Tie strength applied to a node's solid edge once the viewer logs a real-world
+// meetup ("I met up with this person"). Meeting in person is the strongest
+// signal, so the edge jumps to full strength (vibrant) via the s12 visuals.
+const MET_UP_STRENGTH = 1
 
 export type BoardStatus = 'idle' | 'loading' | 'error'
 
@@ -31,6 +26,8 @@ export interface BoardState {
   goalText: string
   /** Ids of people the viewer has connected with (dotted bridge -> solid link). */
   connectedIds: string[]
+  /** Ids of people the viewer has logged a real-world meetup with (edge -> full strength). */
+  metUpIds: string[]
   /**
    * Resolved people for the current goal — populated from `/api/web/generate`
    * by the WebBoard. Empty until a goal is mapped. `selectNode` reads from
@@ -40,8 +37,6 @@ export interface BoardState {
   people: PersonInput[]
   status: BoardStatus
   error: string | null
-  /** Set when a premium gate is hit; drives the WebBoard's upgrade prompt. */
-  upgradePrompt: UpgradeReason | null
 }
 
 export type BoardAction =
@@ -52,8 +47,7 @@ export type BoardAction =
   | { type: 'mapError'; error: string }
   | { type: 'selectNode'; id: string }
   | { type: 'connectNode'; id: string }
-  | { type: 'showUpgrade'; reason: UpgradeReason }
-  | { type: 'dismissUpgrade' }
+  | { type: 'logMeetup'; id: string }
   | { type: 'clearSelection' }
   | { type: 'reset' }
 
@@ -69,10 +63,10 @@ export function createInitialBoardState(): BoardState {
     selectedId: null,
     goalText: '',
     connectedIds: [],
+    metUpIds: [],
     people: [],
     status: 'idle',
     error: null,
-    upgradePrompt: null,
   }
 }
 
@@ -95,12 +89,93 @@ function applyConnections(
   return { ...snapshot, edges }
 }
 
+/**
+ * Strengthens only the solid self↔person edge for each person the viewer has
+ * logged a meetup with, bumping it to full strength. Idempotent (uses
+ * `Math.max`) so it can be re-applied after a snapshot rebuild without
+ * over-accumulating.
+ */
+function applyMeetups(
+  snapshot: WebSnapshot,
+  metUpIds: string[],
+): WebSnapshot {
+  if (metUpIds.length === 0) return snapshot
+  const selfId = snapshot.goal?.userId
+  if (!selfId) return snapshot
+  const metUp = new Set(metUpIds)
+  const edges = snapshot.edges.map((e) =>
+    !e.isDotted &&
+    ((metUp.has(e.target) && e.source === selfId) ||
+      (metUp.has(e.source) && e.target === selfId))
+      ? { ...e, strength: Math.max(e.strength, MET_UP_STRENGTH) }
+      : e,
+  )
+  return { ...snapshot, edges }
+}
+
 // Picks the people list to feed the layout: real API-resolved people if the
 // board has them (`submitGoalWithPeople` ran), otherwise the static fallback
 // from config. This preserves existing test/demo behavior for callers that
 // dispatch `submitGoal` directly without going through the API path.
 function effectivePeople(state: BoardState, config: BoardConfig): PersonInput[] {
   return state.people.length > 0 ? state.people : config.people
+}
+
+/**
+ * Re-roots every connected person into a permanent direct (1st-degree)
+ * connection and shifts everyone reached *through* them one warm-path hop
+ * closer. Connecting with someone makes them part of your network, so they move
+ * onto the inner ring with a strong solid self-edge, and their former
+ * suggestions become *your* next-ring suggestions.
+ *
+ * The effective degree of a person is the number of hops up the `via` chain to
+ * the viewer, short-circuiting at the first connected ancestor (which is now
+ * degree 1). Applied at snapshot-build time and keyed off `connectedIds`, so a
+ * connection survives any rebuild while a new goal — which clears
+ * `connectedIds` — starts clean. People with no connection in their lineage are
+ * returned unchanged.
+ */
+function promoteConnected(
+  people: PersonInput[],
+  connectedIds: string[],
+): PersonInput[] {
+  if (connectedIds.length === 0) return people
+  const connected = new Set(connectedIds)
+  const byId = new Map(people.map((p) => [p.id, p]))
+  const cache = new Map<string, number>()
+
+  const effDegree = (p: PersonInput): number => {
+    const cached = cache.get(p.id)
+    if (cached !== undefined) return cached
+    // Guard against accidental cycles in `via` chains.
+    cache.set(p.id, p.degree)
+    let result: number
+    if (connected.has(p.id) || p.degree === 1) {
+      result = 1
+    } else {
+      const parent = p.via ? byId.get(p.via) : undefined
+      result = parent ? effDegree(parent) + 1 : p.degree
+    }
+    cache.set(p.id, result)
+    return result
+  }
+
+  return people.map((p) => {
+    const degree = effDegree(p)
+    const isConnected = connected.has(p.id)
+    if (degree === p.degree && !isConnected) return p
+    const promoted: PersonInput = { ...p, degree }
+    if (isConnected) {
+      // A direct connection no longer hangs off a warm-path bridge, and its
+      // (now solid) self-edge should read as a strong link.
+      promoted.via = undefined
+      promoted.interactionScore = Math.max(
+        p.interactionScore ?? 0,
+        CONNECTED_STRENGTH,
+      )
+    }
+    return promoted
+  })
 }
 
 export function boardReducer(
@@ -122,9 +197,9 @@ export function boardReducer(
         snapshot: buildSnapshot(goal, people, config.options),
         selectedId: null,
         connectedIds: [],
+        metUpIds: [],
         status: 'idle',
         error: null,
-        upgradePrompt: null,
       }
     }
 
@@ -140,10 +215,10 @@ export function boardReducer(
         snapshot: buildSnapshot(goal, action.people, config.options),
         selectedId: null,
         connectedIds: [],
+        metUpIds: [],
         people: action.people,
         status: 'idle',
         error: null,
-        upgradePrompt: null,
       }
     }
 
@@ -156,80 +231,100 @@ export function boardReducer(
         return { ...state, selectedId: action.id }
       }
 
-      // Selecting a 1st-degree node reveals ONLY that connector's 2nd-degree
-      // people, clustered next to it. Rebuilding from the seeded snapshot first
-      // collapses any other connector that was previously expanded, so the web
-      // never shows a different person's warm path.
+      const people = effectivePeople(state, config)
+      let snapshot = state.snapshot
       if (clicked.degree === 1) {
-        const people = effectivePeople(state, config)
+        // Selecting a 1st-degree node reveals ONLY that connector's
+        // 2nd-degree people, clustered next to it. 1st-degree IS the set of
+        // real connections the viewer is already part of, so revealing the
+        // suggestions reachable through them is always allowed. Rebuilding
+        // from the seeded snapshot first collapses any other connector that
+        // was previously expanded, so the web never shows a different
+        // person's warm path. Connected people are promoted to permanent
+        // 1st-degree nodes here, so they persist across the rebuild.
+        const promoted = promoteConnected(people, state.connectedIds)
         const seeded = buildSnapshot(
           state.snapshot.goal,
-          people,
+          promoted,
           config.options,
         )
-        const snapshot = expandNode(seeded, action.id, people, config.options)
-        return {
-          ...state,
-          snapshot: applyConnections(snapshot, state.connectedIds),
-          selectedId: action.id,
-        }
+        snapshot = expandNode(seeded, action.id, promoted, config.options)
+      } else if (state.connectedIds.includes(clicked.id)) {
+        // Selecting a deeper node (2nd+) reveals its next-ring children IN
+        // PLACE — but ONLY if the viewer has explicitly "connected" with that
+        // node. Each ring beyond 1st-degree is a suggestion until the viewer
+        // accepts the warm-path intro: connecting unlocks the next layer
+        // of suggestions reachable through that person, mirroring real-world
+        // network growth (you can't navigate a 3rd-degree intro until your
+        // 2nd-degree connection introduces you). We expand in place against the
+        // current snapshot/depths; the promotion to 1st-degree is applied on the
+        // next rebuild (clicking off, or selecting a 1st-degree node).
+        snapshot = expandNode(state.snapshot, action.id, people, config.options)
       }
-
-      // Deeper (2nd-degree+) nodes only keep going once the viewer has actually
-      // CONNECTED with them — you drill further along a warm path you've opened.
-      // Unconnected deeper nodes just update the selection (sidebar shows the
-      // Connect / InMail actions).
-      if (!state.connectedIds.includes(action.id)) {
-        return { ...state, selectedId: action.id }
-      }
-
-      // Premium depth gate: expanding reveals the NEXT degree. Block past the
-      // free tier's deepest reachable degree and prompt to upgrade instead.
-      if (clicked.degree + 1 > FREE_MAX_DEGREE) {
-        return { ...state, selectedId: action.id, upgradePrompt: 'depth' }
-      }
-
-      // Additively reveal this connected person's own connections (next degree),
-      // keeping everything already on the canvas in place.
-      const people = effectivePeople(state, config)
-      const snapshot = expandNode(
-        state.snapshot,
-        action.id,
-        people,
-        config.options,
-      )
+      // For unconnected 2nd+ nodes, fall through with `snapshot = state.snapshot`
+      // — selection still updates so the sidebar opens with the "Connect" CTA,
+      // but the canvas does not reveal further suggestions until they accept.
       return {
         ...state,
-        snapshot: applyConnections(snapshot, state.connectedIds),
+        snapshot: applyMeetups(
+          applyConnections(snapshot, state.connectedIds),
+          state.metUpIds,
+        ),
         selectedId: action.id,
       }
     }
 
     case 'connectNode': {
-      // Connecting reaches a 2nd-degree person through their warm-path bridge:
-      // record the link and turn that dotted bridge into a solid, strengthened
-      // (blue) edge. Idempotent — connecting again is a no-op.
+      // Connecting reaches a 2nd+-degree person through their warm-path bridge:
+      // record the link, turn the dotted bridge into a solid strengthened (blue)
+      // edge, and unlock the next layer of suggestions reachable through them.
+      // The next-layer reveal happens lazily on the next `selectNode` click on
+      // that node — we do not eagerly expand here, so connecting is a clean
+      // commitment action that the viewer can take without rearranging the
+      // canvas. Idempotent — connecting again is a no-op.
       if (state.connectedIds.includes(action.id)) return state
-      // Free-tier connection cap: prompt to upgrade instead of adding more.
-      if (state.connectedIds.length >= CONNECTION_LIMIT) {
-        return { ...state, upgradePrompt: 'connection' }
-      }
       const connectedIds = [...state.connectedIds, action.id]
       return {
         ...state,
         connectedIds,
-        snapshot: applyConnections(state.snapshot, connectedIds),
+        snapshot: applyMeetups(
+          applyConnections(state.snapshot, connectedIds),
+          state.metUpIds,
+        ),
       }
     }
 
-    case 'showUpgrade':
-      return { ...state, upgradePrompt: action.reason }
+    case 'logMeetup': {
+      // Logging a real-world meetup strengthens the solid edge to this person to
+      // full strength, so it renders thick/vibrant (s12 visuals). Idempotent —
+      // logging again is a no-op.
+      if (state.metUpIds.includes(action.id)) return state
+      const metUpIds = [...state.metUpIds, action.id]
+      return {
+        ...state,
+        metUpIds,
+        snapshot: applyMeetups(state.snapshot, metUpIds),
+      }
+    }
 
-    case 'dismissUpgrade':
-      return { ...state, upgradePrompt: null }
-
-    case 'clearSelection':
-      return { ...state, selectedId: null }
+    case 'clearSelection': {
+      // Clicking off settles the web back to its base (seeded) layout. People the
+      // viewer has connected with are promoted to permanent 1st-degree nodes
+      // here, so a just-connected 2nd-degree person converts into a direct
+      // connection on the inner ring instead of vanishing. With no goal yet,
+      // there is nothing to rebuild — just drop the selection.
+      if (!state.snapshot.goal) return { ...state, selectedId: null }
+      const promoted = promoteConnected(
+        effectivePeople(state, config),
+        state.connectedIds,
+      )
+      const seeded = buildSnapshot(state.snapshot.goal, promoted, config.options)
+      return {
+        ...state,
+        snapshot: applyConnections(seeded, state.connectedIds),
+        selectedId: null,
+      }
+    }
 
     case 'reset':
       return createInitialBoardState()

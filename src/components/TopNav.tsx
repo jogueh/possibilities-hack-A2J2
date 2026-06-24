@@ -29,7 +29,7 @@ type Tab = {
 const tabs: Tab[] = [
   { href: "/", label: "Home", icon: <HomeFilled />, exact: true },
   { href: "/network", label: "My Network", icon: <TeamOutlined /> },
-  { href: "/web", label: "Web", icon: <DeploymentUnitOutlined /> },
+  { href: "/web", label: "Network Web", icon: <DeploymentUnitOutlined /> },
   { href: "/jobs", label: "Jobs", icon: <ShopOutlined /> },
   { href: "/messaging", label: "Messaging", icon: <MessageOutlined /> },
   {
@@ -51,9 +51,9 @@ export default function TopNav() {
   return (
     <header className="top-nav">
       <div className="top-nav-inner">
-        <span className="top-nav-logo" aria-label="LinkedIn">
-          in
-        </span>
+        <Link href="/" className="top-nav-logo" aria-label="LinkedIn">
+          <img src="/LinkedIn_icon.svg" alt="" aria-hidden="true" width={34} height={34} />
+        </Link>
         <Input
           className="top-nav-search"
           placeholder="Search"

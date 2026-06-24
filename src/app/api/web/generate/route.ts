@@ -61,7 +61,6 @@ export async function POST(request: Request): Promise<Response> {
     viewerUserId: userId,
     parsedGoal,
     candidates,
-    maxDegree: 3,
   })
 
   return NextResponse.json({ nodes, edges, parsedGoal })

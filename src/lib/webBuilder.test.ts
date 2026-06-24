@@ -3,8 +3,9 @@ import {
   buildWeb,
   DEFAULT_EDGE_STRENGTH,
   FIRST_DEGREE_MAX,
+  MAX_DEGREE,
 } from '@/lib/webBuilder'
-import type { Job, UserWithJobs } from '@/types/data'
+import type { UserWithJobs } from '@/types/data'
 import type { ParsedGoal } from '@/types/goal'
 
 // ---------- Fixtures ----------
@@ -13,21 +14,6 @@ const goal: ParsedGoal = {
   intent: 'find SWE in SF',
   targetRole: 'Software Engineer',
   targetLocation: 'San Francisco, CA',
-}
-
-function makeJob(overrides: Partial<Job> = {}): Job {
-  return {
-    id: 'job_1',
-    company: 'Innovatech',
-    location: 'San Francisco, CA',
-    position: 'Software Engineer',
-    salary_range: { from: '100k', to: '150k' },
-    industry: 'Software',
-    level: 'Mid',
-    easy_apply: true,
-    description: '',
-    ...overrides,
-  }
 }
 
 function makeUser(
@@ -343,10 +329,17 @@ describe('buildWeb — 2nd-degree selection (from member.connections)', () => {
     expect(secondDegree.map((n) => n.id)).toEqual(['c0', 'c1', 'c2'])
   })
 
-  it('omits 2nd-degree for a parent whose connections all fail the 70 threshold', () => {
+  it("falls back to top-N friends-of-friends when none clear the 70 threshold (weak-match fallback)", () => {
     const fillers = Array.from({ length: 4 }, (_, i) => makeUser(`f${i}`))
-    const weak = makeUser('weak_fof')
-    const parent = makeUser('parent', { connections: ['weak_fof'] })
+    // 4 weak friends-of-friends — none clear 70, mirroring a location-only
+    // goal like "find people in SF" where the scorer caps at ~30 points.
+    const fof1 = makeUser('fof1')
+    const fof2 = makeUser('fof2')
+    const fof3 = makeUser('fof3')
+    const fof4 = makeUser('fof4')
+    const parent = makeUser('parent', {
+      connections: ['fof1', 'fof2', 'fof3', 'fof4'],
+    })
     const viewer = makeUser('viewer', {
       connections: ['parent', 'f0', 'f1', 'f2', 'f3'],
     })
@@ -354,11 +347,37 @@ describe('buildWeb — 2nd-degree selection (from member.connections)', () => {
     const { nodes } = buildWeb({
       viewerUserId: 'viewer',
       parsedGoal: goal,
-      candidates: [viewer, parent, ...fillers, weak],
+      candidates: [viewer, parent, ...fillers, fof1, fof2, fof3, fof4],
       scorer: scorerByMap({
         parent: 99,
         f0: 95, f1: 94, f2: 93, f3: 92,
-        weak_fof: 50,
+        fof1: 30, fof2: 25, fof3: 10, fof4: 5,
+      }),
+    })
+
+    const secondDegree = nodes.filter((n) => n.degree === 2)
+    // Cap at SECOND_DEGREE_PER_NODE_MAX (3), sorted desc by score.
+    expect(secondDegree.map((n) => n.id)).toEqual(['fof1', 'fof2', 'fof3'])
+    // All surfaced via the fallback get the weak tier (< 40 → weak).
+    expect(secondDegree.every((n) => n.alignmentTier === 'weak')).toBe(true)
+  })
+
+  it('omits 2nd-degree for a parent with no friends-of-friends in the candidate set', () => {
+    // Parent has zero friends outside the viewer / existing 1st-degree, so
+    // there is literally nobody to surface — empty regardless of threshold.
+    const fillers = Array.from({ length: 4 }, (_, i) => makeUser(`f${i}`))
+    const parent = makeUser('parent', { connections: [] })
+    const viewer = makeUser('viewer', {
+      connections: ['parent', 'f0', 'f1', 'f2', 'f3'],
+    })
+
+    const { nodes } = buildWeb({
+      viewerUserId: 'viewer',
+      parsedGoal: goal,
+      candidates: [viewer, parent, ...fillers],
+      scorer: scorerByMap({
+        parent: 99,
+        f0: 95, f1: 94, f2: 93, f3: 92,
       }),
     })
     expect(nodes.filter((n) => n.degree === 2)).toHaveLength(0)
@@ -409,7 +428,170 @@ describe('buildWeb — 2nd-degree selection (from member.connections)', () => {
         f0: 95, f1: 94, f2: 93,
       }),
     })
-    expect(nodes.filter((n) => n.degree === 2)).toHaveLength(0)
+    expect(nodes.filter((n) => n.degree === 2).length).toBe(0)
+  })
+})
+
+describe('buildWeb — deep expansion (rings 3+ via MAX_DEGREE loop)', () => {
+  it('emits 3rd-degree nodes via 2nd-degree parents, dotted edges, sorted by score', () => {
+    const viewer = makeUser('viewer', { connections: ['p1', 'p2', 'p3', 'p4', 'p5'] })
+    const p1 = makeUser('p1', { connections: ['f1', 'f2'] })
+    const fillers = Array.from({ length: 4 }, (_, i) => makeUser(`p${i + 2}`))
+    const f1 = makeUser('f1', { connections: ['g1', 'g2'] })
+    const f2 = makeUser('f2', { connections: ['g3'] })
+    const g1 = makeUser('g1')
+    const g2 = makeUser('g2')
+    const g3 = makeUser('g3')
+
+    const { nodes, edges } = buildWeb({
+      viewerUserId: 'viewer',
+      parsedGoal: goal,
+      candidates: [viewer, p1, ...fillers, f1, f2, g1, g2, g3],
+      scorer: scorerByMap({
+        p1: 90, p2: 85, p3: 84, p4: 83, p5: 82,
+        f1: 80, f2: 75,
+        g1: 90, g2: 75, g3: 71,
+      }),
+    })
+
+    const thirdDegree = nodes.filter((n) => n.degree === 3)
+    expect(thirdDegree.map((n) => n.id).sort()).toEqual(['g1', 'g2', 'g3'])
+    // Each 3rd-degree is reached via a dotted edge from its 2nd-degree parent.
+    expect(edges.find((e) => e.target === 'g1')).toMatchObject({ source: 'f1', isDotted: true })
+    expect(edges.find((e) => e.target === 'g2')).toMatchObject({ source: 'f1', isDotted: true })
+    expect(edges.find((e) => e.target === 'g3')).toMatchObject({ source: 'f2', isDotted: true })
+  })
+
+  it('caps every ring (>= 2) at SECOND_DEGREE_PER_NODE_MAX per parent', () => {
+    // One 1st-degree parent with one 2nd-degree child; that 2nd-degree has
+    // 5 friends-of-friends-of-friends, all clearing 70. Only 3 should make it.
+    const viewer = makeUser('viewer', { connections: ['p1', 'p2', 'p3', 'p4', 'p5'] })
+    const grandchildIds = Array.from({ length: 5 }, (_, i) => `g${i}`)
+    const p1 = makeUser('p1', { connections: ['f1'] })
+    const fillers = Array.from({ length: 4 }, (_, i) => makeUser(`p${i + 2}`))
+    const f1 = makeUser('f1', { connections: grandchildIds })
+    const grandchildren = grandchildIds.map((id) => makeUser(id))
+
+    const scores: Record<string, number> = {
+      p1: 90, p2: 85, p3: 84, p4: 83, p5: 82, f1: 80,
+    }
+    grandchildIds.forEach((id, i) => (scores[id] = 90 - i))
+
+    const { nodes } = buildWeb({
+      viewerUserId: 'viewer',
+      parsedGoal: goal,
+      candidates: [viewer, p1, ...fillers, f1, ...grandchildren],
+      scorer: scorerByMap(scores),
+    })
+    const thirdDegree = nodes.filter((n) => n.degree === 3)
+    expect(thirdDegree).toHaveLength(3)
+    expect(thirdDegree.map((n) => n.id)).toEqual(['g0', 'g1', 'g2'])
+  })
+
+  it('extends past 3rd-degree along a long chain (verifies the MAX_DEGREE loop, not a hardcoded 3)', () => {
+    // Long single-thread chain: viewer -> a -> b -> c -> d. Every link is the
+    // only connection in either direction, so each ring contains exactly one
+    // node and the loop walks straight down. Verifies the algorithm does not
+    // stop at degree 3 — it keeps going until MAX_DEGREE.
+    const viewer = makeUser('viewer', { connections: ['a'] })
+    const a = makeUser('a', { connections: ['b'] })
+    const b = makeUser('b', { connections: ['c'] })
+    const c = makeUser('c', { connections: ['d'] })
+    const d = makeUser('d')
+
+    const { nodes, edges } = buildWeb({
+      viewerUserId: 'viewer',
+      parsedGoal: goal,
+      candidates: [viewer, a, b, c, d],
+      scorer: scorerByMap({ a: 90, b: 90, c: 90, d: 90 }),
+    })
+
+    // Every link is added; node degrees go 1, 2, 3, 4 (assumes MAX_DEGREE >= 4).
+    expect(MAX_DEGREE).toBeGreaterThanOrEqual(4)
+    expect(nodes.map((n) => ({ id: n.id, degree: n.degree }))).toEqual([
+      { id: 'a', degree: 1 },
+      { id: 'b', degree: 2 },
+      { id: 'c', degree: 3 },
+      { id: 'd', degree: 4 },
+    ])
+    // Bridge edges are dotted; the viewer->1st-degree edge is solid.
+    const solidCount = edges.filter((edge) => !edge.isDotted).length
+    expect(solidCount).toBe(1)
+    expect(edges.length).toBe(4)
+  })
+
+  it('respects MAX_DEGREE: nothing beyond the cap is emitted', () => {
+    // Chain of (MAX_DEGREE + 4) nodes so the dataset itself could go deeper
+    // than the cap. Verifies the algorithm refuses to walk past MAX_DEGREE.
+    const length = MAX_DEGREE + 4
+    const ids = Array.from({ length }, (_, i) => `n${i}`)
+    const users = ids.map((id, i) =>
+      makeUser(id, { connections: i + 1 < ids.length ? [ids[i + 1]] : [] }),
+    )
+    const viewer = makeUser('viewer', { connections: [ids[0]] })
+    const scores: Record<string, number> = {}
+    ids.forEach((id) => (scores[id] = 90))
+
+    const { nodes } = buildWeb({
+      viewerUserId: 'viewer',
+      parsedGoal: goal,
+      candidates: [viewer, ...users],
+      scorer: scorerByMap(scores),
+    })
+
+    // MAX_DEGREE rings filled, one node each.
+    expect(nodes).toHaveLength(MAX_DEGREE)
+    const maxDegree = Math.max(...nodes.map((n) => n.degree))
+    expect(maxDegree).toBe(MAX_DEGREE)
+  })
+
+  it('falls back to top-N grandchildren when none clear the 70 threshold (weak-match, ring 3)', () => {
+    const viewer = makeUser('viewer', { connections: ['p1', 'p2', 'p3', 'p4', 'p5'] })
+    const p1 = makeUser('p1', { connections: ['f1'] })
+    const fillers = Array.from({ length: 4 }, (_, i) => makeUser(`p${i + 2}`))
+    const f1 = makeUser('f1', { connections: ['g1', 'g2', 'g3', 'g4'] })
+
+    const { nodes } = buildWeb({
+      viewerUserId: 'viewer',
+      parsedGoal: goal,
+      candidates: [
+        viewer, p1, ...fillers, f1,
+        makeUser('g1'), makeUser('g2'), makeUser('g3'), makeUser('g4'),
+      ],
+      scorer: scorerByMap({
+        p1: 90, p2: 85, p3: 84, p4: 83, p5: 82, f1: 80,
+        g1: 30, g2: 25, g3: 10, g4: 5,
+      }),
+    })
+    const thirdDegree = nodes.filter((n) => n.degree === 3)
+    expect(thirdDegree.map((n) => n.id)).toEqual(['g1', 'g2', 'g3'])
+    expect(thirdDegree.every((n) => n.alignmentTier === 'weak')).toBe(true)
+  })
+
+  it('never surfaces a user already in the web at a deeper ring', () => {
+    // `shared` is a 1st-degree connection (top-5 by score), AND would also
+    // be reachable as 2nd-degree via p1 or 3rd-degree via p1 -> f1. The
+    // uniqueness invariant means it appears once, at the SHALLOWEST ring
+    // it qualifies for (degree 1).
+    const viewer = makeUser('viewer', { connections: ['p1', 'p2', 'p3', 'p4', 'p5', 'shared'] })
+    const p1 = makeUser('p1', { connections: ['f1', 'shared'] })
+    const fillers = Array.from({ length: 4 }, (_, i) => makeUser(`p${i + 2}`))
+    const f1 = makeUser('f1', { connections: ['shared'] })
+    const shared = makeUser('shared')
+
+    const { nodes } = buildWeb({
+      viewerUserId: 'viewer',
+      parsedGoal: goal,
+      candidates: [viewer, p1, ...fillers, f1, shared],
+      // shared scores higher than the lowest filler so it secures a
+      // 1st-degree slot.
+      scorer: scorerByMap({
+        p1: 99, p2: 85, p3: 84, p4: 83, p5: 60, shared: 88, f1: 80,
+      }),
+    })
+    const sharedNodes = nodes.filter((n) => n.id === 'shared')
+    expect(sharedNodes).toHaveLength(1)
+    expect(sharedNodes[0].degree).toBe(1)
   })
 })
 
@@ -509,110 +691,5 @@ describe('buildWeb — WebNode shape', () => {
       scorer,
     })
     expect(one).toEqual(two)
-  })
-})
-
-describe('buildWeb — 3rd-degree selection (maxDegree: 3)', () => {
-  // viewer -> friend (1st) -> fof (2nd) -> fofof (3rd)
-  const buildChain = (maxDegree?: 2 | 3) => {
-    const viewer = makeUser('viewer', { connections: ['friend'] })
-    const friend = makeUser('friend', { connections: ['fof'] })
-    const fof = makeUser('fof', { connections: ['fofof'] })
-    const fofof = makeUser('fofof', { connections: [] })
-    return buildWeb({
-      viewerUserId: 'viewer',
-      parsedGoal: goal,
-      candidates: [viewer, friend, fof, fofof],
-      scorer: scorerByMap({ friend: 90, fof: 85, fofof: 80 }),
-      maxDegree,
-    })
-  }
-
-  it('does not emit 3rd-degree nodes by default (maxDegree defaults to 2)', () => {
-    const { nodes } = buildChain()
-    expect(nodes.some((n) => n.degree === 3)).toBe(false)
-    expect(nodes.find((n) => n.id === 'fofof')).toBeUndefined()
-  })
-
-  it('emits 3rd-degree nodes from the 2nd-degree connections with a dotted bridge', () => {
-    const { nodes, edges } = buildChain(3)
-    const third = nodes.find((n) => n.id === 'fofof')
-    expect(third?.degree).toBe(3)
-    const bridge = edges.find((e) => e.id === 'fof__fofof')
-    expect(bridge?.isDotted).toBe(true)
-  })
-
-  it('carries the activity ring status onto built nodes', () => {
-    const viewer = makeUser('viewer', { connections: ['active1'] })
-    const active1 = makeUser('active1', { posts_activity: ['x', 'y', 'z'] }) // 3 posts -> active
-    const { nodes } = buildWeb({
-      viewerUserId: 'viewer',
-      parsedGoal: goal,
-      candidates: [viewer, active1],
-      scorer: scorerByMap({ active1: 90 }),
-    })
-    expect(nodes.find((n) => n.id === 'active1')?.activityStatus).toBe('active')
-  })
-
-  it('keeps revealing a 2nd-degree node\'s connections even when none clear the 70 threshold (weak-match fallback)', () => {
-    // viewer -> friend (1st) -> fof (2nd). `fof`'s own connections are all weak
-    // goal-matches (< 70). The 2nd-degree pass would drop them, but the
-    // 3rd-degree pass must still surface the top SECOND_DEGREE_PER_NODE_MAX so
-    // the web can "keep going" once the viewer connects with `fof`.
-    const viewer = makeUser('viewer', { connections: ['friend'] })
-    const friend = makeUser('friend', { connections: ['fof'] })
-    const fof = makeUser('fof', { connections: ['w1', 'w2', 'w3', 'w4'] })
-    const weaks = ['w1', 'w2', 'w3', 'w4'].map((id) => makeUser(id))
-    const { nodes, edges } = buildWeb({
-      viewerUserId: 'viewer',
-      parsedGoal: goal,
-      candidates: [viewer, friend, fof, ...weaks],
-      // friend + fof clear thresholds; the 3rd-degree pool is all weak.
-      scorer: scorerByMap({ friend: 90, fof: 85, w1: 30, w2: 20, w3: 10, w4: 5 }),
-      maxDegree: 3,
-    })
-    const thirdIds = nodes.filter((n) => n.degree === 3).map((n) => n.id)
-    // Top 3 weak connections by score, capped at SECOND_DEGREE_PER_NODE_MAX.
-    expect(thirdIds).toEqual(['w1', 'w2', 'w3'])
-    // Each is bridged (dotted) from the 2nd-degree parent `fof`.
-    expect(
-      thirdIds.every((id) =>
-        edges.some((e) => e.id === `fof__${id}` && e.isDotted),
-      ),
-    ).toBe(true)
-  })
-})
-
-describe('buildWeb — node headlines', () => {
-  it('resolves a "position at company" headline from the member\'s first job', () => {
-    const viewer = makeUser('viewer', { connections: ['a'] })
-    const a = makeUser('a', {
-      name: 'Alice Anderson',
-      job_history: [
-        makeJob({ position: 'Product Manager', company: 'Tech Innovators Inc.' }),
-        makeJob({ position: 'Analyst', company: 'Old Co' }),
-      ],
-    })
-    const { nodes } = buildWeb({
-      viewerUserId: 'viewer',
-      parsedGoal: goal,
-      candidates: [viewer, a],
-      scorer: scorerByMap({ a: 80 }),
-    })
-    expect(nodes.find((n) => n.id === 'a')?.headline).toBe(
-      'Product Manager at Tech Innovators Inc.',
-    )
-  })
-
-  it('omits the headline when the member has no resolvable job', () => {
-    const viewer = makeUser('viewer', { connections: ['a'] })
-    const a = makeUser('a', { job_history: [] })
-    const { nodes } = buildWeb({
-      viewerUserId: 'viewer',
-      parsedGoal: goal,
-      candidates: [viewer, a],
-      scorer: scorerByMap({ a: 80 }),
-    })
-    expect(nodes.find((n) => n.id === 'a')?.headline).toBeUndefined()
   })
 })

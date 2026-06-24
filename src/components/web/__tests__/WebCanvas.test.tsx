@@ -25,20 +25,38 @@ describe('WebCanvas', () => {
     expect(container.querySelectorAll('[data-testid^="web-edge-"]')).toHaveLength(0)
   })
 
-  it('renders the self centre in the empty state when alwaysShowSelf is set', () => {
-    const { queryByTestId, container } = render(
-      <WebCanvas snapshot={buildSnapshot(null, people, options)} alwaysShowSelf />,
-    )
-    expect(queryByTestId('web-self')).toBeTruthy()
-    expect(container.querySelectorAll('[data-testid^="web-node-"]')).toHaveLength(0)
-  })
-
   it('renders the self centre, one marker and one edge per 1st-degree node', () => {
     const seeded = buildSnapshot(goal, people, options)
     const { container, getByTestId } = render(<WebCanvas snapshot={seeded} />)
     expect(getByTestId('web-self')).toBeTruthy()
     expect(container.querySelectorAll('[data-testid^="web-node-"]')).toHaveLength(2)
     expect(container.querySelectorAll('[data-testid^="web-edge-"]')).toHaveLength(2)
+  })
+
+  it('renders a clipped avatar photo for each member node', () => {
+    const seeded = buildSnapshot(goal, people, options)
+    const { container } = render(<WebCanvas snapshot={seeded} />)
+    const node = container.querySelector('[data-testid="web-node-a"]')!
+    const image = node.querySelector('image')
+    expect(image?.getAttribute('href')).toBe(
+      seeded.nodes.find((n) => n.id === 'a')!.photo,
+    )
+    expect(image?.getAttribute('clip-path')).toBe('url(#avatar-clip-a)')
+    // Initials remain as the fallback beneath the photo.
+    expect(node.textContent).toContain('AL')
+  })
+
+  it('styles a strong edge with a gradient stroke and a weak edge with a solid colour', () => {
+    const seeded = buildSnapshot(goal, people, options)
+    const { container } = render(<WebCanvas snapshot={seeded} />)
+    // `a` has interactionScore 0.9 → strength 0.9 → vibrant tier (gradient stroke).
+    const strongEdge = container.querySelector('[data-testid="web-edge-self_1__a"]')
+    expect(strongEdge?.getAttribute('stroke')).toBe('url(#edge-grad-self_1__a)')
+    expect(container.querySelector('#edge-grad-self_1__a')).toBeTruthy()
+    // `b` has interactionScore 0.4 → steady tier → solid colour, no gradient def.
+    const steadyEdge = container.querySelector('[data-testid="web-edge-self_1__b"]')
+    expect(steadyEdge?.getAttribute('stroke')).not.toContain('url(#')
+    expect(container.querySelector('#edge-grad-self_1__b')).toBeNull()
   })
 
   it('draws dotted bridge edges once a node is expanded', () => {
