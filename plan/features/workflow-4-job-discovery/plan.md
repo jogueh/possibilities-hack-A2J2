@@ -16,7 +16,7 @@ Transform the relationship web from a pure networking tool into a job-hunting ac
 | Step | Branch | Status | PR |
 |------|--------|--------|----|
 | 1. job types + Vitest infra | `w4-step1-types` | ✅ **merged** | [#2](https://github.com/jogueh/possibilities-hack-A2J2/pull/2) |
-| 2. shared scoring engine | `w4-step2-scoring-engine` | ✅ **ready to merge** (clean) | [#18](https://github.com/jogueh/possibilities-hack-A2J2/pull/18) |
+| 2. shared scoring engine | `w4-step2-scoring-engine` | ✅ **merged** | [#18](https://github.com/jogueh/possibilities-hack-A2J2/pull/18) |
 | 3. web overlap | _fresh off main_ | 🔁 code written + reconciled; recreate PR | — (old #20 closed) |
 | 4. job matching | _fresh off main_ | 🔁 code written + reconciled; recreate PR | — (old #21 closed) |
 | 5. jobs panel | _fresh off main_ | ⬜ pending | — |
