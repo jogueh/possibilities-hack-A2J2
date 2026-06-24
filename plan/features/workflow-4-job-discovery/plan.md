@@ -55,9 +55,9 @@ Main now owns the shared contracts; W4 consumes them — do not redefine these l
 ### Step 1 — `w4-step1-types` ✅ merged
 - **Exposed:** `src/types/job.ts` (`JobMatch`, `WebConnectionRef`, `JobMatchesResponse`), shared test fixtures, Vitest infra.
 
-### Step 2 — `w4-step2-scoring-engine` ✅ ready to merge (#18)
+### Step 2 — `w4-step2-scoring-engine` ✅ merged (#18)
 - **Needs:** ✅ main's `@/types/goal`, `@/types/data`; ✅ W2 sign-off on W4 owning the scorer.
-- **Exposes (once #18 merges):** `src/lib/scoring.ts` (pure, no API/LLM):
+- **Exposes:** `src/lib/scoring.ts` (pure, no API/LLM):
   - `scoreUserAgainstGoal(user: UserWithJobs, parsedGoal): number` (role 35 / industry 20 / location 20 / skills 15 / activity 10) — consumed by **W2**
   - `scoreJobAgainstGoal(job, goal): number` (role/industry/location re-weighted to 100) — consumed by step 4
   - `matchesRole`/`matchesIndustry`/`matchesLocation`, `deriveAlignmentTier`, `deriveActivityStatus`, `WEIGHTS`
