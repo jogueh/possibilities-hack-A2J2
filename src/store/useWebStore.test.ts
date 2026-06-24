@@ -94,7 +94,7 @@ describe('useWebStore', () => {
       const s = useWebStore.getState()
       expect(s.state).toBe('expanded')
       expect(s.nodes.map((n) => n.id)).toEqual(['a', 'b'])
-      const bridge = s.edges.find((e) => e.id === 'e_a_b')
+      const bridge = s.edges.find((e) => e.id === 'a__b')
       expect(bridge).toMatchObject({ source: 'a', target: 'b', isDotted: true, strength: 50 })
     })
 
@@ -109,7 +109,7 @@ describe('useWebStore', () => {
       const afterSecond = useWebStore.getState()
 
       expect(afterSecond.nodes).toHaveLength(2)
-      expect(afterSecond.edges.filter((e) => e.id === 'e_a_b')).toHaveLength(1)
+      expect(afterSecond.edges.filter((e) => e.id === 'a__b')).toHaveLength(1)
       // No new references created on the no-op call.
       expect(afterSecond.nodes).toBe(afterFirst.nodes)
       expect(afterSecond.edges).toBe(afterFirst.edges)
@@ -121,7 +121,7 @@ describe('useWebStore', () => {
       )
       const s = useWebStore.getState()
       expect(s.nodes.map((n) => n.id)).toContain('z')
-      expect(s.edges.some((e) => e.id === 'e_ghost_z')).toBe(false)
+      expect(s.edges.some((e) => e.id === 'ghost__z')).toBe(false)
     })
   })
 

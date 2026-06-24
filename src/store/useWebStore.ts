@@ -81,7 +81,10 @@ export const useWebStore = create<WebStoreState>((set) => ({
       const isDuplicate = s.nodes.some((n) => n.id === node.id)
       const nodes = isDuplicate ? s.nodes : [...s.nodes, node]
 
-      const edgeId = `e_${parentNodeId}_${node.id}`
+      // Edge ids follow the repo-wide `${source}__${target}` convention
+      // (see src/lib/web/snapshot.ts and src/lib/webBuilder.ts) so bridge edges
+      // stay consistent with edges produced elsewhere in the system.
+      const edgeId = `${parentNodeId}__${node.id}`
       const parentInWeb = s.nodes.some((n) => n.id === parentNodeId)
       const edgeExists = s.edges.some((e) => e.id === edgeId)
       const edges =
