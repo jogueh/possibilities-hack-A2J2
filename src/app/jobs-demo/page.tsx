@@ -1,14 +1,14 @@
 "use client";
 // ⚠️ W4 MANUAL-TESTING HARNESS — remove at integration (W1 provides the real canvas
-// + top nav). Seeds the mock web store and renders the JobsPanel + toggle so the
+// + top nav). Seeds the real W1 web store and renders the JobsPanel + toggle so the
 // jobs-discovery flow can be exercised end-to-end via `npm run dev` →
 // http://localhost:3000/jobs-demo. See plan.md
 import { useEffect, useState } from "react";
 import { JobsPanel, JOBS_PANEL_WIDTH } from "@/components/JobsPanel";
 import { JobsPanelToggle } from "@/components/JobsPanelToggle";
 import { __setMockWebState } from "@/store/useWebStore";
-import { MOCK_USERS } from "@/mocks/userApi";
 import type { WebNode } from "@/types/web";
+import type { UserWithJobs } from "@/types/data";
 
 // Bob (user_4579) worked at Google + Innovatech; Alice (user_1001) worked at Google.
 // A software-engineering goal surfaces Google SWE roles → web overlap on both.
@@ -42,10 +42,18 @@ export default function JobsDemoPage() {
   useEffect(() => {
     __setMockWebState({
       goal: { raw: "Break into software engineering in technology", userId: "user_4579" },
-      viewerProfile: MOCK_USERS.user_4579,
+      viewerProfile: null,
       nodes: [bobNode, aliceNode],
       edges: [],
     });
+    fetch("/api/user/user_4579")
+      .then((r) => (r.ok ? (r.json() as Promise<UserWithJobs>) : null))
+      .then((viewer) => {
+        if (viewer) __setMockWebState({ viewerProfile: viewer });
+      })
+      .catch(() => {
+        /* dev-only harness; surface no UI error */
+      });
   }, []);
 
   return (

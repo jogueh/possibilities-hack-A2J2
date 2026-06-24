@@ -1,12 +1,13 @@
 "use client";
 // ⚠️ W3 MANUAL-TESTING HARNESS — remove at integration (W1 provides the real canvas).
-// Seeds the mock web store and renders clickable nodes so the NodeSidebar can be exercised
-// end-to-end via `npm run dev` → http://localhost:3000/w3-demo. See docs/workflow-3.
+// Seeds the real W1 web store and renders clickable nodes so the NodeSidebar can
+// be exercised end-to-end via `npm run dev` → http://localhost:3000/w3-demo.
+// See docs/workflow-3.
 import { useEffect, useState } from "react";
 import { NodeSidebar } from "@/components/NodeSidebar";
 import { __setMockWebState } from "@/store/useWebStore";
-import { MOCK_USERS } from "@/mocks/userApi";
 import type { WebNode, WebEdge } from "@/types/web";
+import type { UserWithJobs } from "@/types/data";
 
 const aliceNode: WebNode = {
   id: "n_alice",
@@ -52,12 +53,22 @@ export default function W3DemoPage() {
   const [selected, setSelected] = useState<WebNode | null>(null);
 
   useEffect(() => {
+    // Seed the snapshot synchronously, then fetch the viewer's real profile
+    // from the production /api/user/[userId] endpoint and patch it in.
     __setMockWebState({
       goal: { raw: "Break into software engineering", userId: "user_4579" },
-      viewerProfile: MOCK_USERS.user_4579,
+      viewerProfile: null,
       nodes: [aliceNode, bobNode, secondDegree],
       edges,
     });
+    fetch("/api/user/user_4579")
+      .then((r) => (r.ok ? (r.json() as Promise<UserWithJobs>) : null))
+      .then((viewer) => {
+        if (viewer) __setMockWebState({ viewerProfile: viewer });
+      })
+      .catch(() => {
+        /* dev-only harness; surface no UI error */
+      });
   }, []);
 
   return (
