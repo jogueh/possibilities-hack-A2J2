@@ -13,6 +13,7 @@ import { useWebStore } from "@/mocks/useWebStore";
 import { parseGoalRaw } from "@/mocks/goalParser";
 import { fetchJobMatches } from "@/mocks/jobsApi";
 import { deriveAlignmentTier } from "@/lib/scoring";
+import { RECENTLY_IN_FIELD_YEARS } from "@/lib/webOverlap";
 import { LI } from "@/lib/linkedinTokens";
 
 export const JOBS_PANEL_WIDTH = 360;
@@ -312,7 +313,7 @@ function JobCard({ match, expanded, onToggle, onOpenConnection }: JobCardProps) 
           {hasRecentInsider && (
             <span
               data-testid="recently-in-field-badge"
-              title="A connection here graduated within the last 3 years — fresh, relevant context"
+              title={`A connection here graduated within the last ${RECENTLY_IN_FIELD_YEARS} years — fresh, relevant context`}
               style={{
                 fontSize: 12,
                 fontWeight: 600,
