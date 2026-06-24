@@ -1,11 +1,23 @@
 // =============================================================================
 // Edge Strength visuals — presentation mapping (Workflow 4 stretch s12).
 // =============================================================================
-// Pure, deterministic mapping from a `WebEdge.strength` (0–100, the cross-
-// workflow scale used by the store and `WebEdge`) to the stroke styling for the
-// edge on the web canvas. Stronger ties — built up through interaction (chats,
-// posts, "I met up") — render thicker, warmer, and eventually pulse, so the web
-// visibly "strengthens its roots".
+// Pure, deterministic mapping from a `WebEdge.strength` to the stroke styling
+// for the edge on the web canvas. Stronger ties — built up through interaction
+// (chats, posts, "I met up") — render thicker, warmer, and eventually pulse, so
+// the web visibly "strengthens its roots".
+//
+// SCALE: this util expects the store's 0–100 strength scale — the same scale
+// `useWebStore` produces and clamps (`DEFAULT_EDGE_STRENGTH = 50`, `[0,100]`),
+// shared with `interactionScore` / `relevanceScore`. Inputs are clamped to
+// [0,100] (NaN → weakest), so passing a 0..1 value would land almost everything
+// in the faint tier — convert to 0–100 first.
+//
+// CAUTION — mixed scales exist: `src/lib/web/layout.ts` `edgeStrokeWidth()`
+// still documents/clamps strength as 0..1 (and is, today, mis-fed the 0–100
+// `edge.strength` in WebCanvas, pinning every edge to max width). Do not route
+// this util's value through those 0..1 helpers. When the canvas adopts this
+// util it should replace `edgeStrokeWidth(edge.strength)` with
+// `edgeStrengthStyle(edge.strength).width`, retiring the 0..1 path.
 //
 // The canvas is custom DOM/SVG (not React Flow), so this exposes plain style
 // data (colour / width / pulse / optional gradient) that the renderer applies;
