@@ -3,6 +3,17 @@ PIT Hackathon
 
 A LinkedIn-inspired prototype built with **Next.js (App Router) + TypeScript + Ant Design 5**. Alongside a static homepage mockup, it includes an interactive **Web** feature: set a career goal and see how your network maps a warm path toward it.
 
+### Presentation
+
+📊 **[Slides](https://docs.google.com/presentation/d/1JEbf07Vd9cBJwBB0Oi8OZ3LaapymIsZCzgF90yeZmpk/edit?usp=sharing)**
+
+### Team
+
+- Jada Ogueh
+- Jacob Ryabinky
+- Arty Basilio
+- Albert Yorn
+
 ### Prerequisites
 
 - **Node.js** `>=20.9.0` (check with `node -v`)
