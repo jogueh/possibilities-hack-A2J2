@@ -38,9 +38,10 @@ describe("signal primitives", () => {
     expect(matchesIndustry("Healthcare", goalSwe)).toBe(false);
   });
 
-  it("matchesLocation matches on a shared token", () => {
+  it("matchesLocation requires all city tokens when the goal has a city", () => {
     expect(matchesLocation("Mountain View, CA", goalSwe)).toBe(true);
     expect(matchesLocation("San Francisco, CA", goalSwe)).toBe(false);
+    expect(matchesLocation("Mountain House, CA", goalSwe)).toBe(false);
     expect(matchesLocation("Boston, MA", goalSwe)).toBe(false);
   });
 
@@ -332,6 +333,32 @@ describe("weightOverrides", () => {
     );
   });
 
+  it("does not cap user scores for a role mismatch when role weight is 0", () => {
+    const goal: ParsedGoal = {
+      intent: "location-led PM search",
+      targetRoles: ["Product Manager"],
+      targetIndustries: ["Technology"],
+      targetLocations: ["San Francisco, CA"],
+      weightOverrides: {
+        role: 0,
+        industry: 50,
+        location: 50,
+        skills: 0,
+        activity: 0,
+      },
+    };
+    const user: UserWithJobs = {
+      ...userBobWithJobs,
+      job_history: [{ ...jobAcmeSwe, position: "Software Engineer" }],
+      current_location: "San Francisco, CA",
+      posts_activity: [],
+      skills: [],
+    };
+
+    expect(matchesRole("Software Engineer", goal)).toBe(false);
+    expect(scoreUserAgainstGoal(user, goal)).toBe(100);
+  });
+
   it("scoreJobAgainstGoal returns 0 when all job-relevant weights are 0", () => {
     const goal: ParsedGoal = {
       intent: "x",
@@ -339,5 +366,23 @@ describe("weightOverrides", () => {
       weightOverrides: { role: 0, industry: 0, location: 0 },
     };
     expect(scoreJobAgainstGoal(jobAcmeSwe, goal)).toBe(0);
+  });
+
+  it("does not cap job scores for a role mismatch when role weight is 0", () => {
+    const goal: ParsedGoal = {
+      intent: "location-led PM jobs",
+      targetRoles: ["Product Manager"],
+      targetIndustries: ["Technology"],
+      targetLocations: ["San Francisco, CA"],
+      weightOverrides: { role: 0, industry: 50, location: 50 },
+    };
+    const job = {
+      ...jobAcmeSwe,
+      position: "Software Engineer",
+      industry: "Technology",
+      location: "San Francisco, CA",
+    };
+
+    expect(scoreJobAgainstGoal(job, goal)).toBe(100);
   });
 });

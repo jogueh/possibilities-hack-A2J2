@@ -221,7 +221,7 @@ function locationOverlaps(candidate: string, target: string): boolean {
   const targetTokens = locationTokenSet(target);
 
   if (targetTokens.size > 0) {
-    return [...targetTokens].some((t) => candidateTokens.has(t));
+    return [...targetTokens].every((t) => candidateTokens.has(t));
   }
 
   const candidateStates = stateTokenSet(candidate);
@@ -397,7 +397,7 @@ export function scoreUserAgainstGoal(
   }
 
   const finalScore = clamp(score);
-  return hasTargetRole && !roleMatched
+  return hasTargetRole && w.role > 0 && !roleMatched
     ? Math.min(finalScore, ROLE_MISMATCH_MAX_SCORE)
     : finalScore;
 }
@@ -434,7 +434,7 @@ export function scoreJobAgainstGoal(job: Job, goal: ParsedGoal): number {
   if (excludedByLocation(job.location, goal)) score -= w.location;
 
   const finalScore = clamp(score * scale);
-  return hasTargetRole && !roleMatched
+  return hasTargetRole && w.role > 0 && !roleMatched
     ? Math.min(finalScore, ROLE_MISMATCH_MAX_SCORE)
     : finalScore;
 }
