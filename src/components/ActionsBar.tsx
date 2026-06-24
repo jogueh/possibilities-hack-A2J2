@@ -74,6 +74,28 @@ export function ActionsBar({
     cursor: "pointer",
   };
 
+  // LinkedIn-style modal-action buttons (pill primary + pill outline) so the
+  // Cancel / Send pair matches the visual language of the rest of the bar
+  // instead of falling through to the browser default <button> look.
+  const modalPrimaryBtn: React.CSSProperties = {
+    background: LI.blue,
+    color: "#fff",
+    border: "none",
+    borderRadius: 16,
+    padding: "6px 16px",
+    fontWeight: 600,
+    cursor: "pointer",
+  };
+  const modalSecondaryBtn: React.CSSProperties = {
+    background: "transparent",
+    color: LI.blue,
+    border: `1px solid ${LI.blue}`,
+    borderRadius: 16,
+    padding: "6px 16px",
+    fontWeight: 600,
+    cursor: "pointer",
+  };
+
   return (
     <section style={{ marginTop: 24, paddingTop: 16, borderTop: `1px solid ${LI.border}` }}>
       <div style={{ display: "flex", gap: 8 }}>
@@ -168,7 +190,7 @@ export function ActionsBar({
         <Modal title="Connect" onClose={() => setConnectOpen(false)}>
           <p>Send {targetName} a connection request?</p>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button type="button" onClick={() => setConnectOpen(false)}>Cancel</button>
+            <button type="button" onClick={() => setConnectOpen(false)} style={modalSecondaryBtn}>Cancel</button>
             <button
               type="button"
               onClick={() => {
@@ -176,7 +198,7 @@ export function ActionsBar({
                 setToast(`Connection request sent to ${targetName}`);
                 setConnectOpen(false);
               }}
-              style={{ background: LI.blue, color: "#fff", border: "none", borderRadius: 16, padding: "4px 14px", fontWeight: 600 }}
+              style={modalPrimaryBtn}
             >
               Send
             </button>
@@ -202,14 +224,14 @@ export function ActionsBar({
             style={{ width: "100%", marginBottom: 8, padding: 6 }}
           />
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button type="button" onClick={() => setMessageOpen(false)}>Cancel</button>
+            <button type="button" onClick={() => setMessageOpen(false)} style={modalSecondaryBtn}>Cancel</button>
             <button
               type="button"
               onClick={() => {
                 setToast(`Message sent to ${targetName}`);
                 setMessageOpen(false);
               }}
-              style={{ background: LI.blue, color: "#fff", border: "none", borderRadius: 16, padding: "4px 14px", fontWeight: 600 }}
+              style={modalPrimaryBtn}
             >
               Send
             </button>
