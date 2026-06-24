@@ -10,19 +10,26 @@ this as the script and the slide diagram. For the engineering-level data contrac
 
 ## ⏱️ 90-Second Cut (the demo-video script)
 
-Hit only these beats — total **≤ 1:30**. Skip the Premium gate and re-prompt loop.
+Hit only these beats — total **≤ 1:30**. The free-tier cap is the closing business beat.
 
 | Time | Beat | What you do / say |
 |------|------|-------------------|
 | **0:00–0:10** | **State A — blank web** | "Your network, organized around a goal." Open `/web`. Motto: _"Expand your web, reinforce its roots."_ |
-| **0:10–0:20** | **Map it** | Click the suggestion `Grow my software engineering network in San Francisco.` → press Enter → web draws. |
-| **0:20–0:35** | **State B — the match** | "One on-target path, not 500 noisy connections." Point at **Kimberly Nguyen — Software Engineer · San Francisco** (top tier). |
-| **0:35–0:55** | **The AI copilot beat** | Click her node → sidebar shows goal-relevant profile + **shared context** + a **drafted warm intro**. "It tells me exactly how to reach out." |
-| **0:55–1:15** | **State C — warm paths** | Click **Connect** → 2nd-degree offshoots unlock (e.g. Margaret Clark, SF). "Now I can see who introduces me next." |
-| **1:15–1:30** | **Depth + close** | Hit **🔗 Linked up** → the edge thickens. Close on the motto: _"Keep weaving. Keep connecting."_ |
+| **0:10–0:18** | **Map it** | Click the suggestion `Grow my software engineering network in San Francisco.` → Enter → web draws. |
+| **0:18–0:30** | **State B — the match** | "One on-target path, not 500 noisy connections." Point at **Kimberly Nguyen — Software Engineer · San Francisco** (top tier). |
+| **0:30–0:48** | **The AI copilot beat** | Click her node → sidebar shows goal-relevant profile + **shared context** + a **drafted warm intro**. "It tells me exactly how to reach out." |
+| **0:48–1:05** | **State C — warm paths** | **Connect** through Kimberly to her warm-path offshoots — connect **3 people** (the free-tier limit). "Now I see who introduces me next." |
+| **1:05–1:30** | **Free-tier cap → Premium** | Attempt a **4th connect** → the **"You've reached the 3-connection limit"** modal appears. Toggle **⭐ Premium: ON** → it bypasses and the web keeps growing. Close on _"Keep weaving. Keep connecting."_ |
 
-> **Tightest 60s:** drop the State-C "Linked up" beat (1:15–1:30) and end right after the
-> warm-path unlock. The must-keep moment is **0:35–0:55** (the AI warm intro).
+> **Hitting the cap (mechanic):** only **2nd-degree** nodes show a **Connect** button, and the
+> gate fires on the **4th** connect (limit = 3). Connect through Kimberly's warm path; the
+> 2 blank-role offshoots still connect fine on the canvas (role only shows in the sidebar,
+> which you skip here). Clicking a just-connected node reveals its next layer if you need a
+> 4th node to trigger the gate.
+>
+> **Faster fallback (if the grind feels slow on camera):** skip the 3-connect climb and just
+> click the **Premium: OFF → ⭐ ON** pill while narrating "free caps at 3 connections, Premium
+> unlocks unlimited." ~5s, same business beat, no modal.
 
 > **Data note (important):** the running app resolves jobs from the **remote** dataset
 > (`https://pit.najera.cc/jobs_data.json`, see `src/lib/data.ts`), not the committed
