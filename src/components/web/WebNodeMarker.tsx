@@ -3,24 +3,13 @@
 import type { KeyboardEvent } from 'react'
 import { motion } from 'framer-motion'
 import type { WebNode } from '@/types/web'
-import { tierColor, tierRadius, truncateLabel, wrapWords, activityRingColor, activityRingLabel } from '@/lib/web/layout'
-
-/**
- * Per-node visual decorations injected by sibling workflows. Workflow 1 owns the
- * plumbing (this prop + applying the marker class); the data and styling are
- * owned by the injecting workflow. `hasJobOverlap` is set by Workflow 4 (job
- * discovery) to flag connections that overlap with relevant job postings; when
- * true the marker gets the `node-job-overlap` class W4 styles into a pulsing ring.
- */
-export interface NodeDecoration {
-  hasJobOverlap?: boolean
-}
+import { tierRadius, truncateLabel, wrapWords, activityRingLabel } from '@/lib/web/layout'
+import { alignmentColor } from '@/lib/alignmentColors'
 
 export interface WebNodeMarkerProps {
   node: WebNode
   selected?: boolean
   onSelect?: (id: string) => void
-  decoration?: NodeDecoration
 }
 
 // The name caption stays on one line (capped width). The headline wraps two
@@ -34,14 +23,12 @@ export default function WebNodeMarker({
   node,
   selected = false,
   onSelect,
-  decoration,
 }: WebNodeMarkerProps) {
   const r = tierRadius(node.alignmentTier)
-  // The avatar ring encodes outreach-activity status (blue/amber/red). Falls back
-  // to the alignment-tier colour for nodes that don't carry an activity status.
-  const ring = node.activityStatus
-    ? activityRingColor(node.activityStatus)
-    : tierColor(node.alignmentTier)
+  // The avatar ring encodes goal-match strength (alignment tier): blue = strong,
+  // amber = moderate, grey = weak. Uses the same `alignmentColor` palette as the
+  // NodeSidebar so the canvas and sidebar stay perfectly in sync.
+  const ring = alignmentColor(node.alignmentTier)
   const activityTooltip = node.activityStatus ? activityRingLabel(node.activityStatus) : undefined
   const baseLabel = node.headline ? `${node.label}, ${node.headline}` : node.label
   // Fold the activity nudge into the accessible name: the `<g>`'s aria-label
@@ -49,7 +36,6 @@ export default function WebNodeMarker({
   // ring's meaning that sighted users get from the hover tooltip.
   const ariaLabel = activityTooltip ? `${baseLabel}. ${activityTooltip}` : baseLabel
   const interactive = Boolean(onSelect)
-  const hasJobOverlap = Boolean(decoration?.hasJobOverlap)
 
   const handleKeyDown = (event: KeyboardEvent<SVGGElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -61,8 +47,6 @@ export default function WebNodeMarker({
   return (
     <motion.g
       data-testid={`web-node-${node.id}`}
-      className={hasJobOverlap ? 'node-job-overlap' : undefined}
-      data-job-overlap={hasJobOverlap ? 'true' : undefined}
       role={interactive ? 'button' : undefined}
       aria-label={ariaLabel}
       aria-pressed={interactive ? selected : undefined}

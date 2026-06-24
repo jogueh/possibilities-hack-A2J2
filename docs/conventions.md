@@ -75,8 +75,7 @@
   `aria-current="page"` when active.
 - **Presentational vs. owned logic is labelled.** Components that render a control
   surface or hook whose real behavior belongs to another workflow say so in a comment
-  (e.g. `WebCanvas`'s `nodeDecorations` prop: "the flag data and ring styling are
-  owned by the injecting workflow").
+  (noting which workflow owns the injected data and styling).
 
 ## 5. Mocks & Cross-Workflow Integration
 
