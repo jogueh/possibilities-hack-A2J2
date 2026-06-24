@@ -6,6 +6,7 @@ import type {
   WebState,
 } from '@/types/web'
 import type { UserWithJobs } from '@/types/data'
+import type { ParsedGoal } from '@/types/goal'
 
 // Global state for the connection web — the single source of truth other
 // workflows read from and dispatch into. This module is the real W1 store that
@@ -27,14 +28,17 @@ export interface WebStoreState {
   // ── Snapshot slice (mirrors `WebSnapshot`; read by W3/W4) ──────────────────
   state: WebState
   goal: GoalQuery | null
+  parsedGoal: ParsedGoal | null
   nodes: WebNode[]
   edges: WebEdge[]
   /** Viewer's own resolved profile — set once on app load, read by W3. */
   viewerProfile: UserWithJobs | null
 
   // ── Actions ────────────────────────────────────────────────────────────────
-  /** Stores the parsed goal (produced by Workflow 2). */
+  /** Stores the raw goal query and clears any cached parse from a prior goal. */
   setGoal: (goal: GoalQuery) => void
+  /** Stores the parsed goal (produced by Workflow 2). */
+  setParsedGoal: (parsedGoal: ParsedGoal | null) => void
   /** Seeds the web with 1st-degree nodes/edges; moves to the `seeded` state. */
   seedWeb: (nodes: WebNode[], edges: WebEdge[]) => void
   /**
@@ -64,6 +68,7 @@ export interface WebStoreState {
 const emptySnapshot = () => ({
   state: 'empty' as WebState,
   goal: null,
+  parsedGoal: null,
   nodes: [] as WebNode[],
   edges: [] as WebEdge[],
 })
@@ -72,7 +77,9 @@ export const useWebStore = create<WebStoreState>()((set) => ({
   ...emptySnapshot(),
   viewerProfile: null,
 
-  setGoal: (goal) => set({ goal }),
+  setGoal: (goal) => set({ goal, parsedGoal: null }),
+
+  setParsedGoal: (parsedGoal) => set({ parsedGoal }),
 
   seedWeb: (nodes, edges) => set({ nodes, edges, state: 'seeded' }),
 
@@ -126,3 +133,31 @@ export const useWebStore = create<WebStoreState>()((set) => ({
 
   setViewerProfile: (viewerProfile) => set({ viewerProfile }),
 }))
+
+// Capture the store's initial state (snapshot fields + all actions) so the
+// test-only `__resetMockWebState` helper can put the store back to first-mount
+// behaviour even when a previous test has replaced an action with a spy.
+const initialState = useWebStore.getState()
+
+// ── Test/dev helpers (NOT part of the planned W1 store API) ──────────────────
+// Preserved from the W3 mock store at @/mocks/useWebStore so the migration is
+// a one-line import swap for the components and demo pages that already use
+// these names. Production code should never call these directly.
+
+/**
+ * TEST-ONLY: partial overwrite of store state, including action fields.
+ * Used by component tests (NodeSidebar, JobsPanel, SecondDegreePreview) to
+ * stub `addSecondDegreeNode` with a spy and to preload nodes/edges/goal.
+ */
+export function __setMockWebState(partial: Partial<WebStoreState>): void {
+  useWebStore.setState(partial)
+}
+
+/**
+ * TEST-ONLY: reset the store to its initial state, including restoring any
+ * actions that were replaced by `__setMockWebState`. Required so spy stubs
+ * installed by one test don't leak into the next.
+ */
+export function __resetMockWebState(): void {
+  useWebStore.setState(initialState, true)
+}

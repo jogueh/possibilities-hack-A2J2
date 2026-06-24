@@ -5,10 +5,9 @@ import { useEffect, useRef, useState } from "react";
 import type { WebNode } from "@/types/web";
 import type { SharedContext } from "@/types/sharedContext";
 import type { UserWithJobs } from "@/types/data";
-import { useWebStore } from "@/mocks/useWebStore";
+import { useWebStore } from "@/store/useWebStore";
 import { fetchUserWithJobs } from "@/lib/userApi";
-import { ALIGNMENT_LABELS, alignmentColor } from "@/mocks/alignmentColors";
-import { parseGoalRaw } from "@/mocks/goalParser";
+import { ALIGNMENT_LABELS, alignmentColor } from "@/lib/alignmentColors";
 import { filterRelevantJobs } from "@/lib/relevance";
 import { getSharedContext } from "@/lib/sharedContext";
 import { LI, SIDEBAR_WIDTH } from "@/lib/linkedinTokens";
@@ -46,6 +45,7 @@ function targetSummary(jobs: { position: string; company: string }[]): string {
 
 export function NodeSidebar({ node, onClose, connected, onConnect }: NodeSidebarProps) {
   const goal = useWebStore((s) => s.goal);
+  const parsedGoal = useWebStore((s) => s.parsedGoal);
   const viewerProfile = useWebStore((s) => s.viewerProfile);
 
   // State is keyed by userId and only ever written from async callbacks, so we never call
@@ -90,7 +90,6 @@ export function NodeSidebar({ node, onClose, connected, onConnect }: NodeSidebar
     return () => document.removeEventListener("mousedown", onDown);
   }, [node, onClose]);
 
-  const parsedGoal = goal ? parseGoalRaw(goal.raw) : null;
   const relevantJobs =
     user && parsedGoal ? filterRelevantJobs(user.job_history, parsedGoal) : [];
   const commonalities: SharedContext[] =
@@ -99,7 +98,7 @@ export function NodeSidebar({ node, onClose, connected, onConnect }: NodeSidebar
   // Fetch the AI talking point once per userId (cached). Cached value is read at render
   // time; the effect only performs the async fetch on a cache miss.
   useEffect(() => {
-    if (!user || !userId) return;
+    if (!user || !userId || !parsedGoal) return;
     if (tipCache.has(userId)) return;
     let cancelled = false;
     fetch("/api/node/talking-points", {
@@ -127,7 +126,7 @@ export function NodeSidebar({ node, onClose, connected, onConnect }: NodeSidebar
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, userId]);
+  }, [user, userId, parsedGoal]);
 
   const tip =
     userId && tipCache.has(userId)

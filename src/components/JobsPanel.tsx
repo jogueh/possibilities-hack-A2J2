@@ -1,18 +1,16 @@
 "use client";
 // W4-OWNED. Jobs Panel: goal-matched job postings cross-referenced against the web.
 // Left-anchored collapsible panel (opposite the W3 sidebar on the right). Reads `goal`
-// and `nodes` from the web store; ranks jobs via the W4 scoring/matching engine.
+// and `nodes` from the web store; fetches ranked matches from the real jobs route.
 //
-// Data source is the W4 MOCK `@/mocks/jobsApi` (mirrors W2's future
-// `GET /api/jobs/matches`). Swap that import for the real route at integration.
 // Salary is NEVER rendered (scope rule). See plan.md
 import { useEffect, useState } from "react";
 import type { JobMatch } from "@/types/job";
 import type { AlignmentTier } from "@/types/web";
-import { useWebStore } from "@/mocks/useWebStore";
-import { parseGoalRaw } from "@/mocks/goalParser";
-import { fetchJobMatches } from "@/mocks/jobsApi";
+import { useWebStore } from "@/store/useWebStore";
+import { fetchJobMatches } from "@/lib/jobMatchesClient";
 import { deriveAlignmentTier } from "@/lib/scoring";
+import { RECENTLY_IN_FIELD_YEARS } from "@/lib/webOverlap";
 import { LI } from "@/lib/linkedinTokens";
 
 export const JOBS_PANEL_WIDTH = 360;
@@ -51,7 +49,9 @@ export function JobsPanel({ open, onClose, onOpenConnection }: JobsPanelProps) {
   const nodes = useWebStore((s) => s.nodes);
 
   const webUserIds = nodes.map((n) => n.userId);
-  const requestKey = goal ? `${goal.raw}::${[...webUserIds].sort().join(",")}` : null;
+  const requestKey = goal
+    ? `${goal.raw}::${[...webUserIds].sort().join(",")}`
+    : null;
 
   // Keyed result written only from the async callback (React 19: never setState
   // synchronously in an effect). `current === null` (for the active key) means a
@@ -65,7 +65,7 @@ export function JobsPanel({ open, onClose, onOpenConnection }: JobsPanelProps) {
   useEffect(() => {
     if (!open || !goal || !requestKey) return;
     let cancelled = false;
-    fetchJobMatches(parseGoalRaw(goal.raw), webUserIds)
+    fetchJobMatches(goal.raw, webUserIds)
       .then((matches) => {
         if (!cancelled) setResult({ key: requestKey, status: "loaded", matches });
       })
@@ -241,6 +241,7 @@ interface JobCardProps {
 function JobCard({ match, expanded, onToggle, onOpenConnection }: JobCardProps) {
   const { job, relevanceScore, webConnections } = match;
   const tier = deriveAlignmentTier(relevanceScore);
+  const hasRecentInsider = webConnections.some((c) => c.recentlyInField);
 
   return (
     <article
@@ -306,6 +307,22 @@ function JobCard({ match, expanded, onToggle, onOpenConnection }: JobCardProps) 
               }}
             >
               Easy Apply
+            </span>
+          )}
+          {hasRecentInsider && (
+            <span
+              data-testid="recently-in-field-badge"
+              title={`A connection here graduated within the last ${RECENTLY_IN_FIELD_YEARS} years — fresh, relevant context`}
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: LI.green,
+                border: `1px solid ${LI.green}`,
+                borderRadius: 12,
+                padding: "2px 8px",
+              }}
+            >
+              Recently in your field
             </span>
           )}
         </div>

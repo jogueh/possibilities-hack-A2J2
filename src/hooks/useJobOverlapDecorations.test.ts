@@ -4,11 +4,8 @@ import { renderHook, waitFor, act } from "@testing-library/react";
 // Module mocks MUST be declared before importing the hook under test
 // (repo convention — see src/lib/goalParser.test.ts).
 const fetchJobMatchesMock = vi.fn();
-vi.mock("@/mocks/jobsApi", () => ({
+vi.mock("@/lib/jobMatchesClient", () => ({
   fetchJobMatches: (...args: unknown[]) => fetchJobMatchesMock(...args),
-}));
-vi.mock("@/mocks/goalParser", () => ({
-  parseGoalRaw: (raw: string) => ({ intent: raw }),
 }));
 
 import { useJobOverlapDecorations } from "./useJobOverlapDecorations";
@@ -50,6 +47,10 @@ const nodes = [node("n1", "user_a"), node("n2", "user_b")];
 function seedStore() {
   act(() => {
     useWebStore.getState().setGoal({ raw: "find engineers", userId: "viewer" });
+    useWebStore.getState().setParsedGoal({
+      intent: "find engineers",
+      targetRole: "Software Engineer",
+    });
     useWebStore.getState().seedWeb(nodes, []);
   });
 }

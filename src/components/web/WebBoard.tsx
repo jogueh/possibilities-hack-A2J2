@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useReducer, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import {
+  Alert,
   Button,
   Card,
   Empty,
@@ -20,8 +21,11 @@ import {
 } from './boardState'
 import { SELF_USER_ID, webPeople } from '@/data/web_people'
 import { NodeSidebar } from '@/components/NodeSidebar'
-import { __setMockWebState } from '@/mocks/useWebStore'
+import { __setMockWebState } from '@/store/useWebStore'
 import { fetchUserWithJobs } from '@/lib/userApi'
+import type { WebEdge, WebNode } from '@/types/web'
+import type { ParsedGoal } from '@/types/goal'
+import type { PersonInput } from '@/lib/web/snapshot'
 
 const CANVAS_WIDTH = 820
 const CANVAS_HEIGHT = 620
@@ -42,6 +46,38 @@ const EVENT_OPTIONS = ['All events', 'Recently active', 'New connections']
 const round = (n: number) => Math.round(n)
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0)
 
+/**
+ * Converts the `/api/web/generate` response (WebNode[] + WebEdge[], with
+ * scores on the 0..100 scale) into the layout's `PersonInput[]` shape
+ * (scores on 0..1, optional `via` for 2nd-degree). `via` is derived from
+ * the dotted bridge edges the server emits between 1st- and 2nd-degree
+ * nodes.
+ */
+function apiResponseToPeople(
+  nodes: WebNode[],
+  edges: WebEdge[],
+): PersonInput[] {
+  const viaByTarget = new Map<string, string>()
+  for (const e of edges) {
+    if (e.isDotted) viaByTarget.set(e.target, e.source)
+  }
+  return nodes.map((n) => {
+    const person: PersonInput = {
+      id: n.id,
+      userId: n.userId,
+      name: n.label,
+      degree: n.degree,
+      relevanceScore: n.relevanceScore / 100,
+      interactionScore: n.interactionScore,
+    }
+    if (n.degree === 2) {
+      const via = viaByTarget.get(n.id)
+      if (via) person.via = via
+    }
+    return person
+  })
+}
+
 export default function WebBoard() {
   const config: BoardConfig = useMemo(
     () => ({
@@ -59,14 +95,51 @@ export default function WebBoard() {
     createInitialBoardState,
   )
 
-  const { snapshot, selectedId, goalText } = state
+  const { snapshot, selectedId, goalText, status, error } = state
   const selected = snapshot.nodes.find((n) => n.id === selectedId) ?? null
   const isEmpty = snapshot.state === 'empty'
   const selectedConnected = selected ? state.connectedIds.includes(selected.id) : false
+  const loading = status === 'loading'
 
   // Collapsible side cards (chevron toggles) — purely presentational.
   const [showSuggestions, setShowSuggestions] = useState(true)
   const [showMetrics, setShowMetrics] = useState(true)
+
+  // Wired-to-real-data submit: POST the goal + viewer id to /api/web/generate,
+  // convert the server-returned graph into the layout's `PersonInput[]` shape,
+  // and dispatch the resolved people so `buildSnapshot` lays out a goal-driven
+  // web instead of replaying the hardcoded `webPeople` fallback.
+  const submit = useCallback(async () => {
+    const raw = goalText.trim()
+    if (!raw || loading) return
+    dispatch({ type: 'mapStart' })
+    try {
+      const res = await fetch('/api/web/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goal: raw, userId: SELF_USER_ID }),
+      })
+      if (!res.ok) {
+        throw new Error(`Map failed: ${res.status} ${res.statusText}`)
+      }
+      const data = (await res.json()) as {
+        nodes: WebNode[]
+        edges: WebEdge[]
+        parsedGoal?: ParsedGoal | null
+      }
+      const people = apiResponseToPeople(data.nodes, data.edges)
+      dispatch({ type: 'submitGoalWithPeople', people })
+      // Cache the server-parsed goal so NodeSidebar's filterRelevantJobs +
+      // shared-context flow uses the LLM-aware parse instead of the sync
+      // keyword fallback. (Field added by PR #56.)
+      __setMockWebState({ parsedGoal: data.parsedGoal ?? null })
+    } catch (e) {
+      dispatch({
+        type: 'mapError',
+        error: e instanceof Error ? e.message : 'Failed to map your web.',
+      })
+    }
+  }, [goalText, loading])
 
   // Bridge the reducer-driven board to the store NodeSidebar reads: when a goal
   // is mapped, seed the goal and fetch the viewer's own profile (used for the
@@ -74,7 +147,7 @@ export default function WebBoard() {
   const goal = snapshot.goal
   useEffect(() => {
     if (!goal) {
-      __setMockWebState({ goal: null, viewerProfile: null })
+      __setMockWebState({ goal: null, parsedGoal: null, viewerProfile: null })
       return
     }
     __setMockWebState({ goal: { raw: goal.raw, userId: goal.userId } })
@@ -115,18 +188,20 @@ export default function WebBoard() {
               // Shift+Enter inserts a newline; plain Enter submits the goal.
               if (e.shiftKey) return
               e.preventDefault()
-              dispatch({ type: 'submitGoal' })
+              void submit()
             }}
           />
           <Space style={{ marginTop: 12, width: '100%', justifyContent: 'space-between' }}>
             <Button
               type="primary"
               icon={<AimOutlined />}
-              onClick={() => dispatch({ type: 'submitGoal' })}
+              loading={loading}
+              disabled={!goalText.trim()}
+              onClick={() => void submit()}
             >
-              Map my web
+              {loading ? 'Mapping…' : 'Map my web'}
             </Button>
-            {!isEmpty && (
+            {!isEmpty && !loading && (
               <Button
                 type="text"
                 icon={<ReloadOutlined />}
@@ -136,6 +211,14 @@ export default function WebBoard() {
               </Button>
             )}
           </Space>
+          {error && (
+            <Alert
+              type="error"
+              showIcon
+              message={error}
+              style={{ marginTop: 12 }}
+            />
+          )}
         </Card>
 
         <Card

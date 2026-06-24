@@ -13,17 +13,31 @@ import {
 // 2nd-degree person it reaches, so the (now solid) line reads as a strong link.
 const CONNECTED_STRENGTH = 0.9
 
+export type BoardStatus = 'idle' | 'loading' | 'error'
+
 export interface BoardState {
   snapshot: WebSnapshot
   selectedId: string | null
   goalText: string
   /** Ids of people the viewer has connected with (dotted bridge -> solid link). */
   connectedIds: string[]
+  /**
+   * Resolved people for the current goal — populated from `/api/web/generate`
+   * by the WebBoard. Empty until a goal is mapped. `selectNode` reads from
+   * here so 2nd-degree expansion matches the goal-driven web rather than the
+   * `config.people` fallback.
+   */
+  people: PersonInput[]
+  status: BoardStatus
+  error: string | null
 }
 
 export type BoardAction =
   | { type: 'setGoalText'; value: string }
   | { type: 'submitGoal' }
+  | { type: 'mapStart' }
+  | { type: 'submitGoalWithPeople'; people: PersonInput[] }
+  | { type: 'mapError'; error: string }
   | { type: 'selectNode'; id: string }
   | { type: 'connectNode'; id: string }
   | { type: 'clearSelection' }
@@ -41,6 +55,9 @@ export function createInitialBoardState(): BoardState {
     selectedId: null,
     goalText: '',
     connectedIds: [],
+    people: [],
+    status: 'idle',
+    error: null,
   }
 }
 
@@ -63,6 +80,14 @@ function applyConnections(
   return { ...snapshot, edges }
 }
 
+// Picks the people list to feed the layout: real API-resolved people if the
+// board has them (`submitGoalWithPeople` ran), otherwise the static fallback
+// from config. This preserves existing test/demo behavior for callers that
+// dispatch `submitGoal` directly without going through the API path.
+function effectivePeople(state: BoardState, config: BoardConfig): PersonInput[] {
+  return state.people.length > 0 ? state.people : config.people
+}
+
 export function boardReducer(
   state: BoardState,
   action: BoardAction,
@@ -76,13 +101,37 @@ export function boardReducer(
       const raw = state.goalText.trim()
       if (!raw) return state
       const goal: GoalQuery = { raw, userId: config.userId }
+      const people = effectivePeople(state, config)
       return {
-        snapshot: buildSnapshot(goal, config.people, config.options),
+        ...state,
+        snapshot: buildSnapshot(goal, people, config.options),
         selectedId: null,
-        goalText: state.goalText,
         connectedIds: [],
+        status: 'idle',
+        error: null,
       }
     }
+
+    case 'mapStart':
+      return { ...state, status: 'loading', error: null }
+
+    case 'submitGoalWithPeople': {
+      const raw = state.goalText.trim()
+      if (!raw) return { ...state, status: 'idle' }
+      const goal: GoalQuery = { raw, userId: config.userId }
+      return {
+        ...state,
+        snapshot: buildSnapshot(goal, action.people, config.options),
+        selectedId: null,
+        connectedIds: [],
+        people: action.people,
+        status: 'idle',
+        error: null,
+      }
+    }
+
+    case 'mapError':
+      return { ...state, status: 'error', error: action.error }
 
     case 'selectNode': {
       const clicked = state.snapshot.nodes.find((n) => n.id === action.id)
@@ -96,15 +145,16 @@ export function boardReducer(
       // people, clustered next to it. Rebuilding from the seeded snapshot first
       // collapses any other connector that was previously expanded, so the web
       // never shows a different person's warm path.
+      const people = effectivePeople(state, config)
       const seeded = buildSnapshot(
         state.snapshot.goal,
-        config.people,
+        people,
         config.options,
       )
       const snapshot = expandNode(
         seeded,
         action.id,
-        config.people,
+        people,
         config.options,
       )
       return {

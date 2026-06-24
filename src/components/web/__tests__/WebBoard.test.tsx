@@ -19,12 +19,72 @@ vi.mock('@/lib/userApi', () => ({
   })),
 }))
 
+// Synthetic /api/web/generate response used to drive the board deterministically.
+// Mirrors the real WebNode/WebEdge contract: relevanceScore is on the 0..100
+// scale, dotted edges carry 2nd-degree bridges, and the node ids match what the
+// canvas asserts on later in the suite.
+const generateResponse = {
+  nodes: [
+    {
+      id: 'p_john',
+      userId: 'user_1227',
+      label: 'Diana Prince',
+      degree: 1,
+      avatarInitials: 'DP',
+      alignmentTier: 'strong',
+      interactionScore: 0.8,
+      relevanceScore: 78,
+      position: { x: 0, y: 0 },
+    },
+    {
+      id: 'p_alice',
+      userId: 'user_1151',
+      label: 'Charlie Brown',
+      degree: 1,
+      avatarInitials: 'CB',
+      alignmentTier: 'strong',
+      interactionScore: 0.9,
+      relevanceScore: 86,
+      position: { x: 0, y: 0 },
+    },
+    {
+      id: 'p_david_l',
+      userId: 'user_1364',
+      label: 'Diana Prince',
+      degree: 2,
+      avatarInitials: 'DP',
+      alignmentTier: 'strong',
+      interactionScore: 0.5,
+      relevanceScore: 72,
+      position: { x: 0, y: 0 },
+    },
+  ],
+  edges: [
+    { id: 'self__p_john', source: SELF_USER_ID, target: 'p_john', strength: 50, isDotted: false },
+    { id: 'self__p_alice', source: SELF_USER_ID, target: 'p_alice', strength: 50, isDotted: false },
+    { id: 'p_john__p_david_l', source: 'p_john', target: 'p_david_l', strength: 50, isDotted: true },
+  ],
+}
+
+import { SELF_USER_ID } from '@/data/web_people'
+
 beforeEach(() => {
-  // NodeSidebar POSTs to the talking-points endpoint; stub it so the async tip
-  // fetch resolves instead of throwing in jsdom.
+  // The board fetches /api/web/generate on submit and /api/node/talking-points
+  // when the sidebar opens. Branch on the URL so a single stub serves both.
   vi.stubGlobal(
     'fetch',
-    vi.fn(() => Promise.resolve({ json: () => Promise.resolve({ tip: 'Say hi!' }) })),
+    vi.fn(async (url: string) => {
+      if (typeof url === 'string' && url.includes('/api/web/generate')) {
+        return new Response(JSON.stringify(generateResponse), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response(JSON.stringify({ tip: 'Say hi!' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }),
   )
 })
 
@@ -40,11 +100,15 @@ describe('WebBoard', () => {
     expect(container.querySelector('[data-testid="web-canvas"]')).toBeNull()
   })
 
-  it('maps the web when a goal is submitted', () => {
+  it('maps the web from the /api/web/generate response when a goal is submitted', async () => {
     const { container, getByLabelText, getByRole } = render(<WebBoard />)
     fireEvent.change(getByLabelText('Goal'), { target: { value: 'Become a PM' } })
     fireEvent.click(getByRole('button', { name: /map my web/i }))
-    expect(container.querySelector('[data-testid="web-canvas"]')).not.toBeNull()
+    // Canvas appears only after the API response is applied — asserts the
+    // submit flow actually awaited the network round-trip.
+    await waitFor(() =>
+      expect(container.querySelector('[data-testid="web-canvas"]')).not.toBeNull(),
+    )
     expect(container.querySelectorAll('[data-testid^="web-node-"]').length).toBeGreaterThan(0)
   })
 
@@ -52,6 +116,9 @@ describe('WebBoard', () => {
     const { container, getByLabelText, getByRole } = render(<WebBoard />)
     fireEvent.change(getByLabelText('Goal'), { target: { value: 'Become a PM' } })
     fireEvent.click(getByRole('button', { name: /map my web/i }))
+    await waitFor(() =>
+      expect(container.querySelector('[data-testid="web-node-p_john"]')).not.toBeNull(),
+    )
 
     const before = container.querySelectorAll('[data-testid^="web-node-"]').length
     fireEvent.click(container.querySelector('[data-testid="web-node-p_john"]')!)

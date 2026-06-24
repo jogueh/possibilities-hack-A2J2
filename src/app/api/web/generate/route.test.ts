@@ -78,14 +78,23 @@ describe('POST /api/web/generate', () => {
     else process.env.OPENROUTER_API_KEY = ORIGINAL_KEY
   })
 
-  it('returns a 200 with { nodes, edges } for a valid goal', async () => {
+  it('returns a 200 with { nodes, edges, parsedGoal } for a valid goal', async () => {
     const res = await POST(
       postRequest({ goal: 'find software engineers', userId: 'user_0' }),
     )
     expect(res.status).toBe(200)
-    const body = (await res.json()) as { nodes: unknown[]; edges: unknown[] }
+    const body = (await res.json()) as {
+      nodes: unknown[]
+      edges: unknown[]
+      parsedGoal: unknown
+    }
     expect(Array.isArray(body.nodes)).toBe(true)
     expect(Array.isArray(body.edges)).toBe(true)
+    expect(body.parsedGoal).toEqual({
+      intent: 'find software engineers',
+      targetRole: 'Software Engineer',
+      targetIndustry: 'Technology',
+    })
   })
 
   it('excludes the requesting userId from the returned nodes', async () => {

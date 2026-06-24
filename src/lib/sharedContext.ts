@@ -1,5 +1,5 @@
 // W3-OWNED. Client-side commonalities detection between viewer and target. See plan.md
-import type { UserWithJobs } from "@/mocks/data";
+import type { UserWithJobs } from "@/types/data";
 import type { SharedContext } from "@/types/sharedContext";
 
 function norm(s: string): string {
