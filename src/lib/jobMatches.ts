@@ -15,9 +15,13 @@ import { findWebOverlap } from "@/lib/webOverlap";
 /** Max job cards surfaced for the MVP (scope: "take top 10"). */
 export const MAX_JOB_MATCHES = 10;
 
+/** Web-connection count that floats a job into the boosted tier. */
+export const JOB_BOOST_MIN_CONNECTIONS = 2;
+
 /**
  * Score every job against the goal, attach web-overlap connections, drop weak
- * matches, sort by relevance (web overlap breaks ties), and cap at the top N.
+ * matches, float jobs with enough web connections into a boosted tier, sort each
+ * tier by relevance (web overlap breaks ties), and cap at the top N.
  */
 export function buildJobMatches(
   jobs: Job[],
@@ -40,6 +44,9 @@ export function buildJobMatches(
   }
 
   scored.sort((a, b) => {
+    const aBoosted = a.webConnections.length >= JOB_BOOST_MIN_CONNECTIONS;
+    const bBoosted = b.webConnections.length >= JOB_BOOST_MIN_CONNECTIONS;
+    if (aBoosted !== bBoosted) return aBoosted ? -1 : 1;
     if (b.relevanceScore !== a.relevanceScore) {
       return b.relevanceScore - a.relevanceScore;
     }
