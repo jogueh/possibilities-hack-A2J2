@@ -172,17 +172,70 @@ describe('buildWeb — 1st-degree selection', () => {
     expect(nodes).toEqual([])
   })
 
-  it('returns an empty payload when no candidates qualify on score', () => {
-    const viewer = makeUser('viewer', { connections: ['u1', 'u2'] })
-    const candidates = [viewer, makeUser('u1'), makeUser('u2')]
+  it('falls back to top-N connections by score when none clear the threshold (weak-match fallback)', () => {
+    // Real connections, none of which clear FIRST_DEGREE_MIN_SCORE (40).
+    // Old behaviour returned an empty web; new behaviour surfaces the top
+    // FIRST_DEGREE_MAX so the user with a real network never sees a blank
+    // canvas. Visual weak-match cue lives in the node's alignmentTier.
+    const viewer = makeUser('viewer', { connections: ['u1', 'u2', 'u3'] })
+    const candidates = [
+      viewer,
+      makeUser('u1'),
+      makeUser('u2'),
+      makeUser('u3'),
+    ]
     const { nodes, edges } = buildWeb({
       viewerUserId: 'viewer',
       parsedGoal: goal,
       candidates,
-      scorer: scorerByMap({ u1: 10, u2: 0 }),
+      scorer: scorerByMap({ u1: 30, u2: 20, u3: 5 }),
     })
-    expect(nodes).toEqual([])
-    expect(edges).toEqual([])
+    const firstDegree = nodes.filter((n) => n.degree === 1)
+    expect(firstDegree.map((n) => n.id)).toEqual(['u1', 'u2', 'u3'])
+    // The alignmentTier still reflects the weak score (< 40) so the UI can
+    // surface the visual weak-match cue.
+    expect(firstDegree.every((n) => n.alignmentTier === 'weak')).toBe(true)
+    expect(edges).toHaveLength(3)
+    expect(edges.every((e) => e.source === 'viewer' && !e.isDotted)).toBe(true)
+  })
+
+  it('weak-match fallback caps at FIRST_DEGREE_MAX', () => {
+    const connectionIds = Array.from({ length: 8 }, (_, i) => `u${i}`)
+    const viewer = makeUser('viewer', { connections: connectionIds })
+    const candidates = [viewer, ...connectionIds.map((id) => makeUser(id))]
+    const scores: Record<string, number> = {}
+    // 30, 28, 26 ... — all below the 40 threshold.
+    connectionIds.forEach((id, i) => (scores[id] = 30 - i * 2))
+    const { nodes } = buildWeb({
+      viewerUserId: 'viewer',
+      parsedGoal: goal,
+      candidates,
+      scorer: scorerByMap(scores),
+    })
+    const firstDegree = nodes.filter((n) => n.degree === 1)
+    expect(firstDegree).toHaveLength(FIRST_DEGREE_MAX)
+    // Top 5 by score: u0..u4 (30, 28, 26, 24, 22).
+    expect(firstDegree.map((n) => n.id)).toEqual(['u0', 'u1', 'u2', 'u3', 'u4'])
+  })
+
+  it('returns an empty payload when the viewer has no connections AND cold-start finds nothing', () => {
+    // Viewer.connections === [] and no other candidates have connections, so
+    // suggestConnections returns []. New behaviour: empty web (preserved).
+    const viewer = makeUser('viewer')
+    const a = makeUser('a')
+    const b = makeUser('b')
+    const { nodes, edges } = buildWeb({
+      viewerUserId: 'viewer',
+      parsedGoal: goal,
+      candidates: [viewer, a, b],
+      scorer: scorerByMap({ a: 90, b: 80 }),
+    })
+    // No connections + no 2nd-degree warm paths → cold-start hub fallback
+    // surfaces 'a' and 'b' (each has 0 connections, so they tie; id sort
+    // breaks the tie deterministically), then the score threshold (>= 40)
+    // gates them in because their scores are 90/80.
+    expect(nodes.map((n) => n.id)).toEqual(['a', 'b'])
+    expect(edges.map((e) => e.source).every((s) => s === 'viewer')).toBe(true)
   })
 
   it('returns an empty payload when the viewer is not in the candidates set', () => {

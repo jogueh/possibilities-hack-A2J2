@@ -1,4 +1,4 @@
-import type { AlignmentTier, WebEdge, WebNode } from '@/types/web'
+import type { ActivityStatus, AlignmentTier, WebEdge, WebNode } from '@/types/web'
 
 // Pure, deterministic geometry + styling helpers for the Graph Canvas.
 // No React / DOM imports here so this module is trivially unit-testable.
@@ -42,6 +42,31 @@ export function tierRadius(tier: AlignmentTier): number {
 }
 
 /**
+ * Activity-status → ring colour. This is the "activity ring" shown around node
+ * avatars: blue = active, amber = moderate, red = inactive.
+ */
+export const ACTIVITY_RING_COLORS: Record<ActivityStatus, string> = {
+  active: '#3B82F6',
+  moderate: '#F59E0B',
+  inactive: '#EF4444',
+}
+
+/** Activity-status → hover tooltip copy (the outreach nudge). */
+export const ACTIVITY_RING_LABELS: Record<ActivityStatus, string> = {
+  active: 'Great time to reach out',
+  moderate: 'Worth a nudge',
+  inactive: 'Lead with shared context',
+}
+
+export function activityRingColor(status: ActivityStatus): string {
+  return ACTIVITY_RING_COLORS[status]
+}
+
+export function activityRingLabel(status: ActivityStatus): string {
+  return ACTIVITY_RING_LABELS[status]
+}
+
+/**
  * Truncates a label to `max` characters with a trailing ellipsis so node
  * captions (name / headline) keep a bounded width and never overlap their
  * neighbours on the canvas. The full text stays available for accessibility
@@ -52,6 +77,34 @@ export function truncateLabel(text: string, max: number): string {
   if (text.length <= max) return text
   if (max === 1) return '…'
   return `${text.slice(0, max - 1).trimEnd()}…`
+}
+
+/**
+ * Word-wraps a label into lines no longer than `maxChars` characters each, so a
+ * node caption (e.g. a full role like "Product Manager at Tech Innovators Inc.")
+ * stays inside the node's width instead of being truncated — it flows onto the
+ * next line whenever the next word would overflow. A single word longer than
+ * `maxChars` is kept whole on its own line. Pure and deterministic.
+ */
+export function wrapLabel(text: string, maxChars: number): string[] {
+  const words = text.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return []
+  if (maxChars <= 0) return [words.join(' ')]
+
+  const lines: string[] = []
+  let line = ''
+  for (const word of words) {
+    if (!line) {
+      line = word
+    } else if ((line + ' ' + word).length <= maxChars) {
+      line += ' ' + word
+    } else {
+      lines.push(line)
+      line = word
+    }
+  }
+  if (line) lines.push(line)
+  return lines
 }
 
 const round2 = (n: number): number => Math.round(n * 100) / 100

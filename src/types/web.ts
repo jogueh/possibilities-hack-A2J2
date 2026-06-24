@@ -6,6 +6,14 @@ export type AlignmentTier = 'strong' | 'moderate' | 'weak'
 export type WebState = 'empty' | 'seeded' | 'expanded'
 export type DegreeLevel = 1 | 2
 
+/**
+ * Outreach-activity status, used to colour a node's "activity ring":
+ * active = blue, moderate = amber, inactive = red. Mirrors the values of
+ * scoring.ts `ActivityStatus`; defined inline here so this shared cross-workflow
+ * type contract doesn't depend on a workflow-owned module (`@/lib/scoring`).
+ */
+export type ActivityStatus = 'active' | 'moderate' | 'inactive'
+
 export interface WebNode {
   id: string
   userId: string
@@ -22,6 +30,12 @@ export interface WebNode {
    * remain compatible; Workflow 2 can populate it from resolved job data.
    */
   headline?: string
+  /**
+   * Optional outreach-activity status driving the node's activity-ring colour
+   * (blue/amber/red). Additive/optional so workflows that don't supply it stay
+   * compatible; derived from a member's recent activity (see deriveActivityStatus).
+   */
+  activityStatus?: ActivityStatus
 }
 
 export interface WebEdge {
