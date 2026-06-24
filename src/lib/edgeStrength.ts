@@ -74,7 +74,7 @@ export function edgeStrengthTier(strength: number): EdgeStrengthTier {
   return "vibrant";
 }
 
-/** Full stroke styling (colour / width / pulse / gradient) for an edge strength. */
 export function edgeStrengthStyle(strength: number): EdgeStrengthStyle {
-  return STYLES[edgeStrengthTier(strength)];
+  const style = STYLES[edgeStrengthTier(strength)];
+  return style.gradient ? { ...style, gradient: { ...style.gradient } } : { ...style };
 }
