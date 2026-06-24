@@ -21,16 +21,6 @@ interface ActionsBarProps {
   atConnectionLimit?: boolean;
   /** Surfaces the "Upgrade to Premium" prompt (free-tier connection cap reached). */
   onUpgrade?: () => void;
-  /** True once the viewer has pinned this person to the canvas via "Add to web". */
-  pinned?: boolean;
-  /**
-   * Called when the viewer clicks "Add to web". Pins this person on the
-   * canvas so a click on another 1st-degree connector does NOT collapse
-   * this branch — they (and their warm-path chain back to the viewer) are
-   * re-materialized after every snapshot rebuild. Hidden for 1st-degree
-   * nodes (always on the canvas regardless).
-   */
-  onPin?: () => void;
   /** Graph id of the open node — passed to the "I met up" button as its key. */
   nodeId?: string;
   /** True when board state says the meetup has already been logged for this node. */
@@ -47,8 +37,6 @@ export function ActionsBar({
   onConnect,
   atConnectionLimit,
   onUpgrade,
-  pinned,
-  onPin,
   nodeId,
   metUpLogged,
   onLogMeetup,
@@ -135,67 +123,49 @@ export function ActionsBar({
               Connect
             </button>
           ))}
-        <button
-          type="button"
-          onClick={openMessage}
-          style={{
-            ...btn,
-            background: "transparent",
-            color: LI.blue,
-            border: `1px solid ${LI.blue}`,
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 6,
-          }}
-        >
-          <img src="/premiumin.svg" alt="" aria-hidden="true" width={16} height={16} style={{ display: "block" }} />
-          InMail
-        </button>
+        {/* Messaging is free for your connections (1st-degree or accepted
+            warm-path connections). For everyone else it is a Premium-only
+            action: the InMail button is shown but blocked with a notice
+            prompting the viewer to connect first. (Premium bypass is not
+            implemented — described to the user only.) */}
+        {degree === 1 || connected ? (
+          <button
+            type="button"
+            onClick={openMessage}
+            style={{
+              ...btn,
+              background: "transparent",
+              color: LI.blue,
+              border: `1px solid ${LI.blue}`,
+            }}
+          >
+            Message
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() =>
+              setToast(
+                `Connect with ${targetName} to message them. Premium members can message anyone.`,
+              )
+            }
+            aria-label={`Messaging ${targetName} requires connecting first`}
+            style={{
+              ...btn,
+              background: "transparent",
+              color: LI.textSecondary,
+              border: `1px solid ${LI.border}`,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+            }}
+          >
+            <img src="/premiumin.svg" alt="" aria-hidden="true" width={16} height={16} style={{ display: "block" }} />
+            InMail
+          </button>
+        )}
       </div>
-
-      {/* "Add to web" pins a 2nd+-degree suggestion to the canvas so navigating
-          to another branch doesn't make them disappear. 1st-degree people are
-          permanently on the canvas, so the button is hidden for them. */}
-      {degree !== 1 && (
-        <div style={{ marginTop: 8 }}>
-          {pinned ? (
-            <button
-              type="button"
-              disabled
-              aria-label="Pinned to web"
-              style={{
-                ...btn,
-                width: "100%",
-                background: "transparent",
-                color: LI.textSecondary,
-                border: `1px solid ${LI.border}`,
-                cursor: "default",
-              }}
-            >
-              Added to web ✓
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                onPin?.();
-                setToast(`${targetName} added to your web`);
-              }}
-              aria-label="Add to web"
-              style={{
-                ...btn,
-                width: "100%",
-                background: "transparent",
-                color: LI.blue,
-                border: `1px solid ${LI.blue}`,
-              }}
-            >
-              + Add to web
-            </button>
-          )}
-        </div>
-      )}
 
       {/* Logging a real-world meetup is offered for everyone on the canvas —
           it turns that person's connection line purple (W4 stretch s11). */}

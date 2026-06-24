@@ -21,20 +21,20 @@ describe("ActionsBar", () => {
   });
 
   it("pre-fills the message subject from the AI talking point", () => {
-    render(<ActionsBar targetName="Alice" tip="Ask about her time at Google" />);
-    fireEvent.click(screen.getByRole("button", { name: "InMail" }));
+    render(<ActionsBar targetName="Alice" degree={1} tip="Ask about her time at Google" />);
+    fireEvent.click(screen.getByRole("button", { name: "Message" }));
     expect(screen.getByLabelText("Subject")).toHaveValue("Ask about her time at Google");
   });
 
   it("falls back to a default subject when no tip is provided", () => {
-    render(<ActionsBar targetName="Alice" tip={null} />);
-    fireEvent.click(screen.getByRole("button", { name: "InMail" }));
+    render(<ActionsBar targetName="Alice" degree={1} tip={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Message" }));
     expect(screen.getByLabelText("Subject")).toHaveValue("Connecting with you, Alice");
   });
 
   it("shows a success toast after sending a message", () => {
-    render(<ActionsBar targetName="Alice" tip="hi" />);
-    fireEvent.click(screen.getByRole("button", { name: "InMail" }));
+    render(<ActionsBar targetName="Alice" degree={1} tip="hi" />);
+    fireEvent.click(screen.getByRole("button", { name: "Message" }));
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(screen.getByRole("status")).toHaveTextContent("Message sent to Alice");
   });
@@ -48,25 +48,27 @@ describe("ActionsBar", () => {
   });
 
   it("clears a previously typed message body when the composer is reopened", () => {
-    render(<ActionsBar targetName="Alice" tip="hi" />);
-    fireEvent.click(screen.getByRole("button", { name: "InMail" }));
+    render(<ActionsBar targetName="Alice" degree={1} tip="hi" />);
+    fireEvent.click(screen.getByRole("button", { name: "Message" }));
     fireEvent.change(screen.getByLabelText("Message body"), { target: { value: "draft text" } });
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    fireEvent.click(screen.getByRole("button", { name: "InMail" }));
+    fireEvent.click(screen.getByRole("button", { name: "Message" }));
     expect(screen.getByLabelText("Message body")).toHaveValue("");
   });
 
   it("renders action buttons with explicit type=button", () => {
-    render(<ActionsBar targetName="Alice" />);
+    render(<ActionsBar targetName="Alice" degree={2} />);
     expect(screen.getByRole("button", { name: "Connect" })).toHaveAttribute("type", "button");
-    expect(screen.getByRole("button", { name: "InMail" })).toHaveAttribute("type", "button");
+    expect(
+      screen.getByRole("button", { name: /requires connecting first/ }),
+    ).toHaveAttribute("type", "button");
   });
 
   it("hides the Connect button for 1st-degree connections", () => {
     render(<ActionsBar targetName="Alice" degree={1} />);
     expect(screen.queryByRole("button", { name: "Connect" })).not.toBeInTheDocument();
-    // Message stays available for everyone.
-    expect(screen.getByRole("button", { name: "InMail" })).toBeInTheDocument();
+    // Free Message stays available for your connections.
+    expect(screen.getByRole("button", { name: "Message" })).toBeInTheDocument();
   });
 
   it("shows the Connect button for 2nd-degree connections", () => {
@@ -89,33 +91,20 @@ describe("ActionsBar", () => {
     expect(connected).toBeDisabled();
   });
 
-  it("renders an Add-to-web button for 2nd+-degree people", () => {
+  it("offers a free Message button once a 2nd-degree person is connected", () => {
+    render(<ActionsBar targetName="Alice" degree={2} connected tip="hi" />);
+    fireEvent.click(screen.getByRole("button", { name: "Message" }));
+    expect(screen.getByRole("dialog", { name: "Message Alice" })).toBeInTheDocument();
+  });
+
+  it("blocks messaging non-connections with a connect-first notice instead of a composer", () => {
     render(<ActionsBar targetName="Alice" degree={2} />);
-    expect(screen.getByRole("button", { name: "Add to web" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /requires connecting first/ }));
+    expect(screen.queryByRole("dialog", { name: "Message Alice" })).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Connect with Alice to message them. Premium members can message anyone.",
+    );
   });
-
-  it("hides the Add-to-web button for 1st-degree people (already on the canvas)", () => {
-    render(<ActionsBar targetName="Alice" degree={1} />);
-    expect(screen.queryByRole("button", { name: "Add to web" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Pinned to web" })).not.toBeInTheDocument();
-  });
-
-  it("invokes onPin and shows a confirmation toast when Add-to-web is clicked", () => {
-    const onPin = vi.fn();
-    render(<ActionsBar targetName="Alice" degree={2} onPin={onPin} />);
-    fireEvent.click(screen.getByRole("button", { name: "Add to web" }));
-    expect(onPin).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("status")).toHaveTextContent("Alice added to your web");
-  });
-
-  it("shows a disabled Added state once pinned", () => {
-    render(<ActionsBar targetName="Alice" degree={2} pinned />);
-    expect(screen.queryByRole("button", { name: "Add to web" })).not.toBeInTheDocument();
-    const pinned = screen.getByRole("button", { name: "Pinned to web" });
-    expect(pinned).toBeDisabled();
-    expect(pinned).toHaveTextContent("Added to web ✓");
-  });
-
   it("offers the 'Linked up' button for 1st-degree people and logs the meetup", () => {
     const onLogMeetup = vi.fn();
     render(
