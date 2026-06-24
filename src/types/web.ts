@@ -4,7 +4,14 @@
 
 export type AlignmentTier = 'strong' | 'moderate' | 'weak'
 export type WebState = 'empty' | 'seeded' | 'expanded'
-export type DegreeLevel = 1 | 2
+/**
+ * Degree-level on the network web. 1 = direct connection (viewer's friend),
+ * 2 = friend-of-friend, 3 = friend-of-friend-of-friend, and so on up to
+ * `MAX_DEGREE` (defined in webBuilder). Modeled as `number` — not a literal
+ * union — so callers can iterate over depth without unsafe casts. The hard
+ * cap is enforced where the rings are generated.
+ */
+export type DegreeLevel = number
 
 /**
  * Outreach-activity status, used to colour a node's "activity ring":

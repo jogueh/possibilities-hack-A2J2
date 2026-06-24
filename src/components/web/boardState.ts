@@ -135,28 +135,39 @@ export function boardReducer(
 
     case 'selectNode': {
       const clicked = state.snapshot.nodes.find((n) => n.id === action.id)
-      // Selecting a 2nd-degree node (or an unknown id) only changes the
-      // selection — it must not collapse or rebuild the web.
-      if (!clicked || clicked.degree !== 1 || !state.snapshot.goal) {
+      if (!clicked || !state.snapshot.goal) {
         return { ...state, selectedId: action.id }
       }
 
-      // Selecting a 1st-degree node reveals ONLY that connector's 2nd-degree
-      // people, clustered next to it. Rebuilding from the seeded snapshot first
-      // collapses any other connector that was previously expanded, so the web
-      // never shows a different person's warm path.
       const people = effectivePeople(state, config)
-      const seeded = buildSnapshot(
-        state.snapshot.goal,
-        people,
-        config.options,
-      )
-      const snapshot = expandNode(
-        seeded,
-        action.id,
-        people,
-        config.options,
-      )
+      let snapshot = state.snapshot
+      if (clicked.degree === 1) {
+        // Selecting a 1st-degree node reveals ONLY that connector's
+        // 2nd-degree people, clustered next to it. 1st-degree IS the set of
+        // real connections the viewer is already part of, so revealing the
+        // suggestions reachable through them is always allowed. Rebuilding
+        // from the seeded snapshot first collapses any other connector that
+        // was previously expanded, so the web never shows a different
+        // person's warm path.
+        const seeded = buildSnapshot(
+          state.snapshot.goal,
+          people,
+          config.options,
+        )
+        snapshot = expandNode(seeded, action.id, people, config.options)
+      } else if (state.connectedIds.includes(clicked.id)) {
+        // Selecting a deeper node (2nd+) reveals its next-ring children IN
+        // PLACE — but ONLY if the viewer has explicitly "connected" with that
+        // node. Each ring beyond 1st-degree is a suggestion until the viewer
+        // accepts the warm-path intro: connecting unlocks the next layer
+        // of suggestions reachable through that person, mirroring real-world
+        // network growth (you can't navigate a 3rd-degree intro until your
+        // 2nd-degree connection introduces you).
+        snapshot = expandNode(state.snapshot, action.id, people, config.options)
+      }
+      // For unconnected 2nd+ nodes, fall through with `snapshot = state.snapshot`
+      // — selection still updates so the sidebar opens with the "Connect" CTA,
+      // but the canvas does not reveal further suggestions until they accept.
       return {
         ...state,
         snapshot: applyConnections(snapshot, state.connectedIds),
@@ -165,9 +176,13 @@ export function boardReducer(
     }
 
     case 'connectNode': {
-      // Connecting reaches a 2nd-degree person through their warm-path bridge:
-      // record the link and turn that dotted bridge into a solid, strengthened
-      // (blue) edge. Idempotent — connecting again is a no-op.
+      // Connecting reaches a 2nd+-degree person through their warm-path bridge:
+      // record the link, turn the dotted bridge into a solid strengthened (blue)
+      // edge, and unlock the next layer of suggestions reachable through them.
+      // The next-layer reveal happens lazily on the next `selectNode` click on
+      // that node — we do not eagerly expand here, so connecting is a clean
+      // commitment action that the viewer can take without rearranging the
+      // canvas. Idempotent — connecting again is a no-op.
       if (state.connectedIds.includes(action.id)) return state
       const connectedIds = [...state.connectedIds, action.id]
       return {
