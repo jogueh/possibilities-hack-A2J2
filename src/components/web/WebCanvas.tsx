@@ -10,7 +10,7 @@ import {
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import type { WebSnapshot } from '@/types/web'
 import { edgeStrokeDasharray } from '@/lib/web/layout'
-import { edgeStrengthStyleUnit } from '@/lib/edgeStrength'
+import { edgeStrengthStyleUnit, edgeStrengthOpacityUnit } from '@/lib/edgeStrength'
 import WebNodeMarker from './WebNodeMarker'
 
 export interface WebCanvasProps {
@@ -222,6 +222,10 @@ export default function WebCanvas({
                     : MET_UP_EDGE_COLOR
                   : NORMAL_EDGE_COLOR
               const pulse = edge.isMetUp && style.pulse && !reduceMotion
+              // Weaker connections render more transparent (stronger ties read
+              // as more solid). `stroke-opacity` is independent of the entry
+              // fade / met-up pulse, which drive element `opacity`.
+              const strokeOpacity = edgeStrengthOpacityUnit(edge.strength)
               return (
                 <motion.line
                   key={edge.id}
@@ -231,6 +235,7 @@ export default function WebCanvas({
                   x2={b.x}
                   y2={b.y}
                   stroke={stroke}
+                  strokeOpacity={strokeOpacity}
                   strokeWidth={style.width}
                   strokeDasharray={edgeStrokeDasharray(edge.isDotted)}
                   strokeLinecap="round"

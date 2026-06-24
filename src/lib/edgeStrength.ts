@@ -69,6 +69,41 @@ const STYLES: Record<EdgeStrengthTier, EdgeStrengthStyle> = {
 const clampStrength = (strength: number): number =>
   Math.min(EDGE_STRENGTH_MAX, Math.max(EDGE_STRENGTH_MIN, strength));
 
+/** Opacity floor/ceiling for a strength-mapped edge stroke. The weakest tie
+ *  still renders faintly visible (never fully invisible) at the floor. */
+export const EDGE_OPACITY_MIN = 0.3;
+export const EDGE_OPACITY_MAX = 1;
+
+/**
+ * Maps a 0–100 edge strength to a stroke opacity in
+ * [`EDGE_OPACITY_MIN`, `EDGE_OPACITY_MAX`]: the weaker the connection, the more
+ * transparent the line, so stronger ties read as more solid. Inputs are clamped
+ * to the scale (NaN → weakest / most transparent).
+ *
+ * NOTE: this is purely the *visual* mapping from a strength value to opacity.
+ * How a connection's underlying strength is computed — i.e. what makes a tie
+ * "weak" — is owned by Workflow 2; this function just renders whatever strength
+ * it produces.
+ */
+export function edgeStrengthOpacity(strength0to100: number): number {
+  const s = clampStrength(
+    Number.isNaN(strength0to100) ? EDGE_STRENGTH_MIN : strength0to100,
+  );
+  const t = (s - EDGE_STRENGTH_MIN) / (EDGE_STRENGTH_MAX - EDGE_STRENGTH_MIN);
+  const opacity = EDGE_OPACITY_MIN + t * (EDGE_OPACITY_MAX - EDGE_OPACITY_MIN);
+  return Math.round(opacity * 100) / 100;
+}
+
+/**
+ * Stroke opacity for a 0..1 edge strength (the web canvas / boardState scale).
+ * Convenience wrapper that scales into the 0–100 `edgeStrengthOpacity` logic.
+ */
+export function edgeStrengthOpacityUnit(strength0to1: number): number {
+  return edgeStrengthOpacity(
+    (Number.isNaN(strength0to1) ? 0 : strength0to1) * 100,
+  );
+}
+
 /**
  * Bucket a 0–100 edge strength into its tier. Inputs are clamped to the scale,
  * so out-of-range values fall into the nearest tier (NaN is treated as the
