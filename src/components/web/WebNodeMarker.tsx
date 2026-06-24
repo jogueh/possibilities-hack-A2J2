@@ -71,8 +71,8 @@ export default function WebNodeMarker({
       {/* Selection halo — soft glow + ring */}
       {selected && (
         <>
-          <circle r={r + 11} fill={ring} opacity={0.12} />
-          <circle r={r + 6} fill="none" stroke={ring} strokeWidth={2.5} opacity={0.55} />
+          <circle r={r + 11} fill={ring} opacity={0.12} pointerEvents="none" />
+          <circle r={r + 6} fill="none" stroke={ring} strokeWidth={2.5} opacity={0.55} pointerEvents="none" />
         </>
       )}
 
