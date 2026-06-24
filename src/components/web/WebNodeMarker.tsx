@@ -3,7 +3,7 @@
 import type { KeyboardEvent } from 'react'
 import { motion } from 'framer-motion'
 import type { WebNode } from '@/types/web'
-import { tierColor, tierRadius } from '@/lib/web/layout'
+import { tierColor, tierRadius, truncateLabel } from '@/lib/web/layout'
 
 /**
  * Per-node visual decorations injected by sibling workflows. Workflow 1 owns the
@@ -22,6 +22,12 @@ export interface WebNodeMarkerProps {
   onSelect?: (id: string) => void
   decoration?: NodeDecoration
 }
+
+// Caption length caps keep each node's name + headline narrower than the gap
+// between adjacent nodes so labels never collide. The full text remains in the
+// marker's `aria-label` for screen readers.
+const NAME_MAX = 18
+const HEADLINE_MAX = 22
 
 // Presentational SVG marker for a single person node.
 export default function WebNodeMarker({
@@ -51,7 +57,7 @@ export default function WebNodeMarker({
       aria-label={node.headline ? `${node.label}, ${node.headline}` : node.label}
       aria-pressed={interactive ? selected : undefined}
       tabIndex={interactive ? 0 : undefined}
-      style={{ cursor: interactive ? 'pointer' : 'default' }}
+      style={{ cursor: interactive ? 'pointer' : 'default', outline: 'none' }}
       onClick={interactive ? () => onSelect?.(node.id) : undefined}
       onKeyDown={interactive ? handleKeyDown : undefined}
       initial={{ opacity: 0, x: node.position.x, y: node.position.y, scale: 0.6 }}
@@ -92,13 +98,13 @@ export default function WebNodeMarker({
         fontWeight={600}
         fill="#1f2937"
       >
-        {node.label}
+        {truncateLabel(node.label, NAME_MAX)}
       </text>
 
       {/* Headline */}
       {node.headline && (
         <text textAnchor="middle" y={r + 31} fontSize={10.5} fill="#6b7280">
-          {node.headline}
+          {truncateLabel(node.headline, HEADLINE_MAX)}
         </text>
       )}
     </motion.g>

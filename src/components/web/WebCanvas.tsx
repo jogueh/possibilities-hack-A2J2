@@ -149,6 +149,8 @@ export default function WebCanvas({
           display: 'block',
           touchAction: 'none',
           overflow: 'hidden',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
           cursor: panning ? 'grabbing' : snapshot.goal ? 'grab' : 'default',
         }}
       >
