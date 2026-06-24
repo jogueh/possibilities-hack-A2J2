@@ -61,7 +61,7 @@ Main now owns the shared contracts; W4 consumes them — do not redefine these l
   - `scoreUserAgainstGoal(user: UserWithJobs, parsedGoal): number` (role 35 / industry 20 / location 20 / skills 15 / activity 10) — consumed by **W2**
   - `scoreJobAgainstGoal(job, goal): number` (role/industry/location re-weighted to 100) — consumed by step 4
   - `matchesRole`/`matchesIndustry`/`matchesLocation`, `deriveAlignmentTier`, `deriveActivityStatus`, `WEIGHTS`
-- **Blockers:** until #18 merges, `main` still contains the MOCK placeholder implementation.
+- **Blockers:** none.
 
 ### Step 3 — web overlap (recreate fresh off main)
 - **Needs:** ✅ step 2 merged; `UserWithJobs` from `@/types/data`.
