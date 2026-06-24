@@ -10,6 +10,10 @@ const people: PersonInput[] = [
   { id: 'a', name: 'Ada Lovelace', degree: 1 },
   { id: 'b', name: 'Bob Smith', degree: 1 },
   { id: 'c', name: 'Carol Danvers', degree: 2, via: 'a' },
+  // c2/c3 are siblings of c — same parent 'a'. Used to verify that pinning
+  // only c does NOT also retain its siblings after a branch switch.
+  { id: 'c2', name: 'Cara Stark', degree: 2, via: 'a' },
+  { id: 'c3', name: 'Cleo Vance', degree: 2, via: 'a' },
   { id: 'e', name: 'Eve Polastri', degree: 2, via: 'b' },
   // 3rd-degree people reachable through 2nd-degree connectors.
   { id: 'd', name: 'Diana Prince', degree: 3, via: 'c' },
@@ -157,6 +161,24 @@ describe('boardReducer', () => {
     expect(s.connectedIds).toEqual([])
   })
 
+  it('connecting a 2nd-degree does NOT solidify the 3rd-degree bridges below them (target-only)', () => {
+    // Expand a -> reveal c (2nd). Connect to c (solidifies a__c). Click c to
+    // reveal d (3rd). The c__d bridge MUST stay dotted: d is not yet
+    // connected, only c is. (Regression: applyConnections used to solidify
+    // any edge touching a connected endpoint, which incorrectly turned the
+    // c -> d link blue.)
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    s = reduce(s, { type: 'connectNode', id: 'c' })
+    s = reduce(s, { type: 'selectNode', id: 'c' })
+
+    const aToC = s.snapshot.edges.find((e) => e.id === 'a__c')!
+    const cToD = s.snapshot.edges.find((e) => e.id === 'c__d')!
+    expect(aToC.isDotted).toBe(false) // bridge to connected person is solid
+    expect(cToD.isDotted).toBe(true) // bridge to UNCONNECTED person stays dotted
+  })
+
   it('pinNode keeps a 2nd-degree person on the canvas across branch switches', () => {
     // Expand 'a' to reveal its 2nd-degree 'c'. Without pinning, clicking 'b'
     // would collapse 'a's expansion and drop 'c'. Pin 'c' first, then verify
@@ -179,9 +201,29 @@ describe('boardReducer', () => {
     expect(s.snapshot.nodes.some((n) => n.id === 'a')).toBe(true)
   })
 
+  it('pinning ONE sibling does not drag the other siblings back onto the canvas after a branch switch', () => {
+    // Expand 'a' to reveal c, c2, c3 (all 2nd-degree children of 'a'). Pin
+    // only 'c'. Click 'b'. The branch collapses, but only the pinned 'c'
+    // should re-appear — c2 and c3 must stay collapsed.
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    expect(s.snapshot.nodes.map((n) => n.id).sort()).toEqual(
+      ['a', 'b', 'c', 'c2', 'c3'].sort(),
+    )
+
+    s = reduce(s, { type: 'pinNode', id: 'c' })
+    s = reduce(s, { type: 'selectNode', id: 'b' })
+
+    expect(s.snapshot.nodes.some((n) => n.id === 'c')).toBe(true) // pinned
+    expect(s.snapshot.nodes.some((n) => n.id === 'c2')).toBe(false) // sibling
+    expect(s.snapshot.nodes.some((n) => n.id === 'c3')).toBe(false) // sibling
+  })
+
   it('pinning a 3rd-degree person also retains its 2nd-degree connector (full warm-path chain)', () => {
     // Walk to depth 3: expand 'a' -> connect 'c' -> click 'c' to reveal 'd'.
-    // Pin 'd'. Then click 'b' and verify both 'c' (2nd) and 'd' (3rd) survive.
+    // Pin 'd'. Then click 'b' and verify both 'c' (2nd) and 'd' (3rd) survive,
+    // but the sibling 2nd-degrees of 'c' (c2, c3) do NOT.
     let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
     s = reduce(s, { type: 'submitGoal' })
     s = reduce(s, { type: 'selectNode', id: 'a' })
@@ -195,6 +237,9 @@ describe('boardReducer', () => {
     expect(s.snapshot.nodes.some((n) => n.id === 'd')).toBe(true)
     expect(s.snapshot.nodes.some((n) => n.id === 'c')).toBe(true)
     expect(s.snapshot.nodes.some((n) => n.id === 'e')).toBe(true) // b's branch
+    // 'c's siblings (c2, c3) should NOT come along.
+    expect(s.snapshot.nodes.some((n) => n.id === 'c2')).toBe(false)
+    expect(s.snapshot.nodes.some((n) => n.id === 'c3')).toBe(false)
   })
 
   it('pinNode is idempotent, orthogonal to connect, and resets on a new goal', () => {

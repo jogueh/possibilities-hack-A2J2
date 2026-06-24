@@ -122,6 +122,53 @@ export function buildSnapshot(
 }
 
 /**
+ * Adds a SINGLE specific person to the snapshot, placed next to their `via`
+ * parent. Mirrors the positioning logic of `expandNode` but for one node only
+ * — `expandNode` always reveals all of a parent's children, which is wrong
+ * for the pinning UX (the viewer pins one suggestion but its siblings should
+ * stay collapsed). No-op if the person is already in the snapshot, has no
+ * `via` parent in the snapshot, or has no goal set.
+ */
+export function revealPerson(
+  snapshot: WebSnapshot,
+  person: PersonInput,
+  options: LayoutOptions,
+): WebSnapshot {
+  if (!snapshot.goal) return snapshot
+  if (snapshot.nodes.some((n) => n.id === person.id)) return snapshot
+  if (!person.via) return snapshot
+  const parent = snapshot.nodes.find((n) => n.id === person.via)
+  if (!parent) return snapshot
+
+  const center = { x: options.width / 2, y: options.height / 2 }
+  const newNode: WebNode = {
+    ...toNode(person),
+    // Single child sits directly outward from the parent — matches the
+    // expandNode lone-child layout (`count === 1` -> offset 0).
+    position: placeNearParent(parent.position, center, 0, 1, options),
+  }
+  const nodes = [...snapshot.nodes, newNode]
+
+  const relationships: Relationship[] = [
+    {
+      source: person.via,
+      target: person.id,
+      strength: person.interactionScore ?? DEFAULT_INTERACTION,
+    },
+  ]
+  const bridgeEdges = deriveEdges(relationships, nodes)
+  const existingEdgeIds = new Set(snapshot.edges.map((e) => e.id))
+  const addedEdges = bridgeEdges.filter((e) => !existingEdgeIds.has(e.id))
+
+  return {
+    state: 'expanded',
+    nodes,
+    edges: [...snapshot.edges, ...addedEdges],
+    goal: snapshot.goal,
+  }
+}
+
+/**
  * Expands a node, revealing the next-ring people that reach the user through
  * it. Returns an `expanded` snapshot with dotted bridge edges. The new nodes
  * are clustered next to their connector (not on a global outer ring) so the

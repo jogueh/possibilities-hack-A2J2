@@ -4,6 +4,7 @@ import {
   expandNode,
   initialsFromName,
   alignmentFromScore,
+  revealPerson,
   type PersonInput,
 } from '@/lib/web/snapshot'
 import type { GoalQuery } from '@/types/web'
@@ -101,5 +102,41 @@ describe('expandNode', () => {
   it('returns the snapshot unchanged when there is no goal', () => {
     const empty = buildSnapshot(null, people, options)
     expect(expandNode(empty, 'a', people, options)).toBe(empty)
+  })
+})
+
+describe('revealPerson', () => {
+  it('adds a single specific person without revealing their siblings', () => {
+    // Both 'c' and 'd' are 2nd-degree children of 'a'. expandNode reveals
+    // both — revealPerson should reveal only the one passed in.
+    const seeded = buildSnapshot(goal, people, options)
+    const cOnly = revealPerson(seeded, people.find((p) => p.id === 'c')!, options)
+    expect(cOnly.nodes.map((n) => n.id).sort()).toEqual(['a', 'b', 'c'])
+    // d (c's sibling) stays hidden.
+    expect(cOnly.nodes.some((n) => n.id === 'd')).toBe(false)
+    // The bridge edge to c is dotted.
+    const bridge = cOnly.edges.find((e) => e.target === 'c')
+    expect(bridge).toMatchObject({ source: 'a', isDotted: true })
+  })
+
+  it('is a no-op if the person is already in the snapshot', () => {
+    const seeded = buildSnapshot(goal, people, options)
+    const expanded = expandNode(seeded, 'a', people, options)
+    // c is already in the snapshot from expandNode.
+    const noop = revealPerson(expanded, people.find((p) => p.id === 'c')!, options)
+    expect(noop).toBe(expanded)
+  })
+
+  it('is a no-op if the via parent is not yet in the snapshot', () => {
+    // Try to reveal 'c' (via='a') against an empty seeded snapshot for goal
+    // with no people — parent missing, must skip.
+    const empty = buildSnapshot(goal, [], options)
+    const result = revealPerson(empty, people.find((p) => p.id === 'c')!, options)
+    expect(result).toBe(empty)
+  })
+
+  it('returns the snapshot unchanged when there is no goal', () => {
+    const empty = buildSnapshot(null, people, options)
+    expect(revealPerson(empty, people.find((p) => p.id === 'c')!, options)).toBe(empty)
   })
 })

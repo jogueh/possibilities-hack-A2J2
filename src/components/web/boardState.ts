@@ -3,6 +3,7 @@ import type { LayoutOptions } from '@/lib/web/layout'
 import {
   buildSnapshot,
   expandNode,
+  revealPerson,
   type PersonInput,
 } from '@/lib/web/snapshot'
 
@@ -74,9 +75,17 @@ export function createInitialBoardState(): BoardState {
 }
 
 /**
- * Solidifies every dotted bridge edge that touches a connected person: the line
- * stops being dotted, turns into a strong link and is strengthened. Re-applied
- * after a snapshot rebuild so a connection survives re-expanding its connector.
+ * Solidifies every dotted bridge edge whose TARGET is a connected person —
+ * the line stops being dotted, turns into a strong link and is strengthened.
+ * Re-applied after a snapshot rebuild so a connection survives re-expanding
+ * its connector.
+ *
+ * IMPORTANT: only the target endpoint counts. Edges in this app are emitted
+ * with source = parent (shallower, closer to viewer) and target = child
+ * (deeper). Connecting to person X solidifies the parent -> X bridge, NOT
+ * the X -> grandchild bridges that appear when X is later expanded — those
+ * grandchildren are still suggestions until the viewer connects with each
+ * one in turn.
  */
 function applyConnections(
   snapshot: WebSnapshot,
@@ -85,7 +94,7 @@ function applyConnections(
   if (connectedIds.length === 0) return snapshot
   const connected = new Set(connectedIds)
   const edges = snapshot.edges.map((e) =>
-    e.isDotted && (connected.has(e.target) || connected.has(e.source))
+    e.isDotted && connected.has(e.target)
       ? { ...e, isDotted: false, strength: Math.max(e.strength, CONNECTED_STRENGTH) }
       : e,
   )
@@ -98,9 +107,9 @@ function applyConnections(
  * pins their entire warm-path chain back to the viewer (you can't show a
  * 3rd-degree node without rendering the 2nd-degree connector that introduces
  * them) — `walkViaChain` produces that chain by following `via` references
- * up to the 1st-degree root, and the loop expands each ancestor in
- * shallowest-first order so each `expandNode` call has its parent already
- * in the snapshot.
+ * up to the 1st-degree root, and the loop reveals each link pairwise with
+ * `revealPerson` so only the specific pinned path appears (NOT the sibling
+ * suggestions that share the same parent).
  *
  * Idempotent and safe to call with an empty `pinnedIds` (no-op).
  */
@@ -115,13 +124,14 @@ function applyPins(
   let out = snapshot
   for (const pinnedId of pinnedIds) {
     const chain = walkViaChain(pinnedId, byId)
-    // Expand each ancestor (shallowest -> just-before-pinned) so the pinned
-    // node's parent is in the snapshot before we try to expand it. The pinned
-    // node itself is revealed by expanding its direct parent; we don't need
-    // to expand the pinned node unless we also want its children re-pinned,
-    // which is the user's job (they'd pin those nodes too).
-    for (const ancestor of chain.slice(0, -1)) {
-      out = expandNode(out, ancestor, people, options)
+    // The depth-1 root is already in the snapshot; walk the rest of the
+    // chain (depth 2 -> pinned) and add each person individually.
+    // `revealPerson` is a no-op if the person is already present, so chains
+    // that share a prefix don't duplicate work.
+    for (let i = 1; i < chain.length; i++) {
+      const person = byId.get(chain[i])
+      if (!person) continue
+      out = revealPerson(out, person, options)
     }
   }
   return out
