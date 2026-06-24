@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   layoutNodes,
   deriveEdges,
+  placeNearParent,
   tierColor,
   tierRadius,
   edgeStrokeWidth,
@@ -82,6 +83,41 @@ describe('layoutNodes', () => {
   it('is deterministic for the same input', () => {
     const input = [node('a', 1, 0.3), node('b', 1, 0.7), node('c', 2, 0.5)]
     expect(layoutNodes(input, opts)).toEqual(layoutNodes(input, opts))
+  })
+})
+
+describe('placeNearParent', () => {
+  const opts = { width: 800, height: 600, ring1Radius: 100, ring2Radius: 200 }
+  const center = { x: 400, y: 300 }
+
+  it('places a child node near its parent, not on a global ring', () => {
+    // Parent sits to the right of centre on the inner ring.
+    const parent = { x: 500, y: 300 }
+    const pos = placeNearParent(parent, center, 0, 1, opts)
+    const distToParent = Math.hypot(pos.x - parent.x, pos.y - parent.y)
+    const distToCenter = Math.hypot(pos.x - center.x, pos.y - center.y)
+    // The child clusters close to the parent and further out than the parent.
+    expect(distToParent).toBeLessThan(distToCenter)
+    expect(distToCenter).toBeGreaterThan(
+      Math.hypot(parent.x - center.x, parent.y - center.y),
+    )
+  })
+
+  it('fans multiple children to distinct positions around the parent', () => {
+    const parent = { x: 500, y: 300 }
+    const a = placeNearParent(parent, center, 0, 3, opts)
+    const b = placeNearParent(parent, center, 1, 3, opts)
+    const c = placeNearParent(parent, center, 2, 3, opts)
+    expect(a).not.toEqual(b)
+    expect(b).not.toEqual(c)
+    expect(a).not.toEqual(c)
+  })
+
+  it('is deterministic for the same input', () => {
+    const parent = { x: 250, y: 450 }
+    expect(placeNearParent(parent, center, 1, 4, opts)).toEqual(
+      placeNearParent(parent, center, 1, 4, opts),
+    )
   })
 })
 
