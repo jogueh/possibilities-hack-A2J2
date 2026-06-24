@@ -1,7 +1,7 @@
-// ⚠️ W4 MOCK — replace with W2 real endpoint `GET /api/jobs/matches?goal=&userId=`.
-// Mirrors the `JobMatch[]` payload W2's route will return (it runs `buildJobMatches`
-// server-side over the same datasets), so the Jobs Panel can be built/tested now.
-// At integration, swap `fetchJobMatches` for a real `fetch('/api/jobs/matches?...')`.
+// ⚠️ W4 MOCK — stands in for W2's `GET /api/jobs/matches` route wrapper.
+// This mock runs `buildJobMatches` locally over the static datasets using the
+// current web's userIds (from the mock store) and a parsed goal.
+// At integration, replace this implementation with a real fetch to `/api/jobs/matches?goal=...&userId=...` (or align this wrapper's signature to the route).
 import type { Job, UserWithJobs } from "@/types/data";
 import type { ParsedGoal } from "@/types/goal";
 import type { JobMatch } from "@/types/job";
