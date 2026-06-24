@@ -40,6 +40,10 @@ const MIN_ZOOM = 0.6
 const MAX_ZOOM = 3
 const ZOOM_STEP = 1.2
 
+// Connection line into a person the viewer has logged a real-world meetup with.
+// Purple distinguishes it from a normal (blue) connection.
+const MET_UP_EDGE_COLOR = '#8B5CF6'
+
 const clamp = (n: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, n))
 
@@ -173,7 +177,7 @@ export default function WebCanvas({
           <defs>
             {snapshot.edges.map((edge) => {
               const g = edgeStrengthStyleUnit(edge.strength).gradient
-              if (g === undefined || edge.isDotted) return null
+              if (g === undefined || edge.isDotted || edge.isMetUp) return null
               const a = positionById.get(edge.source)
               const b = positionById.get(edge.target)
               if (!a || !b) return null
@@ -202,9 +206,11 @@ export default function WebCanvas({
               const style = edgeStrengthStyleUnit(edge.strength)
               const stroke = edge.isDotted
                 ? '#b9c2cc'
-                : style.gradient
-                  ? `url(#edge-grad-${edge.id})`
-                  : style.color
+                : edge.isMetUp
+                  ? MET_UP_EDGE_COLOR
+                  : style.gradient
+                    ? `url(#edge-grad-${edge.id})`
+                    : style.color
               const pulse = style.pulse && !edge.isDotted && !reduceMotion
               return (
                 <motion.line

@@ -67,6 +67,21 @@ describe('WebCanvas', () => {
     expect(container.querySelector('#edge-grad-self_1__b')).toBeNull()
   })
 
+  it('renders a met-up connection line in purple, overriding the strength gradient', () => {
+    const seeded = buildSnapshot(goal, people, options)
+    const metUp = {
+      ...seeded,
+      edges: seeded.edges.map((e) =>
+        e.id === 'self_1__a' ? { ...e, isDotted: false, isMetUp: true } : e,
+      ),
+    }
+    const { container } = render(<WebCanvas snapshot={metUp} />)
+    const line = container.querySelector('[data-testid="web-edge-self_1__a"]')
+    expect(line?.getAttribute('stroke')).toBe('#8B5CF6')
+    // No gradient def is emitted for a met-up edge (purple is solid).
+    expect(container.querySelector('#edge-grad-self_1__a')).toBeNull()
+  })
+
   it('draws dotted bridge edges once a node is expanded', () => {
     const expanded = expandNode(buildSnapshot(goal, people, options), 'a', people, options)
     const { container } = render(<WebCanvas snapshot={expanded} />)

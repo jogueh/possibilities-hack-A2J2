@@ -44,6 +44,7 @@ describe('web types contract', () => {
       target: string
       strength: number
       isDotted: boolean
+      isMetUp?: boolean
     }>()
   })
 
