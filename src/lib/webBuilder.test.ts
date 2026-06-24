@@ -328,10 +328,17 @@ describe('buildWeb — 2nd-degree selection (from member.connections)', () => {
     expect(secondDegree.map((n) => n.id)).toEqual(['c0', 'c1', 'c2'])
   })
 
-  it('omits 2nd-degree for a parent whose connections all fail the 70 threshold', () => {
+  it("falls back to top-N friends-of-friends when none clear the 70 threshold (weak-match fallback)", () => {
     const fillers = Array.from({ length: 4 }, (_, i) => makeUser(`f${i}`))
-    const weak = makeUser('weak_fof')
-    const parent = makeUser('parent', { connections: ['weak_fof'] })
+    // 4 weak friends-of-friends — none clear 70, mirroring a location-only
+    // goal like "find people in SF" where the scorer caps at ~30 points.
+    const fof1 = makeUser('fof1')
+    const fof2 = makeUser('fof2')
+    const fof3 = makeUser('fof3')
+    const fof4 = makeUser('fof4')
+    const parent = makeUser('parent', {
+      connections: ['fof1', 'fof2', 'fof3', 'fof4'],
+    })
     const viewer = makeUser('viewer', {
       connections: ['parent', 'f0', 'f1', 'f2', 'f3'],
     })
@@ -339,11 +346,37 @@ describe('buildWeb — 2nd-degree selection (from member.connections)', () => {
     const { nodes } = buildWeb({
       viewerUserId: 'viewer',
       parsedGoal: goal,
-      candidates: [viewer, parent, ...fillers, weak],
+      candidates: [viewer, parent, ...fillers, fof1, fof2, fof3, fof4],
       scorer: scorerByMap({
         parent: 99,
         f0: 95, f1: 94, f2: 93, f3: 92,
-        weak_fof: 50,
+        fof1: 30, fof2: 25, fof3: 10, fof4: 5,
+      }),
+    })
+
+    const secondDegree = nodes.filter((n) => n.degree === 2)
+    // Cap at SECOND_DEGREE_PER_NODE_MAX (3), sorted desc by score.
+    expect(secondDegree.map((n) => n.id)).toEqual(['fof1', 'fof2', 'fof3'])
+    // All surfaced via the fallback get the weak tier (< 40 → weak).
+    expect(secondDegree.every((n) => n.alignmentTier === 'weak')).toBe(true)
+  })
+
+  it('omits 2nd-degree for a parent with no friends-of-friends in the candidate set', () => {
+    // Parent has zero friends outside the viewer / existing 1st-degree, so
+    // there is literally nobody to surface — empty regardless of threshold.
+    const fillers = Array.from({ length: 4 }, (_, i) => makeUser(`f${i}`))
+    const parent = makeUser('parent', { connections: [] })
+    const viewer = makeUser('viewer', {
+      connections: ['parent', 'f0', 'f1', 'f2', 'f3'],
+    })
+
+    const { nodes } = buildWeb({
+      viewerUserId: 'viewer',
+      parsedGoal: goal,
+      candidates: [viewer, parent, ...fillers],
+      scorer: scorerByMap({
+        parent: 99,
+        f0: 95, f1: 94, f2: 93, f3: 92,
       }),
     })
     expect(nodes.filter((n) => n.degree === 2)).toHaveLength(0)
