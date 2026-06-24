@@ -31,11 +31,14 @@ export interface BuildWebOutput {
 
 export const FIRST_DEGREE_MIN_SCORE = 40
 export const FIRST_DEGREE_MAX = 5
-// The same threshold + per-parent cap apply to every ring BEYOND 1st-degree —
-// the warm-path framing is identical at each hop (one more introduction step
-// removed). Tighter caps would starve the canvas on thin-signal goals; looser
-// caps would explode it (per-parent fan-out compounds geometrically with depth).
-export const SECOND_DEGREE_MIN_SCORE = 70
+// Per-parent cap on warm-path fan-out at every ring beyond 1st-degree.
+// Tighter caps would starve the canvas on thin-signal goals; looser caps
+// would explode it (per-parent fan-out compounds geometrically with depth).
+// The min-score threshold that used to gate this ring was removed: with
+// stricter scoring the threshold dropped real warm-path candidates whose
+// score was a few points shy of arbitrary cutoffs; the per-parent cap is
+// sufficient to keep the canvas readable. The alignment ring colour on
+// each node conveys match quality visually instead.
 export const SECOND_DEGREE_PER_NODE_MAX = 3
 // Hard ceiling on warm-path depth. 4 keeps the canvas readable: with the
 // per-parent cap of SECOND_DEGREE_PER_NODE_MAX=3 and FIRST_DEGREE_MAX=5, the
@@ -108,35 +111,31 @@ function edge(source: string, target: string, isDotted: boolean): WebEdge {
  *
  *   1. 1st-degree pool = `viewer.connections` resolved against the candidates
  *      map (anyone outside the candidates set is silently dropped). Score
- *      each, keep score >= FIRST_DEGREE_MIN_SCORE, sort desc, take top
- *      FIRST_DEGREE_MAX. Edges viewer -> 1st are SOLID (real connection).
- *   1a. WEAK-MATCH FALLBACK: if the viewer HAS connections but none clear
- *       the threshold, we still show the top FIRST_DEGREE_MAX of their
- *       connections by score. The threshold is only a quality filter for
- *       1st-degree when the viewer has at least one strong match — without
- *       this fallback a goal like "find people in SF" (location-only signal,
- *       caps at ~30 points) would render an empty web even though the user
- *       has connections. The `alignmentTier` on each node already conveys
- *       the weak match visually.
- *   1b. COLD-START FALLBACK: if the viewer has NO direct connections in the
+ *      each, sort by score desc, take top FIRST_DEGREE_MAX. Edges
+ *      viewer -> 1st are SOLID (real connection). The score threshold is
+ *      INFORMATIONAL only — every direct connection is eligible for the
+ *      canvas because the goal re-ranks the viewer's actual network rather
+ *      than narrowing it down. The alignment ring colour on each node
+ *      (strong/moderate/weak) conveys match quality visually. Without this,
+ *      a precise goal that only one connection scores well on would collapse
+ *      the canvas to that single person, breaking the "this is my network"
+ *      mental model.
+ *   1a. COLD-START PATH: if the viewer has NO direct connections in the
  *       candidate set (new / unknown viewer), seed the 1st-degree pool with
  *       structural suggestions from `suggestConnections(...)` (warm 2nd-
- *       degree, then hubs). The score threshold IS enforced on this path so
- *       we don't recommend irrelevant strangers — these aren't real edges.
+ *       degree, then hubs). The FIRST_DEGREE_MIN_SCORE threshold IS
+ *       enforced on this path so we don't recommend irrelevant strangers
+ *       — these aren't real edges.
  *   2. Ring N for N in [2..MAX_DEGREE]: each node in ring N-1 acts as a
  *      parent. Its `connections` (minus everyone already in the web)
- *      become the ring-N candidates, scored against the goal, filtered to
- *      >= SECOND_DEGREE_MIN_SCORE, sorted desc, capped at
- *      SECOND_DEGREE_PER_NODE_MAX. Edges across the ring boundary are
- *      DOTTED ("warm-path introduction"). A user appears at most once
- *      across the whole web.
- *   2a. WEAK-MATCH FALLBACK (mirrors 1a): if a parent in ring N-1 has
- *       candidates in the dataset but NONE clear the threshold, surface its
- *       top SECOND_DEGREE_PER_NODE_MAX by score anyway. Clicking a node
- *       otherwise reveals no warm path for thin-signal goals at deeper
- *       rings. The alignmentTier on each surfaced node still conveys the
- *       weak match visually.
- *   2b. Expansion stops early when a ring yields zero new nodes — every
+ *      become the ring-N candidates, scored against the goal, sorted by
+ *      score desc, capped at SECOND_DEGREE_PER_NODE_MAX per parent. Edges
+ *      across the ring boundary are DOTTED ("warm-path introduction").
+ *      A user appears at most once across the whole web. The score is
+ *      again informational at this hop — gating warm-path introductions
+ *      on a hard threshold would prevent the viewer from discovering
+ *      reachable people whose alignment is weak but real.
+ *   2a. Expansion stops early when a ring yields zero new nodes — every
  *       reachable person is already on the canvas; no need to keep iterating.
  *   3. No edges to strangers outside the candidates set.
  */
@@ -174,19 +173,21 @@ export function buildWeb({
   }
   directScored.sort((a, b) => b.score - a.score)
 
-  // Strict path: filter to scores clearing the threshold, then cap at MAX.
-  const qualifying = directScored.filter(
-    (s) => s.score >= FIRST_DEGREE_MIN_SCORE,
-  )
-  // Weak-match fallback only fires for the real-connections path: if at
-  // least one connection clears the threshold OR we're on the cold-start
-  // path (where the suggestions are strangers, so weak matches should be
-  // dropped), keep the strict result. Otherwise, surface the viewer's
-  // top-MAX connections by score so the web isn't empty.
-  const firstDegree =
-    qualifying.length > 0 || isColdStart
-      ? qualifying.slice(0, FIRST_DEGREE_MAX)
-      : directScored.slice(0, FIRST_DEGREE_MAX)
+  // Real-connections path: always surface up to FIRST_DEGREE_MAX of the
+  // viewer's direct connections, ranked by goal alignment. The alignment
+  // ring colour on each node (strong/moderate/weak) is what conveys the
+  // match quality visually — filtering weak connections OUT of the canvas
+  // would collapse the viewer's network to "just the one person who
+  // matches", breaking the "this is my network, re-ranked" mental model.
+  //
+  // Cold-start path (no real connections) DOES enforce the threshold
+  // strictly: those candidates are stranger suggestions, so showing weak
+  // matches would be noise, not network context.
+  const firstDegree = isColdStart
+    ? directScored
+        .filter((s) => s.score >= FIRST_DEGREE_MIN_SCORE)
+        .slice(0, FIRST_DEGREE_MAX)
+    : directScored.slice(0, FIRST_DEGREE_MAX)
 
   const nodes: WebNode[] = firstDegree.map(({ user, score }) =>
     toNode(user, 1, score),
@@ -217,19 +218,16 @@ export function buildWeb({
       }
       candidateScored.sort((a, b) => b.score - a.score)
 
-      // Strict path: keep only candidates clearing the threshold.
-      const qualifying = candidateScored.filter(
-        (s) => s.score >= SECOND_DEGREE_MIN_SCORE,
-      )
-      // Weak-match fallback: when a parent has friends-of-friends but none
-      // clear the threshold (e.g. location-only goals that cap at ~30 points),
-      // surface the top SECOND_DEGREE_PER_NODE_MAX anyway so deep expansion
-      // is never starved on thin-signal goals. Threshold remains binding
-      // whenever the parent has at least one strong match.
-      const picked =
-        qualifying.length > 0
-          ? qualifying.slice(0, SECOND_DEGREE_PER_NODE_MAX)
-          : candidateScored.slice(0, SECOND_DEGREE_PER_NODE_MAX)
+      // Warm-path expansion: same logic as 1st-degree — every reachable
+      // friend-of-friend of `parent` is fair game for the canvas, ranked
+      // by goal alignment. The alignment ring colour conveys match quality
+      // visually; filtering weak matches out at depth N collapses the
+      // warm-path tree to "only the matches", which (a) breaks the
+      // mental model that this is the viewer's actual reachable network
+      // and (b) starves deeper expansion since the next ring needs
+      // parents to expand from. Per-parent cap of
+      // SECOND_DEGREE_PER_NODE_MAX still keeps the canvas readable.
+      const picked = candidateScored.slice(0, SECOND_DEGREE_PER_NODE_MAX)
       for (const m of picked) {
         inWeb.add(m.user.id)
         nodes.push(toNode(m.user, depth, m.score))

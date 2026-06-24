@@ -59,7 +59,12 @@ describe('buildWeb — 1st-degree selection', () => {
     expect(firstDegree).toHaveLength(FIRST_DEGREE_MAX)
   })
 
-  it('returns fewer than 5 when fewer connections clear the 40 threshold (no padding)', () => {
+  it('shows all FIRST_DEGREE_MAX direct connections regardless of threshold (ranked by score)', () => {
+    // Real-connections path: every direct connection is eligible for the
+    // canvas; the score sorts them and the alignment ring colour conveys
+    // match quality. Without this, a precise goal that only one connection
+    // scores highly on would collapse the canvas to that single person and
+    // hide the viewer's actual network.
     const candidates = [
       makeUser('u_strong'),
       makeUser('u_moderate'),
@@ -83,7 +88,15 @@ describe('buildWeb — 1st-degree selection', () => {
       }),
     })
     const firstDegree = nodes.filter((n) => n.degree === 1)
-    expect(firstDegree.map((n) => n.id)).toEqual(['u_strong', 'u_moderate'])
+    // All 5 connections surface, sorted by score desc. The weak ones still
+    // get the 'weak' alignmentTier so the UI conveys their low match.
+    expect(firstDegree.map((n) => n.id)).toEqual([
+      'u_strong',
+      'u_moderate',
+      'u_weak1',
+      'u_weak2',
+      'u_weak3',
+    ])
   })
 
   it('excludes the viewer even when the viewer appears in their own connection list', () => {
@@ -173,11 +186,9 @@ describe('buildWeb — 1st-degree selection', () => {
     expect(nodes).toEqual([])
   })
 
-  it('falls back to top-N connections by score when none clear the threshold (weak-match fallback)', () => {
-    // Real connections, none of which clear FIRST_DEGREE_MIN_SCORE (40).
-    // Old behaviour returned an empty web; new behaviour surfaces the top
-    // FIRST_DEGREE_MAX so the user with a real network never sees a blank
-    // canvas. Visual weak-match cue lives in the node's alignmentTier.
+  it('surfaces top-N direct connections by score even when none clear the threshold', () => {
+    // Real-connections path always shows up to FIRST_DEGREE_MAX. The
+    // alignment ring colour conveys the weak match visually.
     const viewer = makeUser('viewer', { connections: ['u1', 'u2', 'u3'] })
     const candidates = [
       viewer,
@@ -200,7 +211,7 @@ describe('buildWeb — 1st-degree selection', () => {
     expect(edges.every((e) => e.source === 'viewer' && !e.isDotted)).toBe(true)
   })
 
-  it('weak-match fallback caps at FIRST_DEGREE_MAX', () => {
+  it('caps the direct-connections list at FIRST_DEGREE_MAX', () => {
     const connectionIds = Array.from({ length: 8 }, (_, i) => `u${i}`)
     const viewer = makeUser('viewer', { connections: connectionIds })
     const candidates = [viewer, ...connectionIds.map((id) => makeUser(id))]
@@ -255,7 +266,7 @@ describe('buildWeb — 1st-degree selection', () => {
 })
 
 describe('buildWeb — 2nd-degree selection (from member.connections)', () => {
-  it("emits 2nd-degree nodes only from the parent's connections, ranked by score, filtered by the 70 threshold", () => {
+  it("emits 2nd-degree nodes only from the parent's connections, ranked by score, capped per parent", () => {
     const fillers = Array.from({ length: 4 }, (_, i) => makeUser(`f${i}`))
     const parent = makeUser('parent', {
       connections: ['fofA', 'fofB', 'fofWeak'],
@@ -282,7 +293,11 @@ describe('buildWeb — 2nd-degree selection (from member.connections)', () => {
       f0: 95, f1: 94, f2: 93, f3: 92,
       fofA: 85,
       fofB: 75,
-      fofWeak: 65, // below 70 — must be dropped
+      // The "weak" warm-path candidate is INCLUDED — the per-parent cap (3)
+      // bounds the result; the score threshold no longer gates warm paths
+      // because hiding low-score reachable people breaks the network model.
+      // The alignmentTier on the node still conveys that the match is weak.
+      fofWeak: 65,
       stranger: 99, // high score but NOT connected to parent — must be dropped
     }
 
@@ -296,8 +311,9 @@ describe('buildWeb — 2nd-degree selection (from member.connections)', () => {
     const secondDegreeIds = nodes
       .filter((n) => n.degree === 2)
       .map((n) => n.id)
-    // Sorted desc by score; stranger and fofWeak both excluded.
-    expect(secondDegreeIds).toEqual(['fofA', 'fofB'])
+    // Sorted desc by score; stranger excluded (not parent's connection);
+    // fofWeak included (parent's connection, within the per-parent cap).
+    expect(secondDegreeIds).toEqual(['fofA', 'fofB', 'fofWeak'])
   })
 
   it('caps 2nd-degree nodes per 1st-degree parent at 3', () => {
@@ -329,10 +345,10 @@ describe('buildWeb — 2nd-degree selection (from member.connections)', () => {
     expect(secondDegree.map((n) => n.id)).toEqual(['c0', 'c1', 'c2'])
   })
 
-  it("falls back to top-N friends-of-friends when none clear the 70 threshold (weak-match fallback)", () => {
+  it("surfaces top-N friends-of-friends by score even when none clear high alignment", () => {
     const fillers = Array.from({ length: 4 }, (_, i) => makeUser(`f${i}`))
-    // 4 weak friends-of-friends — none clear 70, mirroring a location-only
-    // goal like "find people in SF" where the scorer caps at ~30 points.
+    // 4 weak friends-of-friends — each one is reachable via the parent;
+    // the per-parent cap (3) bounds the result.
     const fof1 = makeUser('fof1')
     const fof2 = makeUser('fof2')
     const fof3 = makeUser('fof3')
@@ -358,7 +374,7 @@ describe('buildWeb — 2nd-degree selection (from member.connections)', () => {
     const secondDegree = nodes.filter((n) => n.degree === 2)
     // Cap at SECOND_DEGREE_PER_NODE_MAX (3), sorted desc by score.
     expect(secondDegree.map((n) => n.id)).toEqual(['fof1', 'fof2', 'fof3'])
-    // All surfaced via the fallback get the weak tier (< 40 → weak).
+    // All surfaced get the weak tier (< 40 → weak).
     expect(secondDegree.every((n) => n.alignmentTier === 'weak')).toBe(true)
   })
 
