@@ -120,13 +120,21 @@ export default function WebBoard() {
         <Card title="Suggestions" size="small">
           <Space orientation="vertical" size={8} style={{ width: '100%' }}>
             {SUGGESTIONS.map((text) => (
-              <Typography.Link
+              <Button
                 key={text}
+                type="link"
                 onClick={() => dispatch({ type: 'setGoalText', value: text })}
-                style={{ display: 'block', lineHeight: 1.4 }}
+                style={{
+                  display: 'block',
+                  height: 'auto',
+                  padding: 0,
+                  textAlign: 'left',
+                  whiteSpace: 'normal',
+                  lineHeight: 1.4,
+                }}
               >
                 • {text}
-              </Typography.Link>
+              </Button>
             ))}
           </Space>
         </Card>
@@ -214,6 +222,7 @@ export default function WebBoard() {
             <Typography.Text strong>Dynamic filters</Typography.Text>
             <Select
               size="small"
+              aria-label="Filter by location"
               placeholder="Location"
               style={{ width: 150 }}
               options={LOCATION_OPTIONS.map((v) => ({ value: v, label: v }))}
@@ -221,6 +230,7 @@ export default function WebBoard() {
             />
             <Select
               size="small"
+              aria-label="Filter by industry"
               placeholder="Industry"
               style={{ width: 150 }}
               options={INDUSTRY_OPTIONS.map((v) => ({ value: v, label: v }))}
@@ -228,6 +238,7 @@ export default function WebBoard() {
             />
             <Select
               size="small"
+              aria-label="Filter by event activity"
               defaultValue="All events"
               style={{ width: 150 }}
               options={EVENT_OPTIONS.map((v) => ({ value: v, label: v }))}
