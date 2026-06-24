@@ -42,7 +42,12 @@ export function mostRecentGraduationYear(
 /**
  * True when the user's most recent graduation was within the last
  * `RECENTLY_IN_FIELD_YEARS` years (and not in the future) — i.e. they have
- * fresh, relevant context. `currentYear` is injectable for deterministic tests.
+ * fresh, relevant context.
+ *
+ * "Recent" is deliberately relative to the present, so `currentYear` defaults
+ * to the system clock (`new Date().getFullYear()`); called without it, the
+ * result is therefore time-dependent (by design — the badge must track "now").
+ * Inject `currentYear` to pin the reference point for deterministic tests.
  */
 export function isRecentlyInField(
   user: UserWithJobs,
