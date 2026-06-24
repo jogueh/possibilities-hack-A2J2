@@ -68,7 +68,7 @@ const emptySnapshot = () => ({
   edges: [] as WebEdge[],
 })
 
-export const useWebStore = create<WebStoreState>((set) => ({
+export const useWebStore = create<WebStoreState>()((set) => ({
   ...emptySnapshot(),
   viewerProfile: null,
 
