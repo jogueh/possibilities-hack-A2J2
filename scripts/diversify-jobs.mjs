@@ -432,8 +432,28 @@ function desiredTechSlots(user, historyLength, isSelectedTechUser) {
   const rng = rngFor(`tech-slots:${user.id}`);
   const roll = rng();
   if (historyLength === 2) return roll < 0.64 ? 2 : 1;
-  if (historyLength === 3) return roll < 0.34 ? 3 : 2;
+  if (historyLength === 3) return roll < 0.5 ? 3 : 2;
+  if (historyLength === 4) return roll < 0.35 ? 4 : roll < 0.7 ? 3 : 2;
   return roll < 0.22 ? historyLength : Math.max(2, historyLength - 1);
+}
+
+// Every member should have at least 2 entries in their job_history so the
+// "missing experience" footprint goes away (originally ~50% of users had
+// only 1 job, which makes the network UI feel sparse — single headline,
+// no career arc). Distribution is derived purely from `user.id` so re-running
+// the script is idempotent (no length drift across runs). The output
+// distribution leans toward 2-3 jobs per user, with some growing to 4 for
+// variety, none below 2.
+const MAX_HISTORY = 4;
+
+function computeTargetHistoryLength(user) {
+  const rng = rngFor(`length:${user.id}`);
+  const roll = rng();
+  // ~35% length 2, ~40% length 3, ~25% length 4. Deterministic from user.id
+  // alone so re-running the script produces the identical output.
+  if (roll < 0.35) return 2;
+  if (roll < 0.75) return 3;
+  return MAX_HISTORY;
 }
 
 function rebuildUserHistories(users, allJobs) {
@@ -445,7 +465,7 @@ function rebuildUserHistories(users, allJobs) {
   const allJobIds = new Set(allJobs.map((job) => job.id));
 
   for (const user of users) {
-    const historyLength = user.job_history.length;
+    const historyLength = computeTargetHistoryLength(user);
     const rng = rngFor(`history:${user.id}`);
     const used = new Set();
     const techSlots = desiredTechSlots(user, historyLength, selectedTechUsers.has(user.id));
