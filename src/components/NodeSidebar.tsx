@@ -5,10 +5,10 @@ import { useEffect, useRef, useState } from "react";
 import type { WebNode } from "@/types/web";
 import type { SharedContext } from "@/types/sharedContext";
 import type { UserWithJobs } from "@/types/data";
-import { useWebStore } from "@/mocks/useWebStore";
+import { useWebStore } from "@/store/useWebStore";
 import { fetchUserWithJobs } from "@/lib/userApi";
-import { ALIGNMENT_LABELS, alignmentColor } from "@/mocks/alignmentColors";
-import { parseGoalRaw } from "@/mocks/goalParser";
+import { ALIGNMENT_LABELS, alignmentColor } from "@/lib/alignmentColors";
+import { parseGoalFallback } from "@/lib/goalParser";
 import { filterRelevantJobs } from "@/lib/relevance";
 import { getSharedContext } from "@/lib/sharedContext";
 import { LI, SIDEBAR_WIDTH } from "@/lib/linkedinTokens";
@@ -86,7 +86,7 @@ export function NodeSidebar({ node, onClose }: NodeSidebarProps) {
     return () => document.removeEventListener("mousedown", onDown);
   }, [node, onClose]);
 
-  const parsedGoal = goal ? parseGoalRaw(goal.raw) : null;
+  const parsedGoal = goal ? parseGoalFallback(goal.raw) : null;
   const relevantJobs =
     user && parsedGoal ? filterRelevantJobs(user.job_history, parsedGoal) : [];
   const commonalities: SharedContext[] =

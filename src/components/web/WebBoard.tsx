@@ -20,7 +20,7 @@ import {
 } from './boardState'
 import { SELF_USER_ID, webPeople } from '@/data/web_people'
 import { NodeSidebar } from '@/components/NodeSidebar'
-import { __setMockWebState } from '@/mocks/useWebStore'
+import { __setMockWebState } from '@/store/useWebStore'
 import { fetchUserWithJobs } from '@/lib/userApi'
 
 const CANVAS_WIDTH = 820

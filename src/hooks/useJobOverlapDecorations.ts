@@ -10,17 +10,18 @@
 // back to their `WebNode.id`. All decision logic lives in the pure, unit-tested
 // `overlappingNodeIds` helper (@/lib/webOverlap); this hook is just the glue.
 //
-// DATA SOURCE: currently the W4 mock `@/mocks/jobsApi` (mirrors the future
-// `GET /api/jobs/matches`). Swap that single import for the real route at
-// integration — the rest of the hook is unaffected.
+// DATA SOURCE: the W4 jobs-match library at `@/lib/jobMatchesClient` (a
+// client-side wrapper around `buildJobMatches` that resolves users via the
+// real members dataset). A server `/api/jobs/matches` route is tracked as a
+// follow-up; swapping to it would only touch this hook's single import.
 // =============================================================================
 
 import { useEffect, useMemo, useState } from "react";
 import type { JobMatch } from "@/types/job";
 import type { NodeDecoration } from "@/components/web/WebCanvas";
 import { useWebStore } from "@/store/useWebStore";
-import { parseGoalRaw } from "@/mocks/goalParser";
-import { fetchJobMatches } from "@/mocks/jobsApi";
+import { parseGoalFallback } from "@/lib/goalParser";
+import { fetchJobMatches } from "@/lib/jobMatchesClient";
 import { overlappingNodeIds } from "@/lib/webOverlap";
 
 /**
@@ -49,7 +50,7 @@ export function useJobOverlapDecorations(): Record<string, NodeDecoration> {
   useEffect(() => {
     if (!goal || !requestKey) return;
     let cancelled = false;
-    fetchJobMatches(parseGoalRaw(goal.raw), webUserIds)
+    fetchJobMatches(parseGoalFallback(goal.raw), webUserIds)
       .then((matches) => {
         if (!cancelled) setResult({ key: requestKey, matches });
       })

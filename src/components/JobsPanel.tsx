@@ -3,15 +3,16 @@
 // Left-anchored collapsible panel (opposite the W3 sidebar on the right). Reads `goal`
 // and `nodes` from the web store; ranks jobs via the W4 scoring/matching engine.
 //
-// Data source is the W4 MOCK `@/mocks/jobsApi` (mirrors W2's future
-// `GET /api/jobs/matches`). Swap that import for the real route at integration.
-// Salary is NEVER rendered (scope rule). See plan.md
+// Data flows through `@/lib/jobMatchesClient` (a thin client-side wrapper that
+// runs `buildJobMatches` over the static jobs dataset + real members from
+// `@/lib/data`). A server `/api/jobs/matches` route is tracked as a separate
+// follow-up. Salary is NEVER rendered (scope rule). See plan.md
 import { useEffect, useState } from "react";
 import type { JobMatch } from "@/types/job";
 import type { AlignmentTier } from "@/types/web";
-import { useWebStore } from "@/mocks/useWebStore";
-import { parseGoalRaw } from "@/mocks/goalParser";
-import { fetchJobMatches } from "@/mocks/jobsApi";
+import { useWebStore } from "@/store/useWebStore";
+import { parseGoalFallback } from "@/lib/goalParser";
+import { fetchJobMatches } from "@/lib/jobMatchesClient";
 import { deriveAlignmentTier } from "@/lib/scoring";
 import { RECENTLY_IN_FIELD_YEARS } from "@/lib/webOverlap";
 import { LI } from "@/lib/linkedinTokens";
@@ -66,7 +67,7 @@ export function JobsPanel({ open, onClose, onOpenConnection }: JobsPanelProps) {
   useEffect(() => {
     if (!open || !goal || !requestKey) return;
     let cancelled = false;
-    fetchJobMatches(parseGoalRaw(goal.raw), webUserIds)
+    fetchJobMatches(parseGoalFallback(goal.raw), webUserIds)
       .then((matches) => {
         if (!cancelled) setResult({ key: requestKey, status: "loaded", matches });
       })
