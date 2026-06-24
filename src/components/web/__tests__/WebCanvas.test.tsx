@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, fireEvent, cleanup } from '@testing-library/react'
 import WebCanvas from '@/components/web/WebCanvas'
 import { buildSnapshot, expandNode, type PersonInput } from '@/lib/web/snapshot'
+import { alignmentColor } from '@/lib/alignmentColors'
 import type { GoalQuery } from '@/types/web'
 
 const options = { width: 720, height: 520, ring1Radius: 100, ring2Radius: 200 }
@@ -87,21 +88,16 @@ describe('WebCanvas', () => {
     expect(onNodeSelect).toHaveBeenCalledWith('a')
   })
 
-  it('applies the node-job-overlap class only to decorated nodes', () => {
-    const seeded = buildSnapshot(goal, people, options)
-    const { getByTestId } = render(
-      <WebCanvas snapshot={seeded} nodeDecorations={{ a: { hasJobOverlap: true } }} />,
-    )
-    expect(getByTestId('web-node-a').classList.contains('node-job-overlap')).toBe(true)
-    expect(getByTestId('web-node-a').getAttribute('data-job-overlap')).toBe('true')
-    expect(getByTestId('web-node-b').classList.contains('node-job-overlap')).toBe(false)
-    expect(getByTestId('web-node-b').getAttribute('data-job-overlap')).toBeNull()
-  })
-
-  it('decorates no nodes when nodeDecorations is omitted', () => {
-    const seeded = buildSnapshot(goal, people, options)
-    const { container } = render(<WebCanvas snapshot={seeded} />)
-    expect(container.querySelectorAll('.node-job-overlap')).toHaveLength(0)
+  it('colors the node ring by alignment tier even when an activity status is set', () => {
+    // A `weak` tier node with an `active` status would have rendered blue under
+    // the old activity-first logic; the ring must now reflect goal-match strength
+    // (grey) using the same alignmentColor palette as the sidebar.
+    const seeded = buildSnapshot(goal, [
+      { id: 'z', name: 'Zed Active', degree: 1, alignmentTier: 'weak', activityStatus: 'active' },
+    ], options)
+    const { getByTestId } = render(<WebCanvas snapshot={seeded} />)
+    const avatar = getByTestId('web-node-z').querySelector('circle[fill="#eef3f8"]')
+    expect(avatar?.getAttribute('stroke')).toBe(alignmentColor('weak'))
   })
 
   it('dedupes nodes with the same id (defensive against ghost markers)', () => {

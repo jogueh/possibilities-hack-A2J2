@@ -11,9 +11,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import type { WebSnapshot } from '@/types/web'
 import { edgeStrokeDasharray } from '@/lib/web/layout'
 import { edgeStrengthStyleUnit } from '@/lib/edgeStrength'
-import WebNodeMarker, { type NodeDecoration } from './WebNodeMarker'
-
-export type { NodeDecoration }
+import WebNodeMarker from './WebNodeMarker'
 
 export interface WebCanvasProps {
   snapshot: WebSnapshot
@@ -21,13 +19,6 @@ export interface WebCanvasProps {
   height?: number
   selectedId?: string | null
   onNodeSelect?: (id: string) => void
-  /**
-   * Per-node decorations keyed by `WebNode.id`, injected by sibling workflows
-   * (e.g. Workflow 4 sets `{ hasJobOverlap: true }` for connections that match
-   * relevant jobs). Workflow 1 only routes them to the markers; the flag data
-   * and ring styling are owned by the injecting workflow.
-   */
-  nodeDecorations?: Record<string, NodeDecoration>
   /**
    * When true the self ("You") centre node is rendered even with no goal mapped
    * yet. Used by the empty-state board so a blank web still shows the user at
@@ -59,7 +50,6 @@ export default function WebCanvas({
   height = 520,
   selectedId = null,
   onNodeSelect,
-  nodeDecorations,
   alwaysShowSelf = false,
 }: WebCanvasProps) {
   const center = { x: width / 2, y: height / 2 }
@@ -275,7 +265,6 @@ export default function WebCanvas({
                   node={node}
                   selected={selectedId === node.id}
                   onSelect={onNodeSelect}
-                  decoration={nodeDecorations?.[node.id]}
                 />
               ))}
             </AnimatePresence>
