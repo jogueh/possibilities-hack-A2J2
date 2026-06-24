@@ -1,17 +1,13 @@
 "use client";
 // W4-OWNED. Jobs Panel: goal-matched job postings cross-referenced against the web.
 // Left-anchored collapsible panel (opposite the W3 sidebar on the right). Reads `goal`
-// and `nodes` from the web store; ranks jobs via the W4 scoring/matching engine.
+// and `nodes` from the web store; fetches ranked matches from the real jobs route.
 //
-// Data flows through `@/lib/jobMatchesClient` (a thin client-side wrapper that
-// runs `buildJobMatches` over the static jobs dataset + real members from
-// `@/lib/data`). A server `/api/jobs/matches` route is tracked as a separate
-// follow-up. Salary is NEVER rendered (scope rule). See plan.md
+// Salary is NEVER rendered (scope rule). See plan.md
 import { useEffect, useState } from "react";
 import type { JobMatch } from "@/types/job";
 import type { AlignmentTier } from "@/types/web";
 import { useWebStore } from "@/store/useWebStore";
-import { parseGoalFallback } from "@/lib/goalParser";
 import { fetchJobMatches } from "@/lib/jobMatchesClient";
 import { deriveAlignmentTier } from "@/lib/scoring";
 import { RECENTLY_IN_FIELD_YEARS } from "@/lib/webOverlap";
@@ -67,7 +63,7 @@ export function JobsPanel({ open, onClose, onOpenConnection }: JobsPanelProps) {
   useEffect(() => {
     if (!open || !goal || !requestKey) return;
     let cancelled = false;
-    fetchJobMatches(parseGoalFallback(goal.raw), webUserIds)
+    fetchJobMatches(goal.raw, webUserIds)
       .then((matches) => {
         if (!cancelled) setResult({ key: requestKey, status: "loaded", matches });
       })

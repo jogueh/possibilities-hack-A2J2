@@ -19,7 +19,7 @@ export interface JobMatch {
   webConnections: WebConnectionRef[];
 }
 
-// Response shape for GET /api/jobs/matches
+// Response shape for POST /api/jobs/matches
 export interface JobMatchesResponse {
   matches: JobMatch[];
 }
