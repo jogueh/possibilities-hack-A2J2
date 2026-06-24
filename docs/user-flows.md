@@ -51,8 +51,7 @@ Implemented on `/web` via `WebBoard.tsx` + the `boardState` reducer.
    `buildSnapshot(...)`. The board transitions `empty → seeded`.
 3. **View the web.** `WebCanvas` (an SVG renderer) draws the viewer at the centre,
    solid edges to 1st-degree connections, and color-coded node rings by
-   `alignmentTier`. Left-column "metrics" (Goal Progress, Connection Achievability)
-   are derived from the seeded nodes.
+   `alignmentTier`.
 4. **Select a node.** Clicking a node dispatches `selectNode`, which calls
    `expandNode(...)` (revealing 2nd-degree warm-path nodes via dotted bridge edges,
    `seeded → expanded`) and opens a side detail card showing the tier tag, degree,

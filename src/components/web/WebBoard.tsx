@@ -7,8 +7,6 @@ import {
   Card,
   Empty,
   Input,
-  Progress,
-  Select,
   Space,
   Typography,
 } from 'antd'
@@ -36,15 +34,6 @@ const SUGGESTIONS = [
   'Find short, actionable connection and outreach tips.',
   'Meet people who can introduce me to my target community.',
 ]
-
-// Presentational filter options. Real filtering is owned by sibling workflows
-// (W2 data / W4 jobs); these render the control surface from the design.
-const LOCATION_OPTIONS = ['San Francisco', 'New York', 'Remote']
-const INDUSTRY_OPTIONS = ['Software', 'Product', 'Design', 'Recruiting']
-const EVENT_OPTIONS = ['All events', 'Recently active', 'New connections']
-
-const round = (n: number) => Math.round(n)
-const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0)
 
 /**
  * Converts the `/api/web/generate` response (WebNode[] + WebEdge[], with
@@ -103,7 +92,6 @@ export default function WebBoard() {
 
   // Collapsible side cards (chevron toggles) — purely presentational.
   const [showSuggestions, setShowSuggestions] = useState(true)
-  const [showMetrics, setShowMetrics] = useState(true)
 
   // Wired-to-real-data submit: POST the goal + viewer id to /api/web/generate,
   // convert the server-returned graph into the layout's `PersonInput[]` shape,
@@ -160,15 +148,9 @@ export default function WebBoard() {
     }
   }, [goal])
 
-  // Presentational "metrics" derived from the seeded web. Real scoring is
-  // owned by Workflow 2; these are deterministic placeholders for the demo.
-  const degree1 = snapshot.nodes.filter((n) => n.degree === 1)
-  const goalProgress = isEmpty ? 0 : round(avg(degree1.map((n) => n.relevanceScore)) * 100)
-  const achievability = isEmpty ? 0 : round(avg(degree1.map((n) => n.interactionScore)) * 100)
-
   return (
     <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-      {/* ── Left column: goal, suggestions, metrics ─────────────────────── */}
+      {/* ── Left column: goal + suggestions ─────────────────────────────── */}
       <Space orientation="vertical" size="middle" style={{ width: 300, flexShrink: 0 }}>
         <Card>
           <Typography.Title level={4} style={{ marginTop: 0, marginBottom: 2 }}>
@@ -257,34 +239,6 @@ export default function WebBoard() {
             </Space>
           )}
         </Card>
-
-        <Card
-          title="Metrics"
-          size="small"
-          extra={
-            <Button
-              type="text"
-              size="small"
-              aria-label={showMetrics ? 'Collapse metrics' : 'Expand metrics'}
-              aria-expanded={showMetrics}
-              icon={showMetrics ? <UpOutlined /> : <DownOutlined />}
-              onClick={() => setShowMetrics((v) => !v)}
-            />
-          }
-        >
-          {showMetrics && (
-            <Space orientation="vertical" size={12} style={{ width: '100%' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <Progress type="circle" percent={goalProgress} size={72} strokeColor="#0a66c2" />
-                <Typography.Text strong>Goal Progress</Typography.Text>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                <Typography.Text type="secondary">Connection Achievability Metric</Typography.Text>
-                <Typography.Text strong>{achievability}%</Typography.Text>
-              </div>
-            </Space>
-          )}
-        </Card>
       </Space>
 
       {/* ── Center column: the network web ──────────────────────────────── */}
@@ -331,34 +285,6 @@ export default function WebBoard() {
               connected={selectedConnected}
               onConnect={(id) => dispatch({ type: 'connectNode', id })}
               onClose={() => dispatch({ type: 'clearSelection' })}
-            />
-          </div>
-
-          {/* Dynamic filters (presentational; filtering owned by W2/W4). */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <Typography.Text strong>Dynamic filters</Typography.Text>
-            <Select
-              size="small"
-              aria-label="Filter by location"
-              placeholder="Location"
-              style={{ width: 150 }}
-              options={LOCATION_OPTIONS.map((v) => ({ value: v, label: v }))}
-              allowClear
-            />
-            <Select
-              size="small"
-              aria-label="Filter by industry"
-              placeholder="Industry"
-              style={{ width: 150 }}
-              options={INDUSTRY_OPTIONS.map((v) => ({ value: v, label: v }))}
-              allowClear
-            />
-            <Select
-              size="small"
-              aria-label="Filter by event activity"
-              defaultValue="All events"
-              style={{ width: 150 }}
-              options={EVENT_OPTIONS.map((v) => ({ value: v, label: v }))}
             />
           </div>
         </Space>
