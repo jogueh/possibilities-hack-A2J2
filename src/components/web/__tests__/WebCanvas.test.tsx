@@ -82,4 +82,19 @@ describe('WebCanvas', () => {
     const { container } = render(<WebCanvas snapshot={seeded} />)
     expect(container.querySelectorAll('.node-job-overlap')).toHaveLength(0)
   })
+
+  it('dedupes nodes with the same id (defensive against ghost markers)', () => {
+    // Manually construct a snapshot with a duplicate id — should never
+    // happen in practice (every emitter checks for existing ids before
+    // adding) but if one slips through, AnimatePresence + React key reuse
+    // would produce ghost text labels lingering after a snapshot rebuild.
+    // Verify the canvas renders exactly one marker per unique id.
+    const seeded = buildSnapshot(goal, people, options)
+    const duped = {
+      ...seeded,
+      nodes: [...seeded.nodes, { ...seeded.nodes[0] }], // duplicate 'a'
+    }
+    const { container } = render(<WebCanvas snapshot={duped} />)
+    expect(container.querySelectorAll('[data-testid="web-node-a"]')).toHaveLength(1)
+  })
 })
