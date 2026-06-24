@@ -24,10 +24,15 @@ export interface WebNodeMarkerProps {
 }
 
 // The name caption stays on one line (capped width). The headline wraps two
-// words per line so the full role is shown without overflowing the node's width.
+// words per line so the full role is shown without overflowing the node's
+// width. HEADLINE_MAX_LINES caps the vertical footprint of the headline
+// caption — a 4+ line headline visually crashes into the next marker below
+// it (the canvas's NODE_MIN_DISTANCE is sized for the disc + a 3-line
+// caption with breathing room). Beyond the cap the last line is ellipsized.
 const NAME_MAX = 18
 const HEADLINE_WORDS_PER_LINE = 2
 const HEADLINE_LINE_HEIGHT = 13
+const HEADLINE_MAX_LINES = 3
 
 // Presentational SVG marker for a single person node.
 export default function WebNodeMarker({
@@ -149,19 +154,24 @@ export default function WebNodeMarker({
       </text>
 
       {/* Headline — width-constrained: wraps two words per line so the full
-          role (e.g. "Product Manager at Tech Innovators Inc.") is always shown. */}
+          role (e.g. "Product Manager at Tech Innovators Inc.") fits the
+          marker's column. Capped at HEADLINE_MAX_LINES to keep the caption's
+          vertical footprint inside the disc-to-disc gap that
+          NODE_MIN_DISTANCE budgets. Long roles get a trailing ellipsis. */}
       {node.headline &&
-        wrapWords(node.headline, HEADLINE_WORDS_PER_LINE).map((line, i) => (
-          <text
-            key={i}
-            textAnchor="middle"
-            y={r + 31 + i * HEADLINE_LINE_HEIGHT}
-            fontSize={10.5}
-            fill="#6b7280"
-          >
-            {line}
-          </text>
-        ))}
+        wrapWords(node.headline, HEADLINE_WORDS_PER_LINE, HEADLINE_MAX_LINES).map(
+          (line, i) => (
+            <text
+              key={i}
+              textAnchor="middle"
+              y={r + 31 + i * HEADLINE_LINE_HEIGHT}
+              fontSize={10.5}
+              fill="#6b7280"
+            >
+              {line}
+            </text>
+          ),
+        )}
     </motion.g>
   )
 }

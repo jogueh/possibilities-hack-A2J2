@@ -10,7 +10,7 @@ import {
 import type { GoalQuery } from '@/types/web'
 import { NODE_MIN_DISTANCE } from '@/lib/web/layout'
 
-const options = { width: 800, height: 600, ring1Radius: 100, ring2Radius: 200 }
+const options = { width: 800, height: 600, ring1Radius: 120, ring2Radius: 240 }
 const goal: GoalQuery = { raw: 'Break into product management', userId: 'self_1' }
 
 const people: PersonInput[] = [

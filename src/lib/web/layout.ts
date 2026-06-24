@@ -42,11 +42,13 @@ export function tierRadius(tier: AlignmentTier): number {
 }
 
 /**
- * Minimum allowed centre-to-centre distance between two node positions. Larger
- * than twice the biggest node radius (30) so even two `strong` discs keep a
- * clear gap and never visually overlap on the canvas.
+ * Minimum allowed centre-to-centre distance between two node positions. Sized
+ * to keep clear gaps between two `strong` discs (radius 30) and to also leave
+ * room for each node's caption underneath (name + up to a 3-line headline).
+ * The `WebNodeMarker` caps the headline at 3 lines so worst-case caption
+ * height stays within this budget.
  */
-export const NODE_MIN_DISTANCE = 92
+export const NODE_MIN_DISTANCE = 110
 
 /**
  * Activity-status → ring colour. This is the "activity ring" shown around node
@@ -120,14 +122,30 @@ export function wrapLabel(text: string, maxChars: number): string[] {
  * a role like "Product Manager at Tech Innovators Inc." with `wordsPerLine = 2`
  * renders as ["Product Manager", "at Tech", "Innovators Inc."]. Pure and
  * deterministic.
+ *
+ * When `maxLines` is supplied and the wrap would produce more lines than that,
+ * the result is truncated to `maxLines` and the last line gets a trailing
+ * ellipsis ("…") to signal the truncation. Caps the vertical footprint of a
+ * node caption so a long role doesn't visually crash into the marker below it.
  */
-export function wrapWords(text: string, wordsPerLine: number): string[] {
+export function wrapWords(
+  text: string,
+  wordsPerLine: number,
+  maxLines?: number,
+): string[] {
   const words = text.trim().split(/\s+/).filter(Boolean)
   if (words.length === 0) return []
   if (wordsPerLine <= 0) return [words.join(' ')]
   const lines: string[] = []
   for (let i = 0; i < words.length; i += wordsPerLine) {
     lines.push(words.slice(i, i + wordsPerLine).join(' '))
+  }
+  if (maxLines !== undefined && maxLines > 0 && lines.length > maxLines) {
+    const kept = lines.slice(0, maxLines)
+    // Append the ellipsis to the last kept line (without adding a space) so
+    // the visual cue lives on the line that was actually cut off.
+    kept[kept.length - 1] = `${kept[kept.length - 1]}…`
+    return kept
   }
   return lines
 }
