@@ -12,6 +12,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import { AnimatePresence, motion } from 'framer-motion'
 import { AimOutlined, ReloadOutlined, UpOutlined, DownOutlined } from '@ant-design/icons'
 import type { AlignmentTier } from '@/types/web'
 import WebCanvas from './WebCanvas'
@@ -229,31 +230,42 @@ export default function WebBoard() {
               )}
             </div>
 
-            {selected && (
-              <Card size="small" style={{ width: 240, flexShrink: 0 }} title={selected.label}>
-                <Space orientation="vertical" size="small" style={{ width: '100%' }}>
-                  {selected.headline && (
-                    <Typography.Text type="secondary">{selected.headline}</Typography.Text>
-                  )}
-                  <Tag color={TIER_COLORS[selected.alignmentTier]}>
-                    {TIER_LABEL[selected.alignmentTier]}
-                  </Tag>
-                  <Typography.Text type="secondary">
-                    {selected.degree === 1 ? '1st-degree connection' : '2nd-degree (warm path)'}
-                  </Typography.Text>
-                  {selected.degree === 1 ? (
-                    <Typography.Text type="secondary">
-                      Click to reveal who they can introduce you to.
-                    </Typography.Text>
-                  ) : (
-                    // Placeholder hook for Workflow 4 (AI double-opt-in intro).
-                    <Button type="primary" block disabled>
-                      Draft warm intro
-                    </Button>
-                  )}
-                </Space>
-              </Card>
-            )}
+            <AnimatePresence mode="wait">
+              {selected && (
+                <motion.div
+                  key={selected.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  style={{ width: 240, flexShrink: 0 }}
+                >
+                  <Card size="small" style={{ width: '100%' }} title={selected.label}>
+                    <Space orientation="vertical" size="small" style={{ width: '100%' }}>
+                      {selected.headline && (
+                        <Typography.Text type="secondary">{selected.headline}</Typography.Text>
+                      )}
+                      <Tag color={TIER_COLORS[selected.alignmentTier]}>
+                        {TIER_LABEL[selected.alignmentTier]}
+                      </Tag>
+                      <Typography.Text type="secondary">
+                        {selected.degree === 1 ? '1st-degree connection' : '2nd-degree (warm path)'}
+                      </Typography.Text>
+                      {selected.degree === 1 ? (
+                        <Typography.Text type="secondary">
+                          Click to reveal who they can introduce you to.
+                        </Typography.Text>
+                      ) : (
+                        // Placeholder hook for Workflow 4 (AI double-opt-in intro).
+                        <Button type="primary" block disabled>
+                          Draft warm intro
+                        </Button>
+                      )}
+                    </Space>
+                  </Card>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Dynamic filters (presentational; filtering owned by W2/W4). */}

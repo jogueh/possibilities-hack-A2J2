@@ -41,6 +41,7 @@ export const userBob: User = {
   posts_activity: ["Won a hackathon"],
   skills: ["Education", "Psychology"],
   courses: [],
+  connections: [],
 };
 
 // userBob with job_history resolved to full Job records (the UserWithJobs shape

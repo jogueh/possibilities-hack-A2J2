@@ -10,6 +10,7 @@ import type {
 import {
   deriveEdges,
   layoutNodes,
+  placeNearParent,
   type LayoutOptions,
   type Relationship,
 } from '@/lib/web/layout'
@@ -110,8 +111,11 @@ export function buildSnapshot(
 
 /**
  * Expands a 1st-degree node, revealing the 2nd-degree people that reach the user
- * through it. Returns an `expanded` snapshot with dotted bridge edges. Calling it
- * for an unknown / already-expanded node is a no-op (idempotent).
+ * through it. Returns an `expanded` snapshot with dotted bridge edges. The new
+ * 2nd-degree nodes are clustered next to their connector (not on a global outer
+ * ring) so the warm path reads clearly. Existing nodes keep their positions, so
+ * expanding one node never reshuffles the rest of the web. Calling it for an
+ * unknown / already-expanded node is a no-op (idempotent).
  */
 export function expandNode(
   snapshot: WebSnapshot,
@@ -132,12 +136,22 @@ export function expandNode(
     return snapshot
   }
 
-  const nodes = layoutNodes(
-    [...snapshot.nodes, ...newPeople.map(toNode)],
-    options,
+  // Most relevant child sits first in the fan; deterministic id tie-break.
+  const ordered = [...newPeople].sort(
+    (a, b) =>
+      (b.relevanceScore ?? DEFAULT_RELEVANCE) -
+        (a.relevanceScore ?? DEFAULT_RELEVANCE) ||
+      (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
   )
 
-  const relationships: Relationship[] = newPeople.map((p) => ({
+  const center = { x: options.width / 2, y: options.height / 2 }
+  const newNodes: WebNode[] = ordered.map((p, i) => ({
+    ...toNode(p),
+    position: placeNearParent(parent.position, center, i, ordered.length, options),
+  }))
+  const nodes = [...snapshot.nodes, ...newNodes]
+
+  const relationships: Relationship[] = ordered.map((p) => ({
     source: p.via as string,
     target: p.id,
     strength: p.interactionScore ?? DEFAULT_INTERACTION,

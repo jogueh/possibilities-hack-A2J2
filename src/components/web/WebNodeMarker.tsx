@@ -1,6 +1,7 @@
 'use client'
 
 import type { KeyboardEvent } from 'react'
+import { motion } from 'framer-motion'
 import type { WebNode } from '@/types/web'
 import { tierColor, tierRadius, activityRingColor, activityRingLabel } from '@/lib/web/layout'
 
@@ -47,11 +48,10 @@ export default function WebNodeMarker({
   }
 
   return (
-    <g
+    <motion.g
       data-testid={`web-node-${node.id}`}
       className={hasJobOverlap ? 'node-job-overlap' : undefined}
       data-job-overlap={hasJobOverlap ? 'true' : undefined}
-      transform={`translate(${node.position.x}, ${node.position.y})`}
       role={interactive ? 'button' : undefined}
       aria-label={node.headline ? `${node.label}, ${node.headline}` : node.label}
       aria-pressed={interactive ? selected : undefined}
@@ -59,6 +59,11 @@ export default function WebNodeMarker({
       style={{ cursor: interactive ? 'pointer' : 'default' }}
       onClick={interactive ? () => onSelect?.(node.id) : undefined}
       onKeyDown={interactive ? handleKeyDown : undefined}
+      initial={{ opacity: 0, x: node.position.x, y: node.position.y, scale: 0.6 }}
+      animate={{ opacity: 1, x: node.position.x, y: node.position.y, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.6 }}
+      whileHover={interactive ? { scale: 1.07 } : undefined}
+      transition={{ type: 'spring', stiffness: 260, damping: 22 }}
     >
       {/* Native hover tooltip describing the activity-ring nudge */}
       {activityTooltip && <title>{activityTooltip}</title>}
@@ -107,6 +112,6 @@ export default function WebNodeMarker({
           {node.headline}
         </text>
       )}
-    </g>
+    </motion.g>
   )
 }

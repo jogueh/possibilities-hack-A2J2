@@ -120,6 +120,37 @@ export function layoutNodes(nodes: WebNode[], options: LayoutOptions): WebNode[]
 }
 
 /**
+ * Places a 2nd-degree node in a small cluster around its 1st-degree parent,
+ * fanned out along the outward direction (centre → parent) so warm-path nodes
+ * sit visually next to the connector that introduces them instead of being
+ * spread across a global outer ring. Pure and deterministic.
+ */
+export function placeNearParent(
+  parent: { x: number; y: number },
+  center: { x: number; y: number },
+  index: number,
+  count: number,
+  options: LayoutOptions,
+): { x: number; y: number } {
+  const minDim = Math.min(options.width, options.height)
+  const clusterRadius = options.ring2Radius
+    ? Math.max(48, (options.ring2Radius - (options.ring1Radius ?? minDim * 0.22)) * 0.8)
+    : minDim * 0.16
+
+  // Outward direction from the centre through the parent.
+  const baseAngle = Math.atan2(parent.y - center.y, parent.x - center.x)
+  // Total fan width (~80°); a lone child sits directly outward from the parent.
+  const spread = Math.PI / 2.2
+  const offset = count <= 1 ? 0 : (index / (count - 1) - 0.5) * spread
+  const angle = baseAngle + offset
+
+  return {
+    x: round2(parent.x + clusterRadius * Math.cos(angle)),
+    y: round2(parent.y + clusterRadius * Math.sin(angle)),
+  }
+}
+
+/**
  * Builds styled WebEdges from raw relationships. An edge is dotted when either
  * endpoint is a 2nd-degree node (i.e. it crosses into the warm-path frontier).
  * Unknown endpoints are skipped.

@@ -5,12 +5,14 @@ import {
   deriveAlignmentTier,
   scoreUserAgainstGoal as defaultScorer,
 } from '@/lib/scoring'
+import { suggestConnections } from '@/lib/connections'
 
 // =============================================================================
-// Web builder — pure function implementing the 8-step ranking algorithm from
-// the W2 scope. Separated from the route handler so it can be exhaustively unit
-// tested with an injected scoring function (the production route wires in the
-// real one from `@/lib/scoring`).
+// Web builder — pure function implementing the connection-graph-aware ranking
+// algorithm. Separated from the route handler so it can be exhaustively unit
+// tested with an injected scoring function. Connection data is read directly
+// off each candidate's `connections: string[]` field (carried through from
+// `User` via `UserWithJobs`), so there is no separate graph dependency.
 // =============================================================================
 
 export interface BuildWebInput {
@@ -44,22 +46,6 @@ function initialsFromName(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
-function companiesOf(user: UserWithJobs): Set<string> {
-  return new Set(user.job_history.map((j) => j.company))
-}
-
-function skillsOf(user: UserWithJobs): Set<string> {
-  return new Set(user.skills)
-}
-
-function shareSkillOrCompany(a: UserWithJobs, b: UserWithJobs): boolean {
-  const aCompanies = companiesOf(a)
-  for (const c of companiesOf(b)) if (aCompanies.has(c)) return true
-  const aSkills = skillsOf(a)
-  for (const s of skillsOf(b)) if (aSkills.has(s)) return true
-  return false
-}
-
 function toNode(user: UserWithJobs, degree: 1 | 2, score: number): WebNode {
   return {
     id: user.id,
@@ -89,18 +75,27 @@ function edge(source: string, target: string, isDotted: boolean): WebEdge {
 }
 
 /**
- * Builds the `{ nodes, edges }` payload for `POST /api/web/generate`. Implements
- * the 8-step algorithm from `plan/features/workflow-2-ai-data-layer/scope.md`:
+ * Builds the `{ nodes, edges }` payload for `POST /api/web/generate`. The web
+ * reflects the viewer's REAL network ranked by goal — it is no longer a
+ * goal-scored slice of the entire dataset.
  *
- *   1. Score every candidate against the parsed goal (viewer excluded by caller).
- *   2. Sort descending, take up to FIRST_DEGREE_MAX whose score >= FIRST_DEGREE_MIN_SCORE.
- *      No padding with weak matches — return fewer if fewer qualify.
- *   3. For each 1st-degree node, find up to SECOND_DEGREE_PER_NODE_MAX 2nd-degree
- *      candidates from the remaining pool with score >= SECOND_DEGREE_MIN_SCORE
- *      that ALSO share at least one skill or company with the 1st-degree node.
- *      A given user can appear at most once across the whole web.
- *   4. Emit solid edges from viewer -> 1st-degree, dotted edges from
- *      1st-degree -> 2nd-degree. All edges start at DEFAULT_EDGE_STRENGTH.
+ *   1. 1st-degree pool = `viewer.connections` resolved against the candidates
+ *      map (anyone outside the candidates set is silently dropped). Score
+ *      each, keep score >= FIRST_DEGREE_MIN_SCORE, sort desc, take top
+ *      FIRST_DEGREE_MAX. Edges viewer -> 1st are SOLID (real connection).
+ *   1a. COLD-START FALLBACK: if the viewer has no direct connections in the
+ *       candidate set, seed the 1st-degree pool with structural suggestions
+ *       from `suggestConnections(...)` (warm 2nd-degree, then hubs), then
+ *       apply the same score / threshold / cap ranking on top. These are not
+ *       real edges in the dataset, but the user still sees them as solid
+ *       1st-degree edges in the UI — purely a discovery-floor for new users.
+ *   2. 2nd-degree pool per 1st-degree node = that node's `connections`, minus
+ *      the viewer and anyone already in the web. Score, filter
+ *      >= SECOND_DEGREE_MIN_SCORE, sort desc, take top
+ *      SECOND_DEGREE_PER_NODE_MAX. Edges 1st -> 2nd are DOTTED ("people to
+ *      meet" via a warm path). A user appears at most once across the web.
+ *   3. No padding beyond the cold-start fallback. No edges to strangers
+ *      outside the candidates set.
  */
 export function buildWeb({
   viewerUserId,
@@ -108,18 +103,40 @@ export function buildWeb({
   candidates,
   scorer = defaultScorer,
 }: BuildWebInput): BuildWebOutput {
-  const pool = candidates.filter((u) => u.id !== viewerUserId)
+  // O(1) candidate lookup by userId.
+  const byId = new Map<string, UserWithJobs>()
+  for (const u of candidates) byId.set(u.id, u)
 
-  const scored: ScoredUser[] = pool
-    .map((user) => ({ user, score: scorer(user, parsedGoal) }))
-    .sort((a, b) => b.score - a.score)
+  // Reads the connections array off a candidate; unknown ids return [].
+  const connectionsOf = (id: string): readonly string[] =>
+    byId.get(id)?.connections ?? []
 
-  const firstDegree = scored
-    .filter((s) => s.score >= FIRST_DEGREE_MIN_SCORE)
-    .slice(0, FIRST_DEGREE_MAX)
+  // 1st-degree pool: the viewer's real connections present in the candidate
+  // set. Cold-start fallback: if there are none (new / unknown viewer),
+  // structural suggestions from `suggestConnections` seed the pool so the
+  // user never sees a fully-empty web. These suggestions are goal-agnostic
+  // and get ranked by score below — same threshold + cap as real connections.
+  const viewerMember = byId.get(viewerUserId)
+  let firstDegreePoolIds: string[] = [...connectionsOf(viewerUserId)]
+  if (firstDegreePoolIds.length === 0) {
+    firstDegreePoolIds = suggestConnections(
+      viewerMember,
+      byId,
+      FIRST_DEGREE_MAX,
+    )
+  }
 
-  const firstDegreeIds = new Set(firstDegree.map((s) => s.user.id))
-  const remaining = scored.filter((s) => !firstDegreeIds.has(s.user.id))
+  const directScored: ScoredUser[] = []
+  for (const id of firstDegreePoolIds) {
+    if (id === viewerUserId) continue
+    const user = byId.get(id)
+    if (!user) continue
+    const score = scorer(user, parsedGoal)
+    if (score < FIRST_DEGREE_MIN_SCORE) continue
+    directScored.push({ user, score })
+  }
+  directScored.sort((a, b) => b.score - a.score)
+  const firstDegree = directScored.slice(0, FIRST_DEGREE_MAX)
 
   const nodes: WebNode[] = firstDegree.map(({ user, score }) =>
     toNode(user, 1, score),
@@ -128,18 +145,25 @@ export function buildWeb({
     edge(viewerUserId, user.id, false),
   )
 
-  const usedSecondDegreeIds = new Set<string>()
+  // Tracks every userId already placed in the web (viewer + 1st-degree +
+  // 2nd-degree as they are added) so a user appears at most once.
+  const inWeb = new Set<string>([viewerUserId, ...firstDegree.map((s) => s.user.id)])
+
+  // 2nd-degree: friends-of-friends per 1st-degree node, ranked by goal score.
   for (const parent of firstDegree) {
-    const matches: ScoredUser[] = []
-    for (const s of remaining) {
-      if (matches.length >= SECOND_DEGREE_PER_NODE_MAX) break
-      if (s.score < SECOND_DEGREE_MIN_SCORE) continue
-      if (usedSecondDegreeIds.has(s.user.id)) continue
-      if (!shareSkillOrCompany(parent.user, s.user)) continue
-      matches.push(s)
+    const candidateScored: ScoredUser[] = []
+    for (const id of connectionsOf(parent.user.id)) {
+      if (inWeb.has(id)) continue
+      const user = byId.get(id)
+      if (!user) continue
+      const score = scorer(user, parsedGoal)
+      if (score < SECOND_DEGREE_MIN_SCORE) continue
+      candidateScored.push({ user, score })
     }
-    for (const m of matches) {
-      usedSecondDegreeIds.add(m.user.id)
+    candidateScored.sort((a, b) => b.score - a.score)
+    const picked = candidateScored.slice(0, SECOND_DEGREE_PER_NODE_MAX)
+    for (const m of picked) {
+      inWeb.add(m.user.id)
       nodes.push(toNode(m.user, 2, m.score))
       edges.push(edge(parent.user.id, m.user.id, true))
     }
