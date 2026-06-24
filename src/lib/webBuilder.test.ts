@@ -130,17 +130,46 @@ describe('buildWeb — 1st-degree selection', () => {
     expect(firstDegree.map((n) => n.id)).toEqual(['b', 'c', 'a'])
   })
 
-  it('returns an empty payload when the viewer has no connections', () => {
-    // viewer.connections === [] (the makeUser default).
-    const candidates = [makeUser('viewer'), makeUser('u1'), makeUser('u2')]
+  it('falls back to suggestConnections when the viewer has no direct connections (cold-start)', () => {
+    // Viewer record has connections=[] (the makeUser default). The cold-start
+    // fallback should seed the 1st-degree pool with structural suggestions —
+    // here, the most-connected hubs ('a' has 2 connections, 'b' has 1) — and
+    // then rank them by goal score the same way real connections are ranked.
+    const viewer = makeUser('viewer')
+    const a = makeUser('a', { connections: ['b', 'c'] })
+    const b = makeUser('b', { connections: ['a'] })
+    const c = makeUser('c')
     const { nodes, edges } = buildWeb({
       viewerUserId: 'viewer',
       parsedGoal: goal,
-      candidates,
-      scorer: scorerByMap({ u1: 90, u2: 80 }),
+      candidates: [viewer, a, b, c],
+      scorer: scorerByMap({ a: 90, b: 70, c: 50 }),
+    })
+    // 'c' has 0 connections (hub fallback last); 'a' + 'b' are picked first
+    // and both clear the 40 threshold. 'c' joins at degree 1 too because the
+    // hub fallback returns up to FIRST_DEGREE_MAX suggestions and it scores 50.
+    const firstDegreeIds = nodes
+      .filter((n) => n.degree === 1)
+      .map((n) => n.id)
+      .sort()
+    expect(firstDegreeIds).toEqual(['a', 'b', 'c'])
+    // All edges from the viewer are still SOLID — the UI treats the
+    // cold-start fallback the same as real 1st-degree connections.
+    expect(edges.every((e) => !e.isDotted && e.source === 'viewer')).toBe(true)
+  })
+
+  it('cold-start fallback still respects the FIRST_DEGREE_MIN_SCORE threshold', () => {
+    const viewer = makeUser('viewer') // connections=[]
+    const a = makeUser('a', { connections: ['b'] })
+    const b = makeUser('b')
+    const { nodes } = buildWeb({
+      viewerUserId: 'viewer',
+      parsedGoal: goal,
+      candidates: [viewer, a, b],
+      // Both suggested by the fallback but neither clears 40.
+      scorer: scorerByMap({ a: 30, b: 10 }),
     })
     expect(nodes).toEqual([])
-    expect(edges).toEqual([])
   })
 
   it('returns an empty payload when no candidates qualify on score', () => {
@@ -157,8 +186,8 @@ describe('buildWeb — 1st-degree selection', () => {
   })
 
   it('returns an empty payload when the viewer is not in the candidates set', () => {
-    // Connections live ON the viewer record, so an unknown viewer id yields
-    // an empty connection list and therefore an empty web.
+    // Unknown viewer id → suggestConnections is passed `undefined` and
+    // returns [] → empty web. No edges to strangers outside the dataset.
     const candidates = [makeUser('a'), makeUser('b')]
     const { nodes, edges } = buildWeb({
       viewerUserId: 'missing_viewer',
