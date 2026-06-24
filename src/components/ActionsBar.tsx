@@ -16,6 +16,16 @@ interface ActionsBarProps {
   connected?: boolean;
   /** Called when a connection request is confirmed; promotes the person on the web. */
   onConnect?: () => void;
+  /** True once the viewer has pinned this person to the canvas via "Add to web". */
+  pinned?: boolean;
+  /**
+   * Called when the viewer clicks "Add to web". Pins this person on the
+   * canvas so a click on another 1st-degree connector does NOT collapse
+   * this branch — they (and their warm-path chain back to the viewer) are
+   * re-materialized after every snapshot rebuild. Hidden for 1st-degree
+   * nodes (always on the canvas regardless).
+   */
+  onPin?: () => void;
   /** Graph id of the open node — passed to the "I met up" button as its key. */
   nodeId?: string;
   /** True when board state says the meetup has already been logged for this node. */
@@ -24,7 +34,18 @@ interface ActionsBarProps {
   onLogMeetup?: () => void;
 }
 
-export function ActionsBar({ targetName, tip, degree, connected, onConnect, nodeId, metUpLogged, onLogMeetup }: ActionsBarProps) {
+export function ActionsBar({
+  targetName,
+  tip,
+  degree,
+  connected,
+  onConnect,
+  pinned,
+  onPin,
+  nodeId,
+  metUpLogged,
+  onLogMeetup,
+}: ActionsBarProps) {
   const [connectOpen, setConnectOpen] = useState(false);
   const [messageOpen, setMessageOpen] = useState(false);
   const [subject, setSubject] = useState("");
@@ -93,6 +114,49 @@ export function ActionsBar({ targetName, tip, degree, connected, onConnect, node
           InMail
         </button>
       </div>
+
+      {/* "Add to web" pins a 2nd+-degree suggestion to the canvas so navigating
+          to another branch doesn't make them disappear. 1st-degree people are
+          permanently on the canvas, so the button is hidden for them. */}
+      {degree !== 1 && (
+        <div style={{ marginTop: 8 }}>
+          {pinned ? (
+            <button
+              type="button"
+              disabled
+              aria-label="Pinned to web"
+              style={{
+                ...btn,
+                width: "100%",
+                background: "transparent",
+                color: LI.textSecondary,
+                border: `1px solid ${LI.border}`,
+                cursor: "default",
+              }}
+            >
+              Added to web ✓
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                onPin?.();
+                setToast(`${targetName} added to your web`);
+              }}
+              aria-label="Add to web"
+              style={{
+                ...btn,
+                width: "100%",
+                background: "transparent",
+                color: LI.blue,
+                border: `1px solid ${LI.blue}`,
+              }}
+            >
+              + Add to web
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 1st-degree people are existing connections — logging a real-world meetup
           with them strengthens the edge on the web (W4 stretch s11). */}

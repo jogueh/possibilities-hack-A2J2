@@ -124,6 +124,65 @@ export function buildSnapshot(
 }
 
 /**
+ * Adds a SINGLE specific person to the snapshot, placed next to their `via`
+ * parent. Mirrors the positioning logic of `expandNode` but for one node only
+ * — `expandNode` always reveals all of a parent's children, which is wrong
+ * for the pinning UX (the viewer pins one suggestion but its siblings should
+ * stay collapsed). No-op if the person is already in the snapshot, has no
+ * `via` parent in the snapshot, or has no goal set.
+ */
+export function revealPerson(
+  snapshot: WebSnapshot,
+  person: PersonInput,
+  options: LayoutOptions,
+): WebSnapshot {
+  if (!snapshot.goal) return snapshot
+  if (snapshot.nodes.some((n) => n.id === person.id)) return snapshot
+  if (!person.via) return snapshot
+  const parent = snapshot.nodes.find((n) => n.id === person.via)
+  if (!parent) return snapshot
+
+  const center = { x: options.width / 2, y: options.height / 2 }
+
+  // Count how many siblings of this person are already on the canvas (i.e.
+  // other children of `via` that exist via dotted bridge edges). The new
+  // marker must claim the NEXT slot in the parent's fan — using
+  // (count=1, index=0) would land us on top of the existing siblings.
+  // We bump the apparent `count` to include the new arrival so the fan
+  // re-centres around it.
+  const siblingCount = snapshot.edges.reduce(
+    (n, e) => (e.source === person.via && e.target !== person.id ? n + 1 : n),
+    0,
+  )
+  const nextIndex = siblingCount
+  const fanCount = siblingCount + 1
+
+  const newNode: WebNode = {
+    ...toNode(person),
+    position: placeNearParent(parent.position, center, nextIndex, fanCount, options),
+  }
+  const nodes = [...snapshot.nodes, newNode]
+
+  const relationships: Relationship[] = [
+    {
+      source: person.via,
+      target: person.id,
+      strength: person.interactionScore ?? DEFAULT_INTERACTION,
+    },
+  ]
+  const bridgeEdges = deriveEdges(relationships, nodes)
+  const existingEdgeIds = new Set(snapshot.edges.map((e) => e.id))
+  const addedEdges = bridgeEdges.filter((e) => !existingEdgeIds.has(e.id))
+
+  return {
+    state: 'expanded',
+    nodes,
+    edges: [...snapshot.edges, ...addedEdges],
+    goal: snapshot.goal,
+  }
+}
+
+/**
  * Expands a node, revealing the next-ring people that reach the user through
  * it. Returns an `expanded` snapshot with dotted bridge edges. The new nodes
  * are clustered next to their connector (not on a global outer ring) so the

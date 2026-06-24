@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -68,9 +69,25 @@ export default function WebCanvas({
   const drag = useRef<{ x: number; y: number } | null>(null)
   const reduceMotion = useReducedMotion()
 
+  // Defensive dedup: collapse `snapshot.nodes` to one entry per id before
+  // render. Duplicate ids should never happen (every emitter — buildWeb,
+  // expandNode, revealPerson — checks `inWeb` / `existingIds` before adding),
+  // but if one ever slips through, React would log a duplicate-key warning
+  // and AnimatePresence would produce ghost markers and stale text labels
+  // when the snapshot rebuilds. Take the first occurrence; the others would
+  // have shared its position anyway.
+  const uniqueNodes = useMemo(() => {
+    const seen = new Set<string>()
+    return snapshot.nodes.filter((n) => {
+      if (seen.has(n.id)) return false
+      seen.add(n.id)
+      return true
+    })
+  }, [snapshot.nodes])
+
   // Resolve any edge endpoint (a node id, or the self/goal id) to a point.
   const positionById = new Map<string, { x: number; y: number }>(
-    snapshot.nodes.map((n) => [n.id, n.position]),
+    uniqueNodes.map((n) => [n.id, n.position]),
   )
   if (snapshot.goal) positionById.set(snapshot.goal.userId, center)
 
@@ -251,8 +268,8 @@ export default function WebCanvas({
           )}
 
           <g data-testid="web-nodes">
-            <AnimatePresence>
-              {snapshot.nodes.map((node) => (
+            <AnimatePresence mode="popLayout">
+              {uniqueNodes.map((node) => (
                 <WebNodeMarker
                   key={node.id}
                   node={node}
