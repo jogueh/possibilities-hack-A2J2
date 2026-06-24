@@ -45,7 +45,5 @@ export function buildJobMatches(
     }
     // Tie-break: surface jobs where you have a warm connection first.
     return b.webConnections.length - a.webConnections.length;
-  });
-
-  return scored.slice(0, Math.max(0, limit));
+  return scored.slice(0, Math.min(MAX_JOB_MATCHES, Math.max(0, limit)));
 }
