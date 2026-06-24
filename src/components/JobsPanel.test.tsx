@@ -102,10 +102,14 @@ describe("JobsPanel", () => {
         webConnections: [{ userId: "user_4579", name: "Bob Smith", role: "Engineer" }],
       },
     ];
-    render(<JobsPanel open onClose={() => {}} />);
+    const openSpy = vi.fn();
+    render(<JobsPanel open onClose={() => {}} onOpenConnection={openSpy} />);
     const callout = await screen.findByTestId("web-overlap-callout");
     expect(callout.textContent).toMatch(/1 person in your web worked here/);
     expect(screen.getByText("Bob Smith")).toBeTruthy();
+
+    screen.getByRole("button", { name: "Open Bob Smith's profile" }).click();
+    expect(openSpy).toHaveBeenCalledWith("user_4579");
   });
 
   it("never renders salary data", async () => {
