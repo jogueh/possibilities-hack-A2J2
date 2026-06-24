@@ -8,6 +8,7 @@ import type { UserWithJobs } from "@/types/data";
 import { useWebStore } from "@/store/useWebStore";
 import { fetchUserWithJobs } from "@/lib/userApi";
 import { ALIGNMENT_LABELS, alignmentColor } from "@/lib/alignmentColors";
+import { photoUrlForUser } from "@/lib/avatarPhoto";
 import { filterRelevantJobs } from "@/lib/relevance";
 import { getSharedContext } from "@/lib/sharedContext";
 import { LI, SIDEBAR_WIDTH } from "@/lib/linkedinTokens";
@@ -189,6 +190,8 @@ export function NodeSidebar({ node, onClose, connected, onConnect, onLogMeetup, 
             <div
               data-testid="avatar-ring"
               style={{
+                position: "relative",
+                overflow: "hidden",
                 width: 64,
                 height: 64,
                 borderRadius: "50%",
@@ -202,6 +205,18 @@ export function NodeSidebar({ node, onClose, connected, onConnect, onLogMeetup, 
               }}
             >
               {node.avatarInitials}
+              {/* Photo overlays the initials; a failed load stays transparent so
+                  the initials behind it remain visible as the fallback. */}
+              <span
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  backgroundImage: `url(${node.photo ?? user.photo ?? photoUrlForUser(node.userId)})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                }}
+              />
             </div>
             <div>
               <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>{user.name}</h2>

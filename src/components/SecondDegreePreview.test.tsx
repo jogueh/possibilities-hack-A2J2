@@ -43,6 +43,18 @@ describe("SecondDegreePreview", () => {
     expect(screen.getByText("Carol")).toBeInTheDocument();
   });
 
+  it("renders each child's avatar photo over the initials fallback", () => {
+    __setMockWebState({ nodes: [parent, child], edges: [edge] });
+    const { container } = render(
+      <SecondDegreePreview parentNode={parent} parentName="Alice" />,
+    );
+    const overlay = container.querySelector("span[aria-hidden]");
+    expect(overlay?.getAttribute("style")).toMatch(
+      /url\(["']?https:\/\/randomuser\.me\/api\/portraits\/(men|women)\/\d+\.jpg["']?\)/,
+    );
+    expect(screen.getByText("CA")).toBeInTheDocument(); // initials fallback
+  });
+
   it("dispatches addSecondDegreeNode and shows 'Added ✓' after clicking Add to web", () => {
     const addSpy = vi.fn();
     __setMockWebState({ nodes: [parent, child], edges: [edge], addSecondDegreeNode: addSpy });
