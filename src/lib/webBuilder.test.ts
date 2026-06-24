@@ -28,6 +28,7 @@ function makeUser(
     posts_activity: [],
     skills: [],
     courses: [],
+    connections: [],
     ...overrides,
   }
 }

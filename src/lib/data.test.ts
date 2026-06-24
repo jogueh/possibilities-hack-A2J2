@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   __resetDataCachesForTests,
+  __setUsersForTests,
   fetchCourses,
   fetchJobs,
   fetchUsers,
@@ -22,6 +23,7 @@ const users: User[] = [
     posts_activity: ['post a', 'post b'],
     skills: ['TypeScript', 'React'],
     courses: ['course_1'],
+    connections: ['user_2'],
   },
   {
     id: 'user_2',
@@ -32,6 +34,7 @@ const users: User[] = [
     posts_activity: [],
     skills: [],
     courses: [],
+    connections: ['user_1'],
   },
 ]
 
@@ -92,6 +95,7 @@ describe('lib/data — raw fetch + resolve helpers', () => {
 
   beforeEach(() => {
     __resetDataCachesForTests()
+    __setUsersForTests(users)
     fetchSpy = mockFetch()
   })
 
@@ -99,22 +103,29 @@ describe('lib/data — raw fetch + resolve helpers', () => {
     vi.restoreAllMocks()
   })
 
-  it('fetchUsers/fetchJobs/fetchCourses call fetch with cache: force-cache', async () => {
-    await fetchUsers()
+  it('fetchJobs/fetchCourses call fetch with cache: force-cache', async () => {
     await fetchJobs()
     await fetchCourses()
 
-    expect(fetchSpy).toHaveBeenCalledTimes(3)
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
     for (const call of fetchSpy.mock.calls) {
       const init = call[1] as RequestInit | undefined
       expect(init?.cache).toBe('force-cache')
     }
   })
 
+  it('fetchUsers reads the local member table without hitting the network', async () => {
+    __resetDataCachesForTests()
+    const all = await fetchUsers()
+    expect(all.length).toBeGreaterThan(0)
+    expect(all[0]).toHaveProperty('connections')
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
   it('memoizes fetched datasets so fetch is only called once per dataset', async () => {
-    await fetchUsers()
-    await fetchUsers()
-    await fetchUsers()
+    await fetchJobs()
+    await fetchJobs()
+    await fetchJobs()
     expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
 
@@ -157,6 +168,6 @@ describe('lib/data — raw fetch + resolve helpers', () => {
       new Response('boom', { status: 500, statusText: 'Server Error' }),
     )
     __resetDataCachesForTests()
-    await expect(fetchUsers()).rejects.toThrow(/Failed to fetch/)
+    await expect(fetchJobs()).rejects.toThrow(/Failed to fetch/)
   })
 })

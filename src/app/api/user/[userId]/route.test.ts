@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GET } from '@/app/api/user/[userId]/route'
-import { __resetDataCachesForTests } from '@/lib/data'
+import { __resetDataCachesForTests, __setUsersForTests } from '@/lib/data'
 import type { Job, User } from '@/types/data'
 
 const users: User[] = [
@@ -15,6 +15,7 @@ const users: User[] = [
     posts_activity: ['post one'],
     skills: ['TypeScript'],
     courses: ['course_1'],
+    connections: [],
   },
 ]
 
@@ -68,6 +69,7 @@ function getRequest(userId: string) {
 describe('GET /api/user/[userId]', () => {
   beforeEach(() => {
     __resetDataCachesForTests()
+    __setUsersForTests(users)
     mockDatasetFetch()
   })
 
