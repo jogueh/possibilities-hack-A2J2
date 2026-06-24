@@ -16,6 +16,16 @@ interface ActionsBarProps {
   connected?: boolean;
   /** Called when a connection request is confirmed; promotes the person on the web. */
   onConnect?: () => void;
+  /** True once the viewer has pinned this person to the canvas via "Add to web". */
+  pinned?: boolean;
+  /**
+   * Called when the viewer clicks "Add to web". Pins this person on the
+   * canvas so a click on another 1st-degree connector does NOT collapse
+   * this branch — they (and their warm-path chain back to the viewer) are
+   * re-materialized after every snapshot rebuild. Hidden for 1st-degree
+   * nodes (always on the canvas regardless).
+   */
+  onPin?: () => void;
   /** Graph id of the open node — passed to the "I met up" button as its key. */
   nodeId?: string;
   /** True when board state says the meetup has already been logged for this node. */
@@ -24,7 +34,18 @@ interface ActionsBarProps {
   onLogMeetup?: () => void;
 }
 
-export function ActionsBar({ targetName, tip, degree, connected, onConnect, nodeId, metUpLogged, onLogMeetup }: ActionsBarProps) {
+export function ActionsBar({
+  targetName,
+  tip,
+  degree,
+  connected,
+  onConnect,
+  pinned,
+  onPin,
+  nodeId,
+  metUpLogged,
+  onLogMeetup,
+}: ActionsBarProps) {
   const [connectOpen, setConnectOpen] = useState(false);
   const [messageOpen, setMessageOpen] = useState(false);
   const [subject, setSubject] = useState("");
@@ -49,6 +70,28 @@ export function ActionsBar({ targetName, tip, degree, connected, onConnect, node
     flex: 1,
     borderRadius: 20,
     padding: "8px 0",
+    fontWeight: 600,
+    cursor: "pointer",
+  };
+
+  // LinkedIn-style modal-action buttons (pill primary + pill outline) so the
+  // Cancel / Send pair matches the visual language of the rest of the bar
+  // instead of falling through to the browser default <button> look.
+  const modalPrimaryBtn: React.CSSProperties = {
+    background: LI.blue,
+    color: "#fff",
+    border: "none",
+    borderRadius: 16,
+    padding: "6px 16px",
+    fontWeight: 600,
+    cursor: "pointer",
+  };
+  const modalSecondaryBtn: React.CSSProperties = {
+    background: "transparent",
+    color: LI.blue,
+    border: `1px solid ${LI.blue}`,
+    borderRadius: 16,
+    padding: "6px 16px",
     fontWeight: 600,
     cursor: "pointer",
   };
@@ -94,6 +137,49 @@ export function ActionsBar({ targetName, tip, degree, connected, onConnect, node
         </button>
       </div>
 
+      {/* "Add to web" pins a 2nd+-degree suggestion to the canvas so navigating
+          to another branch doesn't make them disappear. 1st-degree people are
+          permanently on the canvas, so the button is hidden for them. */}
+      {degree !== 1 && (
+        <div style={{ marginTop: 8 }}>
+          {pinned ? (
+            <button
+              type="button"
+              disabled
+              aria-label="Pinned to web"
+              style={{
+                ...btn,
+                width: "100%",
+                background: "transparent",
+                color: LI.textSecondary,
+                border: `1px solid ${LI.border}`,
+                cursor: "default",
+              }}
+            >
+              Added to web ✓
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                onPin?.();
+                setToast(`${targetName} added to your web`);
+              }}
+              aria-label="Add to web"
+              style={{
+                ...btn,
+                width: "100%",
+                background: "transparent",
+                color: LI.blue,
+                border: `1px solid ${LI.blue}`,
+              }}
+            >
+              + Add to web
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Logging a real-world meetup is offered for everyone on the canvas —
           it turns that person's connection line purple (W4 stretch s11). */}
       {nodeId && onLogMeetup && (
@@ -104,7 +190,7 @@ export function ActionsBar({ targetName, tip, degree, connected, onConnect, node
         <Modal title="Connect" onClose={() => setConnectOpen(false)}>
           <p>Send {targetName} a connection request?</p>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button type="button" onClick={() => setConnectOpen(false)}>Cancel</button>
+            <button type="button" onClick={() => setConnectOpen(false)} style={modalSecondaryBtn}>Cancel</button>
             <button
               type="button"
               onClick={() => {
@@ -112,7 +198,7 @@ export function ActionsBar({ targetName, tip, degree, connected, onConnect, node
                 setToast(`Connection request sent to ${targetName}`);
                 setConnectOpen(false);
               }}
-              style={{ background: LI.blue, color: "#fff", border: "none", borderRadius: 16, padding: "4px 14px", fontWeight: 600 }}
+              style={modalPrimaryBtn}
             >
               Send
             </button>
@@ -138,14 +224,14 @@ export function ActionsBar({ targetName, tip, degree, connected, onConnect, node
             style={{ width: "100%", marginBottom: 8, padding: 6 }}
           />
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button type="button" onClick={() => setMessageOpen(false)}>Cancel</button>
+            <button type="button" onClick={() => setMessageOpen(false)} style={modalSecondaryBtn}>Cancel</button>
             <button
               type="button"
               onClick={() => {
                 setToast(`Message sent to ${targetName}`);
                 setMessageOpen(false);
               }}
-              style={{ background: LI.blue, color: "#fff", border: "none", borderRadius: 16, padding: "4px 14px", fontWeight: 600 }}
+              style={modalPrimaryBtn}
             >
               Send
             </button>

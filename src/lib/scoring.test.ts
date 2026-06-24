@@ -126,3 +126,144 @@ describe("scoreJobAgainstGoal", () => {
     expect(score).toBeLessThan(100);
   });
 });
+
+describe("multi-value goal fields", () => {
+  it("matchesLocation hits any value in targetLocations (west-coast expansion)", () => {
+    const goal: ParsedGoal = {
+      intent: "find west coast people",
+      targetLocations: [
+        "San Francisco, CA",
+        "Seattle, WA",
+        "Portland, OR",
+        "Los Angeles, CA",
+      ],
+    };
+    expect(matchesLocation("Seattle, WA", goal)).toBe(true);
+    expect(matchesLocation("Portland, OR", goal)).toBe(true);
+    expect(matchesLocation("Mountain View, CA", goal)).toBe(true); // CA token match
+    expect(matchesLocation("Boston, MA", goal)).toBe(false);
+    expect(matchesLocation("New York, NY", goal)).toBe(false);
+  });
+
+  it("matchesRole hits any value in targetRoles", () => {
+    const goal: ParsedGoal = {
+      intent: "find ML people",
+      targetRoles: ["Machine Learning Engineer", "Data Scientist"],
+    };
+    expect(matchesRole("Senior Machine Learning Engineer", goal)).toBe(true);
+    expect(matchesRole("Junior Data Scientist", goal)).toBe(true);
+    expect(matchesRole("Marketing Specialist", goal)).toBe(false);
+  });
+
+  it("array fields take precedence over the deprecated singular alias", () => {
+    // Singular says "Marketing", arrays say "Engineer" — arrays win.
+    const goal: ParsedGoal = {
+      intent: "x",
+      targetRole: "Marketing Specialist",
+      targetRoles: ["Software Engineer"],
+    };
+    expect(matchesRole("Marketing Specialist", goal)).toBe(false);
+    expect(matchesRole("Software Engineer", goal)).toBe(true);
+  });
+});
+
+describe("excludes (soft downrank)", () => {
+  it("excludeLocations subtracts the location weight from the score", () => {
+    // Build a user who DOES match the location (so the bonus is awarded and
+    // there's something for the exclusion to subtract from). The without-
+    // exclude version should award `WEIGHTS.location`; adding the exclude
+    // should subtract it back, netting 0 contribution from the location
+    // signal.
+    const targetLocations = ["San Francisco, CA", "Seattle, WA"];
+    const without: ParsedGoal = {
+      intent: "west coast",
+      targetLocations,
+    };
+    // Same locations on excludeLocations — every candidate location both
+    // matches and excludes. The two weights cancel.
+    const withExclude: ParsedGoal = {
+      ...without,
+      excludeLocations: targetLocations,
+    };
+    const sfBob = { ...userBobWithJobs, current_location: "San Francisco, CA" };
+    const before = scoreUserAgainstGoal(sfBob, without);
+    const after = scoreUserAgainstGoal(sfBob, withExclude);
+    expect(before - after).toBe(WEIGHTS.location);
+  });
+
+  it("excludeRoles subtracts the role weight when any job position matches", () => {
+    const goal: ParsedGoal = {
+      intent: "individual contributor",
+      targetRoles: ["Software Engineer"],
+      excludeRoles: ["Manager"],
+    };
+    // Synthesize a user with a manager title in their job history.
+    const manager = {
+      ...userBobWithJobs,
+      job_history: [
+        { ...userBobWithJobs.job_history[0], position: "Engineering Manager" },
+      ],
+    };
+    const baseline = scoreUserAgainstGoal(manager, {
+      ...goal,
+      excludeRoles: undefined,
+    });
+    const withExclude = scoreUserAgainstGoal(manager, goal);
+    expect(baseline - withExclude).toBe(WEIGHTS.role);
+  });
+});
+
+describe("weightOverrides", () => {
+  it("scales the role signal by the override", () => {
+    // Use the SWE fixture so the user actually matches the role and the
+    // override has something to amplify.
+    const sweBob = {
+      ...userBobWithJobs,
+      job_history: [jobAcmeSwe],
+      current_location: "San Francisco, CA",
+    };
+    const swe: ParsedGoal = {
+      intent: "find swe in SF",
+      targetRoles: ["Software Engineer"],
+      targetLocations: ["San Francisco, CA"],
+    };
+    const roleHeavy: ParsedGoal = {
+      ...swe,
+      weightOverrides: { role: 50 },
+    };
+    const a = scoreUserAgainstGoal(sweBob, swe);
+    const b = scoreUserAgainstGoal(sweBob, roleHeavy);
+    // Role matches; b should beat a by exactly the delta between the
+    // override (50) and the default (35) for role.
+    expect(b - a).toBe(50 - WEIGHTS.role);
+  });
+
+  it("zeroed-out signals contribute 0 (location override = 0)", () => {
+    const goal: ParsedGoal = {
+      intent: "location doesn't matter",
+      targetLocations: ["San Francisco, CA"],
+      weightOverrides: { location: 0 },
+    };
+    const userInSF = {
+      ...userBobWithJobs,
+      current_location: "San Francisco, CA",
+    };
+    const userInBoston = {
+      ...userBobWithJobs,
+      current_location: "Boston, MA",
+    };
+    // With location weight 0 both score the same on the location signal.
+    expect(scoreUserAgainstGoal(userInSF, goal)).toBe(
+      scoreUserAgainstGoal(userInBoston, goal),
+    );
+  });
+
+  it("scoreJobAgainstGoal returns 0 when all job-relevant weights are 0", () => {
+    const goal: ParsedGoal = {
+      intent: "x",
+      targetRoles: ["Software Engineer"],
+      weightOverrides: { role: 0, industry: 0, location: 0 },
+    };
+    expect(scoreJobAgainstGoal(jobAcmeSwe, goal)).toBe(0);
+  });
+});

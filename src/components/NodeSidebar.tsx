@@ -23,6 +23,10 @@ interface NodeSidebarProps {
   connected?: boolean;
   /** Promotes a 2nd-degree node to a connection on the web; receives its graph id. */
   onConnect?: (nodeId: string) => void;
+  /** True when the viewer has pinned this node to the canvas (W1 board state). */
+  pinned?: boolean;
+  /** Pins the open node to the canvas across snapshot rebuilds; receives its graph id. */
+  onPin?: (nodeId: string) => void;
   /** Logs a real-world meetup with this node; receives its graph id (strengthens the edge). */
   onLogMeetup?: (nodeId: string) => void;
   /** True when board state says the selected node's meetup has already been logged. */
@@ -48,7 +52,16 @@ function targetSummary(jobs: { position: string; company: string }[]): string {
   return jobs.map((j) => `${j.position} at ${j.company}`).join("; ");
 }
 
-export function NodeSidebar({ node, onClose, connected, onConnect, onLogMeetup, metUpLogged }: NodeSidebarProps) {
+export function NodeSidebar({
+  node,
+  onClose,
+  connected,
+  onConnect,
+  pinned,
+  onPin,
+  onLogMeetup,
+  metUpLogged,
+}: NodeSidebarProps) {
   const goal = useWebStore((s) => s.goal);
   const parsedGoal = useWebStore((s) => s.parsedGoal);
   const viewerProfile = useWebStore((s) => s.viewerProfile);
@@ -295,6 +308,8 @@ export function NodeSidebar({ node, onClose, connected, onConnect, onLogMeetup, 
             degree={node.degree}
             connected={connected}
             onConnect={() => onConnect?.(node.id)}
+            pinned={pinned}
+            onPin={() => onPin?.(node.id)}
             nodeId={node.id}
             metUpLogged={metUpLogged}
             onLogMeetup={() => onLogMeetup?.(node.id)}

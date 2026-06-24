@@ -93,7 +93,9 @@ describe('POST /api/web/generate', () => {
     expect(body.parsedGoal).toEqual({
       intent: 'find software engineers',
       targetRole: 'Software Engineer',
+      targetRoles: ['Software Engineer'],
       targetIndustry: 'Technology',
+      targetIndustries: ['Technology'],
     })
   })
 

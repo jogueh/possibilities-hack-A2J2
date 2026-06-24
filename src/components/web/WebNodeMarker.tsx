@@ -72,7 +72,19 @@ export default function WebNodeMarker({
       onKeyDown={interactive ? handleKeyDown : undefined}
       initial={{ opacity: 0, x: node.position.x, y: node.position.y, scale: 0.6 }}
       animate={{ opacity: 1, x: node.position.x, y: node.position.y, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.6 }}
+      exit={{
+        opacity: 0,
+        scale: 0.6,
+        // Force a deterministic short fade so the marker fully reaches
+        // opacity: 0 before AnimatePresence unmounts it. Without an explicit
+        // exit transition, framer-motion inherits the parent's spring config
+        // which can leave near-zero residue — visible as ghost name/headline
+        // text after a snapshot rebuild collapses sibling suggestions
+        // (especially when the diversified dataset has multiple users with
+        // the same display name and the React key reuse blurs animation
+        // boundaries).
+        transition: { duration: 0.15, ease: 'easeIn' },
+      }}
       whileHover={interactive ? { scale: 1.07 } : undefined}
       transition={{ type: 'spring', stiffness: 260, damping: 22 }}
     >

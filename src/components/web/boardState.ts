@@ -3,6 +3,7 @@ import type { LayoutOptions } from '@/lib/web/layout'
 import {
   buildSnapshot,
   expandNode,
+  revealPerson,
   type PersonInput,
 } from '@/lib/web/snapshot'
 
@@ -29,6 +30,16 @@ export interface BoardState {
   /** Ids of people the viewer has logged a real-world meetup with (edge -> full strength). */
   metUpIds: string[]
   /**
+   * Ids of people the viewer has explicitly pinned to the canvas via
+   * "Add to web". Their warm-path chain back to the viewer is re-applied
+   * after every snapshot rebuild, so pinning preserves a 2nd-degree (or
+   * deeper) node even when the viewer clicks a different 1st-degree
+   * connector that would otherwise collapse this branch. Pinning is
+   * orthogonal to connecting — you can pin a suggestion without committing
+   * to connect with them.
+   */
+  pinnedIds: string[]
+  /**
    * Resolved people for the current goal — populated from `/api/web/generate`
    * by the WebBoard. Empty until a goal is mapped. `selectNode` reads from
    * here so 2nd-degree expansion matches the goal-driven web rather than the
@@ -47,6 +58,7 @@ export type BoardAction =
   | { type: 'mapError'; error: string }
   | { type: 'selectNode'; id: string }
   | { type: 'connectNode'; id: string }
+  | { type: 'pinNode'; id: string }
   | { type: 'logMeetup'; id: string }
   | { type: 'clearSelection' }
   | { type: 'reset' }
@@ -63,6 +75,7 @@ export function createInitialBoardState(): BoardState {
     selectedId: null,
     goalText: '',
     connectedIds: [],
+    pinnedIds: [],
     metUpIds: [],
     people: [],
     status: 'idle',
@@ -70,6 +83,7 @@ export function createInitialBoardState(): BoardState {
   }
 }
 
+/**
 /**
  * Solidifies every dotted bridge edge that leads INTO a connected person (the
  * connected id is the edge target): the line stops being dotted, turns into a
@@ -90,6 +104,65 @@ function applyConnections(
       : e,
   )
   return { ...snapshot, edges }
+}
+
+/**
+ * Re-applies the warm-path expansion needed to keep every pinned person on
+ * the canvas after a snapshot rebuild. Pinning a depth-N node implicitly
+ * pins their entire warm-path chain back to the viewer (you can't show a
+ * 3rd-degree node without rendering the 2nd-degree connector that introduces
+ * them) — `walkViaChain` produces that chain by following `via` references
+ * up to the 1st-degree root, and the loop reveals each link pairwise with
+ * `revealPerson` so only the specific pinned path appears (NOT the sibling
+ * suggestions that share the same parent).
+ *
+ * Idempotent and safe to call with an empty `pinnedIds` (no-op).
+ */
+function applyPins(
+  snapshot: WebSnapshot,
+  pinnedIds: string[],
+  people: PersonInput[],
+  options: LayoutOptions,
+): WebSnapshot {
+  if (pinnedIds.length === 0) return snapshot
+  const byId = new Map(people.map((p) => [p.id, p]))
+  let out = snapshot
+  for (const pinnedId of pinnedIds) {
+    const chain = walkViaChain(pinnedId, byId)
+    // The depth-1 root is already in the snapshot; walk the rest of the
+    // chain (depth 2 -> pinned) and add each person individually.
+    // `revealPerson` is a no-op if the person is already present, so chains
+    // that share a prefix don't duplicate work.
+    for (let i = 1; i < chain.length; i++) {
+      const person = byId.get(chain[i])
+      if (!person) continue
+      out = revealPerson(out, person, options)
+    }
+  }
+  return out
+}
+
+/**
+ * Walks a person's `via` chain from a 1st-degree root down to `id`. Returns
+ * `[root, ..., id]` (length === person's degree). Returns `[id]` if the id
+ * is itself a 1st-degree or unknown — in both cases there is nothing further
+ * to expand to surface it on the canvas.
+ */
+function walkViaChain(
+  id: string,
+  byId: Map<string, PersonInput>,
+): string[] {
+  const chain: string[] = []
+  let cursor: string | undefined = id
+  // Cap iterations defensively in case of a circular via reference (data bug,
+  // not user error). The realistic chain is bounded by MAX_DEGREE.
+  for (let i = 0; cursor && i < 32; i++) {
+    chain.unshift(cursor)
+    const p = byId.get(cursor)
+    if (!p || p.degree === 1 || !p.via) break
+    cursor = p.via
+  }
+  return chain
 }
 
 /**
@@ -147,6 +220,7 @@ export function boardReducer(
         snapshot: buildSnapshot(goal, people, config.options),
         selectedId: null,
         connectedIds: [],
+        pinnedIds: [],
         metUpIds: [],
         status: 'idle',
         error: null,
@@ -165,6 +239,7 @@ export function boardReducer(
         snapshot: buildSnapshot(goal, action.people, config.options),
         selectedId: null,
         connectedIds: [],
+        pinnedIds: [],
         metUpIds: [],
         people: action.people,
         status: 'idle',
@@ -189,8 +264,9 @@ export function boardReducer(
         // real connections the viewer is already part of, so revealing the
         // suggestions reachable through them is always allowed. Rebuilding
         // from the seeded snapshot first collapses any other connector that
-        // was previously expanded, so the web never shows a different
-        // person's warm path.
+        // was previously expanded — but pinned warm paths (see `applyPins`
+        // below) are then re-materialized so any explicitly retained
+        // person survives the rebuild.
         const seeded = buildSnapshot(
           state.snapshot.goal,
           people,
@@ -210,6 +286,7 @@ export function boardReducer(
       // For unconnected 2nd+ nodes, fall through with `snapshot = state.snapshot`
       // — selection still updates so the sidebar opens with the "Connect" CTA,
       // but the canvas does not reveal further suggestions until they accept.
+      snapshot = applyPins(snapshot, state.pinnedIds, people, config.options)
       return {
         ...state,
         snapshot: applyMeetups(
@@ -251,6 +328,20 @@ export function boardReducer(
         metUpIds,
         snapshot: applyMeetups(state.snapshot, metUpIds),
       }
+    }
+
+    case 'pinNode': {
+      // Pinning retains a person on the canvas across snapshot rebuilds. The
+      // pinned node (and its warm-path chain back to the viewer) is
+      // re-materialized after every selectNode rebuild via `applyPins`, so a
+      // click on another 1st-degree connector no longer collapses this branch.
+      // Orthogonal to `connectNode`: pinning is a display preference and
+      // requires no commitment from the viewer. Idempotent.
+      if (state.pinnedIds.includes(action.id)) return state
+      // 1st-degree nodes are always on the canvas regardless, so a pin there
+      // is recorded but materially a no-op. We still store it so the UI can
+      // reflect the pinned state and the action is consistently idempotent.
+      return { ...state, pinnedIds: [...state.pinnedIds, action.id] }
     }
 
     case 'clearSelection':
