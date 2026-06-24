@@ -65,6 +65,12 @@ describe('parseGoalFallback (deterministic keyword extractor)', () => {
     expect(r.targetRole).toBe('UX Designer')
     expect(r.targetRoles).toEqual(['UX Designer'])
   })
+
+  it('maps "devops engineer" to DevOps Engineer, not Software Engineer', () => {
+    const r = parseGoalFallback('i want a devops engineer role in seattle')
+    expect(r.targetRole).toBe('DevOps Engineer')
+    expect(r.targetLocation).toBe('Seattle, WA')
+  })
 })
 
 describe('parseGoal (LLM path with mocked generateObject)', () => {
