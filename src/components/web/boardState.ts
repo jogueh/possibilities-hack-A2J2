@@ -53,12 +53,12 @@ export interface BoardState {
    * strengthens each staged person's solid edge to `STAGE_STRENGTH[stage]`.
    * `met` subsumes the old "I met up" action. Resets on a new goal.
    */
-  stages: Record<string, ConnectionStage>
+  stages: Partial<Record<string, ConnectionStage>>
   /**
    * Optional helpfulness tags per person, attached when advancing a stage
    * (skippable). Session-only, resets on a new goal.
    */
-  helpfulness: Record<string, HelpfulnessTag[]>
+  helpfulness: Partial<Record<string, HelpfulnessTag[]>>
   /**
    * Ids of people the viewer has explicitly pinned to the canvas via
    * "Add to web". Their warm-path chain back to the viewer is re-applied
@@ -219,23 +219,23 @@ function walkViaChain(
  */
 function applyStages(
   snapshot: WebSnapshot,
-  stages: Record<string, ConnectionStage>,
+  stages: Partial<Record<string, ConnectionStage>>,
 ): WebSnapshot {
   const ids = Object.keys(stages)
   if (ids.length === 0) return snapshot
-  const staged = new Set(ids)
   const selfId = snapshot.goal?.userId
-  const edges = snapshot.edges.map((e) =>
-    selfId && e.source === selfId && staged.has(e.target)
+  const edges = snapshot.edges.map((e) => {
+    const stage = stages[e.target]
+    return selfId && e.source === selfId && stage
       ? {
           ...e,
           isDotted: false,
           isMetUp: true,
-          stage: stages[e.target],
-          strength: STAGE_STRENGTH[stages[e.target]],
+          stage,
+          strength: STAGE_STRENGTH[stage],
         }
-      : e,
-  )
+      : e
+  })
   return { ...snapshot, edges }
 }
 

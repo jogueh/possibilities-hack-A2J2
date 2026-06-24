@@ -83,7 +83,7 @@ float that card into a **boosted tier** above all others, regardless of relevanc
   Met subsumes old meetup behavior; resets on new goal; idempotent; only affects the
   self↔person edge (not warm-path bridges). Helpfulness tags recorded/skippable.
 - `snapshot`/baseline: un-staged 1st-degree self-edges render at the compressed baseline.
-- StageStepper component: renders current stage, advances on click, shows/【skips】tags,
+- StageStepper component: renders current stage, advances on click, shows/skips tags,
   controlled by `stage` prop threaded from boardState (resets on new goal).
 - re-rank: a Collaborated/Advocate connection's children outrank an equivalent
   lower-stage connection's children.

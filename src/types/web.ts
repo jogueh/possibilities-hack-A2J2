@@ -25,7 +25,7 @@ export type ActivityStatus = 'active' | 'moderate' | 'inactive'
  * Relationship-depth ladder for a connection ("Connection Depth" feature).
  * The viewer self-advances a connection up these rungs; deeper stages strengthen
  * the edge and quietly re-rank suggestions. `met` is the first rung — it subsumes
- * the old "I met up with this person" action. See plan/features/connection-depth.
+ * the old "I met up with this person" action. See plan/features/connection-depth/scope.md.
  */
 export type ConnectionStage = 'met' | 'collaborated' | 'advocate'
 
