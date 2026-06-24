@@ -62,13 +62,11 @@ export function useJobOverlapDecorations(): Record<string, NodeDecoration> {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestKey]);
 
-  const matches = result?.key === requestKey ? result.matches : [];
-
   return useMemo(() => {
+    const matches = result?.key === requestKey ? result.matches : [];
     const ids = overlappingNodeIds(matches, nodes);
     const decorations: Record<string, NodeDecoration> = {};
     for (const id of ids) decorations[id] = { hasJobOverlap: true };
     return decorations;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result, nodes]);
+  }, [requestKey, result, nodes]);
 }
