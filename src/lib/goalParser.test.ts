@@ -4,9 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('ai', () => ({
   generateObject: vi.fn(),
 }))
-vi.mock('@openrouter/ai-sdk-provider', () => ({
-  openrouter: vi.fn((model: string) => ({ __mockModel: model })),
-}))
+vi.mock('@openrouter/ai-sdk-provider', () => {
+  const chat = vi.fn((model: string) => ({ __mockModel: model }))
+  const openrouter = Object.assign(chat, { chat })
+  return { openrouter }
+})
 
 import { generateObject } from 'ai'
 import {
