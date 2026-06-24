@@ -9,7 +9,7 @@ vi.mock('@openrouter/ai-sdk-provider', () => {
 })
 
 import { POST } from '@/app/api/web/generate/route'
-import { __resetDataCachesForTests } from '@/lib/data'
+import { __resetDataCachesForTests, __setUsersForTests } from '@/lib/data'
 import {
   __resetMockConnectionGraph,
   __setMockConnectionGraph,
@@ -25,6 +25,7 @@ const users: User[] = Array.from({ length: 8 }, (_, i) => ({
   posts_activity: [],
   skills: ['TypeScript'],
   courses: [],
+  connections: [],
 }))
 
 const jobs: Job[] = Array.from({ length: 3 }, (_, i) => ({
@@ -68,6 +69,7 @@ describe('POST /api/web/generate', () => {
   beforeEach(() => {
     delete process.env.OPENROUTER_API_KEY // force the parseGoal keyword fallback
     __resetDataCachesForTests()
+    __setUsersForTests(users)
     mockDatasetFetch()
     // Seed a fully-connected (modulo self) mock graph so the route returns a
     // non-empty web. W4 owns the real `src/lib/connections.ts`; this test
@@ -118,20 +120,11 @@ describe('POST /api/web/generate', () => {
         posts_activity: [],
         skills: [],
         courses: [],
+        connections: [],
       },
     ]
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
-      const u = String(url)
-      let body: unknown
-      if (u.includes('user_data.json')) body = usersWithViewer
-      else if (u.includes('jobs_data.json')) body = jobs
-      else body = []
-      return new Response(JSON.stringify(body), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    })
     __resetDataCachesForTests()
+    __setUsersForTests(usersWithViewer)
     const res = await POST(postRequest({ goal: 'find software engineers' }))
     expect(res.status).toBe(200)
     const body = (await res.json()) as { nodes: Array<{ userId: string }> }
