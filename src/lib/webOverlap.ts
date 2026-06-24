@@ -1,6 +1,7 @@
 import type { Job } from "@/types/data";
 import type { UserWithJobs } from "@/types/data";
-import type { WebConnectionRef } from "@/types/job";
+import type { WebConnectionRef, JobMatch } from "@/types/job";
+import type { WebNode } from "@/types/web";
 
 /**
  * Web-overlap engine (pure functions).
@@ -70,4 +71,34 @@ export function overlappingUserIds(
     }
   }
   return ids;
+}
+
+/**
+ * Step 6 (canvas overlap highlight): given the goal's job matches and the nodes
+ * currently in the web, return the set of `WebNode.id`s that should get the
+ * pulsing "job overlap" ring — i.e. nodes whose member appears as a web-overlap
+ * connection on at least one matched job.
+ *
+ * Keyed by node id (what the canvas decoration map needs) but driven by the
+ * member's userId. Reuses the `webConnections` already attached to each
+ * JobMatch, so it needs no extra data resolution. Pure and deterministic.
+ */
+export function overlappingNodeIds(
+  matches: JobMatch[],
+  nodes: WebNode[],
+): Set<string> {
+  const overlapUserIds = new Set<string>();
+  for (const match of matches) {
+    for (const ref of match.webConnections) {
+      overlapUserIds.add(ref.userId);
+    }
+  }
+
+  const nodeIds = new Set<string>();
+  for (const node of nodes) {
+    if (overlapUserIds.has(node.userId)) {
+      nodeIds.add(node.id);
+    }
+  }
+  return nodeIds;
 }
