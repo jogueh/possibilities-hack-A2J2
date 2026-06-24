@@ -94,6 +94,12 @@ function edge(source: string, target: string, isDotted: boolean): WebEdge {
  *      >= SECOND_DEGREE_MIN_SCORE, sort desc, take top
  *      SECOND_DEGREE_PER_NODE_MAX. Edges 1st -> 2nd are DOTTED ("people to
  *      meet" via a warm path). A user appears at most once across the web.
+ *   2a. WEAK-MATCH FALLBACK (mirrors 1a): if a 1st-degree parent has friends-
+ *       of-friends in the candidate set but NONE clear the threshold (e.g.
+ *       location-only goals that cap at ~30 points), surface the parent's
+ *       top SECOND_DEGREE_PER_NODE_MAX by score anyway. Clicking a
+ *       1st-degree node otherwise reveals no warm path for thin-signal goals.
+ *       The alignmentTier on each node still conveys the weak match visually.
  *   3. No padding beyond the cold-start fallback. No edges to strangers
  *      outside the candidates set.
  */
@@ -156,12 +162,26 @@ export function buildWeb({
       if (inWeb.has(id)) continue
       const user = byId.get(id)
       if (!user) continue
-      const score = scorer(user, parsedGoal)
-      if (score < SECOND_DEGREE_MIN_SCORE) continue
-      candidateScored.push({ user, score })
+      candidateScored.push({ user, score: scorer(user, parsedGoal) })
     }
     candidateScored.sort((a, b) => b.score - a.score)
-    const picked = candidateScored.slice(0, SECOND_DEGREE_PER_NODE_MAX)
+
+    // Strict path: keep only candidates clearing SECOND_DEGREE_MIN_SCORE.
+    const qualifying = candidateScored.filter(
+      (s) => s.score >= SECOND_DEGREE_MIN_SCORE,
+    )
+    // Weak-match fallback: when a parent has friends-of-friends but none clear
+    // the threshold (e.g. a location-only goal that caps at ~30 points),
+    // surface the top SECOND_DEGREE_PER_NODE_MAX anyway. Without this, clicking
+    // a 1st-degree node never reveals a warm path for goals with thin scoring
+    // signals. The alignmentTier on each surfaced node still reflects the
+    // weak score so the UI's visual cue is intact. Threshold remains in effect
+    // whenever the parent has at least one strong match — no weakening of the
+    // rubric when good data is available.
+    const picked =
+      qualifying.length > 0
+        ? qualifying.slice(0, SECOND_DEGREE_PER_NODE_MAX)
+        : candidateScored.slice(0, SECOND_DEGREE_PER_NODE_MAX)
     for (const m of picked) {
       inWeb.add(m.user.id)
       nodes.push(toNode(m.user, 2, m.score))
