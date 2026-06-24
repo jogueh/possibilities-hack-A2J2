@@ -249,4 +249,25 @@ describe('boardReducer', () => {
     s = reduce(s, { type: 'submitGoal' })
     expect(s.metUpIds).toEqual([])
   })
+
+  it('keeps outgoing warm-path bridges from a connected node dotted until that further person also connects', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    // Reveal c (2nd degree) through a (1st degree), then connect with c.
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    s = reduce(s, { type: 'connectNode', id: 'c' })
+    // The bridge INTO the connected node solidifies (dotted -> solid/blue).
+    expect(s.snapshot.edges.find((e) => e.id === 'a__c')?.isDotted).toBe(false)
+    // Expanding the connected node reveals its 3rd-degree child d.
+    s = reduce(s, { type: 'selectNode', id: 'c' })
+    const cToD = s.snapshot.edges.find((e) => e.id === 'c__d')
+    // d isn't connected yet, so the OUTGOING bridge from c stays a dotted
+    // suggestion (regression guard: it must not auto-solidify just because its
+    // source c is connected).
+    expect(cToD).toBeDefined()
+    expect(cToD?.isDotted).toBe(true)
+    // Connecting with d finally solidifies it.
+    s = reduce(s, { type: 'connectNode', id: 'd' })
+    expect(s.snapshot.edges.find((e) => e.id === 'c__d')?.isDotted).toBe(false)
+  })
 })

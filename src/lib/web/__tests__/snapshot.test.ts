@@ -7,6 +7,7 @@ import {
   type PersonInput,
 } from '@/lib/web/snapshot'
 import type { GoalQuery } from '@/types/web'
+import { NODE_MIN_DISTANCE } from '@/lib/web/layout'
 
 const options = { width: 800, height: 600, ring1Radius: 100, ring2Radius: 200 }
 const goal: GoalQuery = { raw: 'Break into product management', userId: 'self_1' }
@@ -101,5 +102,23 @@ describe('expandNode', () => {
   it('returns the snapshot unchanged when there is no goal', () => {
     const empty = buildSnapshot(null, people, options)
     expect(expandNode(empty, 'a', people, options)).toBe(empty)
+  })
+})
+
+describe('expandNode collision avoidance', () => {
+  it('keeps every node at least NODE_MIN_DISTANCE from the centre and from each other', () => {
+    const seeded = buildSnapshot(goal, people, options)
+    const expanded = expandNode(seeded, 'a', people, options)
+    const center = { x: options.width / 2, y: options.height / 2 }
+    const points = [center, ...expanded.nodes.map((n) => n.position)]
+    for (let i = 0; i < points.length; i++) {
+      for (let j = i + 1; j < points.length; j++) {
+        const dist = Math.hypot(
+          points[i].x - points[j].x,
+          points[i].y - points[j].y,
+        )
+        expect(dist).toBeGreaterThanOrEqual(NODE_MIN_DISTANCE - 0.01)
+      }
+    }
   })
 })

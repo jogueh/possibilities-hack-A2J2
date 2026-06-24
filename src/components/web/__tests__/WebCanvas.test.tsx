@@ -25,6 +25,14 @@ describe('WebCanvas', () => {
     expect(container.querySelectorAll('[data-testid^="web-edge-"]')).toHaveLength(0)
   })
 
+  it('renders the self centre with no goal when alwaysShowSelf is set', () => {
+    const { queryByTestId, getByText } = render(
+      <WebCanvas snapshot={buildSnapshot(null, people, options)} alwaysShowSelf />,
+    )
+    expect(queryByTestId('web-self')).toBeTruthy()
+    expect(getByText('You')).toBeTruthy()
+  })
+
   it('renders the self centre, one marker and one edge per 1st-degree node', () => {
     const seeded = buildSnapshot(goal, people, options)
     const { container, getByTestId } = render(<WebCanvas snapshot={seeded} />)

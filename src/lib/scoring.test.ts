@@ -55,7 +55,7 @@ describe("deriveActivityStatus derivation", () => {
   it("derives from posts_activity length", () => {
     const base = userBobWithJobs;
     expect(deriveActivityStatus({ ...base, posts_activity: [] })).toBe("inactive");
-    expect(deriveActivityStatus({ ...base, posts_activity: ["a"] })).toBe("moderate");
+    expect(deriveActivityStatus({ ...base, posts_activity: ["a"] })).toBe("inactive");
     expect(deriveActivityStatus({ ...base, posts_activity: ["a", "b"] })).toBe("moderate");
     expect(deriveActivityStatus({ ...base, posts_activity: ["a", "b", "c"] })).toBe("active");
   });
@@ -97,8 +97,9 @@ describe("scoreUserAgainstGoal", () => {
 
   it("gives half activity weight for moderate activity", () => {
     const goal: ParsedGoal = { intent: "x", targetLocation: "Boston, MA" };
-    // userBobWithJobs: location Boston (20) + 1 post -> moderate activity (5)
-    expect(scoreUserAgainstGoal(userBobWithJobs, goal)).toBe(
+    // location Boston (20) + 2 posts -> moderate activity (half of 10 = 5)
+    const moderate = { ...userBobWithJobs, posts_activity: ["a", "b"] };
+    expect(scoreUserAgainstGoal(moderate, goal)).toBe(
       WEIGHTS.location + WEIGHTS.activity / 2,
     );
   });

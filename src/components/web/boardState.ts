@@ -71,9 +71,12 @@ export function createInitialBoardState(): BoardState {
 }
 
 /**
- * Solidifies every dotted bridge edge that touches a connected person: the line
- * stops being dotted, turns into a strong link and is strengthened. Re-applied
- * after a snapshot rebuild so a connection survives re-expanding its connector.
+ * Solidifies every dotted bridge edge that leads INTO a connected person (the
+ * connected id is the edge target): the line stops being dotted, turns into a
+ * strong link and is strengthened. Re-applied after a snapshot rebuild so a
+ * connection survives re-expanding its connector. Outgoing bridges FROM a
+ * connected node (to its not-yet-connected warm-path suggestions) intentionally
+ * stay dotted — they only solidify once that further person is connected too.
  */
 function applyConnections(
   snapshot: WebSnapshot,
@@ -82,7 +85,7 @@ function applyConnections(
   if (connectedIds.length === 0) return snapshot
   const connected = new Set(connectedIds)
   const edges = snapshot.edges.map((e) =>
-    e.isDotted && (connected.has(e.target) || connected.has(e.source))
+    e.isDotted && connected.has(e.target)
       ? { ...e, isDotted: false, strength: Math.max(e.strength, CONNECTED_STRENGTH) }
       : e,
   )
