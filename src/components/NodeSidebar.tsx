@@ -227,7 +227,7 @@ export function NodeSidebar({
                 style={{
                   position: "absolute",
                   inset: 0,
-                  backgroundImage: `url(${JSON.stringify(node.photo ?? user.photo ?? photoUrlForUser(node.userId))})`,
+                  backgroundImage: `url(${JSON.stringify(node.photo ?? user.photo ?? photoUrlForUser(node.userId, node.label))})`,
                   backgroundSize: "cover",
                   backgroundPosition: "center",
                 }}
