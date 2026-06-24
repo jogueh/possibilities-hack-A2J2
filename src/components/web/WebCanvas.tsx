@@ -1,6 +1,5 @@
 'use client'
 
-import { Fragment } from 'react'
 import type { WebSnapshot } from '@/types/web'
 import { edgeStrokeDasharray, edgeStrokeWidth } from '@/lib/web/layout'
 import WebNodeMarker from './WebNodeMarker'
@@ -37,7 +36,7 @@ export default function WebCanvas({
       width="100%"
       height={height}
       viewBox={`0 0 ${width} ${height}`}
-      role="img"
+      role={onNodeSelect ? 'group' : 'img'}
       aria-label="Connection web"
     >
       <g data-testid="web-edges">
@@ -78,13 +77,12 @@ export default function WebCanvas({
 
       <g data-testid="web-nodes">
         {snapshot.nodes.map((node) => (
-          <Fragment key={node.id}>
-            <WebNodeMarker
-              node={node}
-              selected={selectedId === node.id}
-              onSelect={onNodeSelect}
-            />
-          </Fragment>
+          <WebNodeMarker
+            key={node.id}
+            node={node}
+            selected={selectedId === node.id}
+            onSelect={onNodeSelect}
+          />
         ))}
       </g>
     </svg>

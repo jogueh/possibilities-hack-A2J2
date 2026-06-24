@@ -1,5 +1,6 @@
 'use client'
 
+import type { KeyboardEvent } from 'react'
 import type { WebNode } from '@/types/web'
 import { tierColor, tierRadius } from '@/lib/web/layout'
 
@@ -18,14 +19,24 @@ export default function WebNodeMarker({
   const r = tierRadius(node.alignmentTier)
   const interactive = Boolean(onSelect)
 
+  const handleKeyDown = (event: KeyboardEvent<SVGGElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onSelect?.(node.id)
+    }
+  }
+
   return (
     <g
       data-testid={`web-node-${node.id}`}
       transform={`translate(${node.position.x}, ${node.position.y})`}
       role={interactive ? 'button' : undefined}
       aria-label={node.label}
+      aria-pressed={interactive ? selected : undefined}
+      tabIndex={interactive ? 0 : undefined}
       style={{ cursor: interactive ? 'pointer' : 'default' }}
       onClick={interactive ? () => onSelect?.(node.id) : undefined}
+      onKeyDown={interactive ? handleKeyDown : undefined}
     >
       <circle
         r={r}
