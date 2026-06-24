@@ -1,9 +1,9 @@
 # possibilities-hack-A2J2
 PIT Hackathon
 
-## LinkedIn Homepage Mockup
+## LinkedIn-style prototype with a "Career GPS" connection web
 
-A visual mockup of the LinkedIn homepage built with **Next.js (App Router) + TypeScript + Ant Design 5**.
+A LinkedIn-inspired prototype built with **Next.js (App Router) + TypeScript + Ant Design 5**. Alongside a static homepage mockup, it includes an interactive **Web** feature: set a career goal and see how your network maps a warm path toward it.
 
 ### Prerequisites
 
@@ -53,29 +53,47 @@ npm test         # run the Vitest test suite
 
 ### Routes
 
-| Path             | Page                                          |
-|------------------|-----------------------------------------------|
-| `/`              | Home — 3-column layout with profile, feed, news |
-| `/network`       | "My Network" placeholder                      |
-| `/jobs`          | "Jobs" placeholder                            |
-| `/messaging`     | "Messaging" placeholder                       |
-| `/notifications` | "Notifications" placeholder                   |
-| `/me`            | "Me" placeholder                              |
+| Path             | Page                                                                 |
+|------------------|----------------------------------------------------------------------|
+| `/`              | Home — 3-column layout with profile, feed, and news                  |
+| `/web`           | **Web** — interactive connection graph: enter a career goal, map your network, and explore warm paths. Nodes are colored by goal-match strength; clicking one opens a sidebar with the member's profile, AI-generated talking points, and job-overlap insights. |
+| `/network`       | "My Network" placeholder                                             |
+| `/jobs`          | "Jobs" placeholder                                                   |
+| `/messaging`     | "Messaging" placeholder                                              |
+| `/notifications` | "Notifications" placeholder                                          |
+| `/me`            | "Me" placeholder                                                     |
+
+### API routes
+
+The Web feature is backed by server routes under `src/app/api/`:
+
+| Endpoint                      | Method | Purpose                                                        |
+|-------------------------------|--------|----------------------------------------------------------------|
+| `/api/web/generate`           | POST   | Build the connection web for a viewer + parsed career goal     |
+| `/api/user/[userId]`          | GET    | Fetch a member's full resolved profile (used by the sidebar)   |
+| `/api/node/talking-points`    | POST   | Generate AI talking points for reaching out to a connection    |
+| `/api/jobs/matches`           | POST   | Return job matches relevant to the goal / web                  |
 
 ### Structure
 
 ```
 src/
-├── app/                       # App Router pages
+├── app/                       # App Router pages + API routes
 │   ├── layout.tsx             # AntdRegistry + ConfigProvider + TopNav
 │   ├── page.tsx               # Home (3-column)
+│   ├── web/                   # Connection-web ("Career GPS") page
+│   ├── api/                   # Route handlers (web, user, talking-points, jobs)
 │   └── {network,jobs,...}/    # Placeholder routes
-├── components/                # UI components (TopNav, ProfileCard, Feed, etc.)
-├── data/                      # Mock data (profile, posts, news)
+├── components/                # UI components (TopNav, Feed, web/* canvas, etc.)
+├── data/                      # Seed data (profile, posts, news, web_people, user_data)
+├── lib/                       # Data layer, scoring, goal parsing, graph/web helpers
+├── store/                     # Zustand store (useWebStore)
+├── types/                     # Shared TypeScript types
+├── test/                      # Shared test fixtures
 └── theme.ts                   # Ant Design theme tokens
 ```
 
-All content is hard-coded mock data in `src/data/`. No backend yet — the structure is set up so API routes (`src/app/api/*/route.ts`) or server actions can be added alongside the UI.
+The homepage content (`profile`, `posts`, `news`) is hard-coded seed data in `src/data/`. The Web feature uses a small data layer in `src/lib/data.ts`: members come from the committed local `src/data/user_data.json` (the source of truth for connections), while jobs and courses are fetched once from the remote hackathon datasets and memoized.
 
 ### Note for contributors
 
