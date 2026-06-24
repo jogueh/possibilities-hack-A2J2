@@ -10,6 +10,10 @@ vi.mock('@openrouter/ai-sdk-provider', () => {
 
 import { POST } from '@/app/api/web/generate/route'
 import { __resetDataCachesForTests } from '@/lib/data'
+import {
+  __resetMockConnectionGraph,
+  __setMockConnectionGraph,
+} from '@/mocks/connectionsMock'
 import type { Job, User } from '@/types/data'
 
 const users: User[] = Array.from({ length: 8 }, (_, i) => ({
@@ -65,10 +69,19 @@ describe('POST /api/web/generate', () => {
     delete process.env.OPENROUTER_API_KEY // force the parseGoal keyword fallback
     __resetDataCachesForTests()
     mockDatasetFetch()
+    // Seed a fully-connected (modulo self) mock graph so the route returns a
+    // non-empty web. W4 owns the real `src/lib/connections.ts`; this test
+    // injects a graph through the mock module to keep the integration self-
+    // contained.
+    const allIds = [...users.map((u) => u.id), 'user_4579']
+    const graph: Record<string, string[]> = {}
+    for (const id of allIds) graph[id] = allIds.filter((other) => other !== id)
+    __setMockConnectionGraph(graph)
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
+    __resetMockConnectionGraph()
     if (ORIGINAL_KEY === undefined) delete process.env.OPENROUTER_API_KEY
     else process.env.OPENROUTER_API_KEY = ORIGINAL_KEY
   })
