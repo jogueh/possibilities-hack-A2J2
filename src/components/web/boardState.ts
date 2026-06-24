@@ -88,6 +88,63 @@ function effectivePeople(state: BoardState, config: BoardConfig): PersonInput[] 
   return state.people.length > 0 ? state.people : config.people
 }
 
+/**
+ * Re-roots every connected person into a permanent direct (1st-degree)
+ * connection and shifts everyone reached *through* them one warm-path hop
+ * closer. Connecting with someone makes them part of your network, so they move
+ * onto the inner ring with a strong solid self-edge, and their former
+ * suggestions become *your* next-ring suggestions.
+ *
+ * The effective degree of a person is the number of hops up the `via` chain to
+ * the viewer, short-circuiting at the first connected ancestor (which is now
+ * degree 1). Applied at snapshot-build time and keyed off `connectedIds`, so a
+ * connection survives any rebuild while a new goal — which clears
+ * `connectedIds` — starts clean. People with no connection in their lineage are
+ * returned unchanged.
+ */
+function promoteConnected(
+  people: PersonInput[],
+  connectedIds: string[],
+): PersonInput[] {
+  if (connectedIds.length === 0) return people
+  const connected = new Set(connectedIds)
+  const byId = new Map(people.map((p) => [p.id, p]))
+  const cache = new Map<string, number>()
+
+  const effDegree = (p: PersonInput): number => {
+    const cached = cache.get(p.id)
+    if (cached !== undefined) return cached
+    // Guard against accidental cycles in `via` chains.
+    cache.set(p.id, p.degree)
+    let result: number
+    if (connected.has(p.id) || p.degree === 1) {
+      result = 1
+    } else {
+      const parent = p.via ? byId.get(p.via) : undefined
+      result = parent ? effDegree(parent) + 1 : p.degree
+    }
+    cache.set(p.id, result)
+    return result
+  }
+
+  return people.map((p) => {
+    const degree = effDegree(p)
+    const isConnected = connected.has(p.id)
+    if (degree === p.degree && !isConnected) return p
+    const promoted: PersonInput = { ...p, degree }
+    if (isConnected) {
+      // A direct connection no longer hangs off a warm-path bridge, and its
+      // (now solid) self-edge should read as a strong link.
+      promoted.via = undefined
+      promoted.interactionScore = Math.max(
+        p.interactionScore ?? 0,
+        CONNECTED_STRENGTH,
+      )
+    }
+    return promoted
+  })
+}
+
 export function boardReducer(
   state: BoardState,
   action: BoardAction,
@@ -148,13 +205,15 @@ export function boardReducer(
         // suggestions reachable through them is always allowed. Rebuilding
         // from the seeded snapshot first collapses any other connector that
         // was previously expanded, so the web never shows a different
-        // person's warm path.
+        // person's warm path. Connected people are promoted to permanent
+        // 1st-degree nodes here, so they persist across the rebuild.
+        const promoted = promoteConnected(people, state.connectedIds)
         const seeded = buildSnapshot(
           state.snapshot.goal,
-          people,
+          promoted,
           config.options,
         )
-        snapshot = expandNode(seeded, action.id, people, config.options)
+        snapshot = expandNode(seeded, action.id, promoted, config.options)
       } else if (state.connectedIds.includes(clicked.id)) {
         // Selecting a deeper node (2nd+) reveals its next-ring children IN
         // PLACE — but ONLY if the viewer has explicitly "connected" with that
@@ -162,7 +221,9 @@ export function boardReducer(
         // accepts the warm-path intro: connecting unlocks the next layer
         // of suggestions reachable through that person, mirroring real-world
         // network growth (you can't navigate a 3rd-degree intro until your
-        // 2nd-degree connection introduces you).
+        // 2nd-degree connection introduces you). We expand in place against the
+        // current snapshot/depths; the promotion to 1st-degree is applied on the
+        // next rebuild (clicking off, or selecting a 1st-degree node).
         snapshot = expandNode(state.snapshot, action.id, people, config.options)
       }
       // For unconnected 2nd+ nodes, fall through with `snapshot = state.snapshot`
@@ -192,8 +253,24 @@ export function boardReducer(
       }
     }
 
-    case 'clearSelection':
-      return { ...state, selectedId: null }
+    case 'clearSelection': {
+      // Clicking off settles the web back to its base (seeded) layout. People the
+      // viewer has connected with are promoted to permanent 1st-degree nodes
+      // here, so a just-connected 2nd-degree person converts into a direct
+      // connection on the inner ring instead of vanishing. With no goal yet,
+      // there is nothing to rebuild — just drop the selection.
+      if (!state.snapshot.goal) return { ...state, selectedId: null }
+      const promoted = promoteConnected(
+        effectivePeople(state, config),
+        state.connectedIds,
+      )
+      const seeded = buildSnapshot(state.snapshot.goal, promoted, config.options)
+      return {
+        ...state,
+        snapshot: applyConnections(seeded, state.connectedIds),
+        selectedId: null,
+      }
+    }
 
     case 'reset':
       return createInitialBoardState()
