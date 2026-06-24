@@ -1,5 +1,5 @@
 "use client";
-// W3-OWNED. Actions bar at the bottom of the node sidebar: Connect + Message.
+// W3-OWNED. Actions bar at the bottom of the node sidebar: Connect + InMail.
 // UI-only — no real LinkedIn API calls. See plan.md
 import { useEffect, useState } from "react";
 import type { DegreeLevel } from "@/types/web";
@@ -71,9 +71,19 @@ export function ActionsBar({ targetName, tip, degree, connected, onConnect }: Ac
         <button
           type="button"
           onClick={openMessage}
-          style={{ ...btn, background: "transparent", color: LI.blue, border: `1px solid ${LI.blue}` }}
+          style={{
+            ...btn,
+            background: "transparent",
+            color: LI.blue,
+            border: `1px solid ${LI.blue}`,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+          }}
         >
-          Message
+          <img src="/premiumin.svg" alt="" aria-hidden="true" width={16} height={16} style={{ display: "block" }} />
+          InMail
         </button>
       </div>
 
