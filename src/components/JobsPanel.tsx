@@ -54,8 +54,12 @@ export function JobsPanel({ open, onClose, onOpenConnection }: JobsPanelProps) {
   const requestKey = goal ? `${goal.raw}::${[...webUserIds].sort().join(",")}` : null;
 
   // Keyed result written only from the async callback (React 19: never setState
-  // synchronously in an effect). `matches === null` while a request is in flight.
-  const [result, setResult] = useState<{ key: string; matches: JobMatch[] } | null>(null);
+  // synchronously in an effect). `current === null` (for the active key) means a
+  // request is in flight; `status` distinguishes a real error from zero results.
+  const [result, setResult] = useState<
+    { key: string; status: "loaded" | "error"; matches: JobMatch[] } | null
+  >(null);
+  const [reloadToken, setReloadToken] = useState(0);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -63,20 +67,21 @@ export function JobsPanel({ open, onClose, onOpenConnection }: JobsPanelProps) {
     let cancelled = false;
     fetchJobMatches(parseGoalRaw(goal.raw), webUserIds)
       .then((matches) => {
-        if (!cancelled) setResult({ key: requestKey, matches });
+        if (!cancelled) setResult({ key: requestKey, status: "loaded", matches });
       })
       .catch(() => {
-        if (!cancelled) setResult({ key: requestKey, matches: [] });
+        if (!cancelled) setResult({ key: requestKey, status: "error", matches: [] });
       });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, requestKey]);
+  }, [open, requestKey, reloadToken]);
 
   if (!open) return null;
 
-  const matches = result?.key === requestKey ? result.matches : null;
+  // Only trust the stored result if it matches the current request key.
+  const current = result?.key === requestKey ? result : null;
 
   const toggleExpand = (id: string) =>
     setExpanded((prev) => {
@@ -85,6 +90,11 @@ export function JobsPanel({ open, onClose, onOpenConnection }: JobsPanelProps) {
       else next.add(id);
       return next;
     });
+
+  const retry = () => {
+    setResult(null);
+    setReloadToken((t) => t + 1);
+  };
 
   return (
     <aside
@@ -148,11 +158,46 @@ export function JobsPanel({ open, onClose, onOpenConnection }: JobsPanelProps) {
           </p>
         )}
 
-        {goal && matches === null && (
+        {goal && current === null && (
           <p style={{ color: LI.textSecondary, fontSize: 14, margin: 0 }}>Finding roles…</p>
         )}
 
-        {goal && matches !== null && matches.length === 0 && (
+        {goal && current?.status === "error" && (
+          <div
+            data-testid="jobs-error-state"
+            style={{
+              textAlign: "center",
+              color: LI.textSecondary,
+              fontSize: 14,
+              padding: "24px 8px",
+            }}
+          >
+            <div style={{ fontWeight: 600, color: LI.text, marginBottom: 6 }}>
+              Couldn’t load jobs
+            </div>
+            Something went wrong fetching matches for your goal.
+            <div style={{ marginTop: 12 }}>
+              <button
+                type="button"
+                onClick={retry}
+                style={{
+                  border: `1px solid ${LI.blue}`,
+                  background: LI.surface,
+                  color: LI.blue,
+                  borderRadius: 16,
+                  padding: "6px 16px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        )}
+
+        {goal && current?.status === "loaded" && current.matches.length === 0 && (
           <div
             data-testid="jobs-empty-state"
             style={{
@@ -171,8 +216,8 @@ export function JobsPanel({ open, onClose, onOpenConnection }: JobsPanelProps) {
         )}
 
         {goal &&
-          matches !== null &&
-          matches.map((match) => (
+          current?.status === "loaded" &&
+          current.matches.map((match) => (
             <JobCard
               key={match.job.id}
               match={match}

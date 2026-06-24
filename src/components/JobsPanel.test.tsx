@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/react";
 import { JobsPanel } from "@/components/JobsPanel";
 import { __setMockWebState, __resetMockWebState } from "@/mocks/useWebStore";
 import type { WebNode } from "@/mocks/web";
@@ -119,6 +119,28 @@ describe("JobsPanel", () => {
     render(<JobsPanel open onClose={() => {}} />);
     await screen.findByTestId("job-card");
     expect(document.body.textContent).not.toMatch(/999111|999222/);
+  });
+
+  it("shows an error state (not the empty state) when the fetch rejects", async () => {
+    const { fetchJobMatches } = await import("@/mocks/jobsApi");
+    vi.mocked(fetchJobMatches).mockRejectedValueOnce(new Error("network down"));
+    render(<JobsPanel open onClose={() => {}} />);
+    const err = await screen.findByTestId("jobs-error-state");
+    expect(err.textContent).toMatch(/couldn’t load jobs/i);
+    expect(screen.queryByTestId("jobs-empty-state")).toBeNull();
+  });
+
+  it("retries the fetch when the retry button is clicked", async () => {
+    const { fetchJobMatches } = await import("@/mocks/jobsApi");
+    vi.mocked(fetchJobMatches).mockRejectedValueOnce(new Error("network down"));
+    state.matches = [
+      { job: job({ id: "j1", position: "Backend Engineer" }), relevanceScore: 85, webConnections: [] },
+    ];
+    render(<JobsPanel open onClose={() => {}} />);
+    const retryBtn = await screen.findByRole("button", { name: /retry/i });
+    fireEvent.click(retryBtn);
+    expect(await screen.findByText("Backend Engineer")).toBeTruthy();
+    expect(screen.queryByTestId("jobs-error-state")).toBeNull();
   });
 
   it("prompts for a goal when none is set", async () => {
