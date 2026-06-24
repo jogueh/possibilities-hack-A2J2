@@ -169,6 +169,7 @@ const US_STATE_ALIASES = new Map([
   ["nh", "nh"],
   ["nj", "nj"],
   ["nm", "nm"],
+  ["ny", "ny"],
   ["oh", "oh"],
   ["ohio", "oh"],
   ["ok", "ok"],
