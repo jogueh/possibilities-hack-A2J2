@@ -36,6 +36,13 @@ export interface WebNode {
    * compatible; derived from a member's recent activity (see deriveActivityStatus).
    */
   activityStatus?: ActivityStatus
+  /**
+   * Optional avatar photo URL shown inside the node disc (initials are the
+   * fallback). Additive/optional so workflows that don't supply it stay
+   * compatible; the snapshot builder derives a deterministic portrait via
+   * `photoUrlForUser` (see src/lib/avatarPhoto.ts).
+   */
+  photo?: string
 }
 
 export interface WebEdge {

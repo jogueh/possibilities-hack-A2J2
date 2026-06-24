@@ -33,6 +33,19 @@ describe('WebCanvas', () => {
     expect(container.querySelectorAll('[data-testid^="web-edge-"]')).toHaveLength(2)
   })
 
+  it('renders a clipped avatar photo for each member node', () => {
+    const seeded = buildSnapshot(goal, people, options)
+    const { container } = render(<WebCanvas snapshot={seeded} />)
+    const node = container.querySelector('[data-testid="web-node-a"]')!
+    const image = node.querySelector('image')
+    expect(image?.getAttribute('href')).toBe(
+      seeded.nodes.find((n) => n.id === 'a')!.photo,
+    )
+    expect(image?.getAttribute('clip-path')).toBe('url(#avatar-clip-a)')
+    // Initials remain as the fallback beneath the photo.
+    expect(node.textContent).toContain('AL')
+  })
+
   it('draws dotted bridge edges once a node is expanded', () => {
     const expanded = expandNode(buildSnapshot(goal, people, options), 'a', people, options)
     const { container } = render(<WebCanvas snapshot={expanded} />)

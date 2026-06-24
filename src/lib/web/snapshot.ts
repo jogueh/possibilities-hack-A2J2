@@ -14,6 +14,7 @@ import {
   type LayoutOptions,
   type Relationship,
 } from '@/lib/web/layout'
+import { photoUrlForUser } from '@/lib/avatarPhoto'
 
 // Snapshot builder: turns shaped people + a goal into a WebSnapshot and walks
 // the empty -> seeded -> expanded state machine. Pure and deterministic.
@@ -29,6 +30,11 @@ export interface PersonInput {
   headline?: string
   /** Optional outreach-activity status driving the activity-ring colour. */
   activityStatus?: ActivityStatus
+  /**
+   * Optional avatar photo URL. When omitted, the snapshot derives a stable
+   * portrait from the member id via `photoUrlForUser`.
+   */
+  photo?: string
   /**
    * Real member id in `user_data.json`, used by the node sidebar to fetch the
    * full profile. Defaults to `id` (the graph/layout id) when omitted.
@@ -68,6 +74,7 @@ function toNode(p: PersonInput): WebNode {
     interactionScore: p.interactionScore ?? DEFAULT_INTERACTION,
     relevanceScore,
     position: { x: 0, y: 0 },
+    photo: p.photo ?? photoUrlForUser(p.userId ?? p.id),
     ...(p.headline ? { headline: p.headline } : {}),
     ...(p.activityStatus ? { activityStatus: p.activityStatus } : {}),
   }

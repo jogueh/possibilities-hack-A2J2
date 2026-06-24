@@ -89,6 +89,7 @@ export default function WebNodeMarker({
 
       {/* Avatar disc + activity-status ring (falls back to alignment-tier colour) */}
       <circle r={r} fill="#eef3f8" stroke={ring} strokeWidth={selected ? 4 : 3} />
+      {/* Initials are the fallback shown when there's no photo (or it fails to load). */}
       <text
         textAnchor="middle"
         dominantBaseline="central"
@@ -98,6 +99,24 @@ export default function WebNodeMarker({
       >
         {node.avatarInitials}
       </text>
+      {/* Avatar photo clipped to the disc, drawn over the initials fallback. */}
+      {node.photo && (
+        <>
+          <clipPath id={`avatar-clip-${node.id}`}>
+            <circle r={r} />
+          </clipPath>
+          <image
+            href={node.photo}
+            x={-r}
+            y={-r}
+            width={r * 2}
+            height={r * 2}
+            preserveAspectRatio="xMidYMid slice"
+            clipPath={`url(#avatar-clip-${node.id})`}
+            style={{ pointerEvents: 'none' }}
+          />
+        </>
+      )}
 
       {/* 2nd-degree badge */}
       {node.degree === 2 && (
