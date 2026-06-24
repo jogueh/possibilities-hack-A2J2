@@ -60,22 +60,16 @@ export interface BoardState {
    */
   helpfulness: Partial<Record<string, HelpfulnessTag[]>>
   /**
-   * Ids of people the viewer has explicitly pinned to the canvas via
-   * "Add to web". Their warm-path chain back to the viewer is re-applied
-   * after every snapshot rebuild, so pinning preserves a 2nd-degree (or
-   * deeper) node even when the viewer clicks a different 1st-degree
-   * connector that would otherwise collapse this branch. Pinning is
-   * orthogonal to connecting — you can pin a suggestion without committing
-   * to connect with them.
-   */
-  pinnedIds: string[]
-  /**
    * Resolved people for the current goal — populated from `/api/web/generate`
-   * by the WebBoard. Empty until a goal is mapped. `selectNode` reads from
-   * here so 2nd-degree expansion matches the goal-driven web rather than the
-   * `config.people` fallback.
+   * by the WebBoard. `selectNode` reads from here so 2nd-degree expansion
+   * matches the goal-driven web rather than the `config.people` fallback.
    */
   people: PersonInput[]
+  /**
+   * True once a goal has been mapped, even if the API legitimately returns no
+   * people. Prevents empty mapped results from falling back to demo people.
+   */
+  goalMapped: boolean
   status: BoardStatus
   error: string | null
   /**
@@ -101,7 +95,6 @@ export type BoardAction =
   | { type: 'mapError'; error: string }
   | { type: 'selectNode'; id: string }
   | { type: 'connectNode'; id: string }
-  | { type: 'pinNode'; id: string }
   | { type: 'setStage'; id: string; stage: ConnectionStage; tags?: HelpfulnessTag[] }
   | { type: 'showUpgrade'; reason: UpgradeReason }
   | { type: 'dismissUpgrade' }
@@ -121,10 +114,10 @@ export function createInitialBoardState(): BoardState {
     selectedId: null,
     goalText: '',
     connectedIds: [],
-    pinnedIds: [],
     stages: {},
     helpfulness: {},
     people: [],
+    goalMapped: false,
     status: 'idle',
     error: null,
     upgradePrompt: null,
@@ -132,7 +125,6 @@ export function createInitialBoardState(): BoardState {
   }
 }
 
-/**
 /**
  * Solidifies every dotted bridge edge that leads INTO a connected person (the
  * connected id is the edge target): the line stops being dotted, turns into a
@@ -156,32 +148,22 @@ function applyConnections(
 }
 
 /**
- * Re-applies the warm-path expansion needed to keep every pinned person on
- * the canvas after a snapshot rebuild. Pinning a depth-N node implicitly
- * pins their entire warm-path chain back to the viewer (you can't show a
- * 3rd-degree node without rendering the 2nd-degree connector that introduces
- * them) — `walkViaChain` produces that chain by following `via` references
- * up to the 1st-degree root, and the loop reveals each link pairwise with
- * `revealPerson` so only the specific pinned path appears (NOT the sibling
- * suggestions that share the same parent).
- *
- * Idempotent and safe to call with an empty `pinnedIds` (no-op).
+ * Re-applies the warm-path expansion needed to keep every connected person on
+ * the canvas after a snapshot rebuild. A connected depth-N node needs its full
+ * chain back to the viewer, so each link is revealed pairwise without pulling
+ * in unrelated siblings from the same branch.
  */
-function applyPins(
+function applyRetainedConnections(
   snapshot: WebSnapshot,
-  pinnedIds: string[],
+  retainedIds: string[],
   people: PersonInput[],
   options: LayoutOptions,
 ): WebSnapshot {
-  if (pinnedIds.length === 0) return snapshot
+  if (retainedIds.length === 0) return snapshot
   const byId = new Map(people.map((p) => [p.id, p]))
   let out = snapshot
-  for (const pinnedId of pinnedIds) {
-    const chain = walkViaChain(pinnedId, byId)
-    // The depth-1 root is already in the snapshot; walk the rest of the
-    // chain (depth 2 -> pinned) and add each person individually.
-    // `revealPerson` is a no-op if the person is already present, so chains
-    // that share a prefix don't duplicate work.
+  for (const retainedId of retainedIds) {
+    const chain = walkViaChain(retainedId, byId)
     for (let i = 1; i < chain.length; i++) {
       const person = byId.get(chain[i])
       if (!person) continue
@@ -249,12 +231,11 @@ function applyStages(
   return { ...snapshot, edges }
 }
 
-// Picks the people list to feed the layout: real API-resolved people if the
-// board has them (`submitGoalWithPeople` ran), otherwise the static fallback
-// from config. This preserves existing test/demo behavior for callers that
-// dispatch `submitGoal` directly without going through the API path.
+// Picks the people list to feed the layout: real API-resolved people once a
+// goal has been mapped, otherwise the static fallback from config. This keeps
+// the initial demo/test seed while respecting legitimate empty API results.
 function effectivePeople(state: BoardState, config: BoardConfig): PersonInput[] {
-  return state.people.length > 0 ? state.people : config.people
+  return !state.goalMapped && state.people.length === 0 ? config.people : state.people
 }
 
 export function boardReducer(
@@ -276,9 +257,10 @@ export function boardReducer(
         snapshot: buildSnapshot(goal, people, config.options),
         selectedId: null,
         connectedIds: [],
-        pinnedIds: [],
         stages: {},
         helpfulness: {},
+        people,
+        goalMapped: true,
         status: 'idle',
         error: null,
         upgradePrompt: null,
@@ -297,10 +279,10 @@ export function boardReducer(
         snapshot: buildSnapshot(goal, action.people, config.options),
         selectedId: null,
         connectedIds: [],
-        pinnedIds: [],
         stages: {},
         helpfulness: {},
         people: action.people,
+        goalMapped: true,
         status: 'idle',
         error: null,
         upgradePrompt: null,
@@ -324,9 +306,8 @@ export function boardReducer(
         // real connections the viewer is already part of, so revealing the
         // suggestions reachable through them is always allowed. Rebuilding
         // from the seeded snapshot first collapses any other connector that
-        // was previously expanded — but pinned and connected warm paths are
-        // then re-materialized so explicitly retained people survive the
-        // rebuild.
+        // was previously expanded — but connected warm paths are then
+        // re-materialized so accepted connections survive the rebuild.
         const seeded = buildSnapshot(
           state.snapshot.goal,
           people,
@@ -346,13 +327,8 @@ export function boardReducer(
       // For unconnected 2nd+ nodes, fall through with `snapshot = state.snapshot`
       // — selection still updates so the sidebar opens with the "Connect" CTA,
       // but the canvas does not reveal further suggestions until they accept.
-      const retainedIds = [...new Set([...state.pinnedIds, ...state.connectedIds])]
-      snapshot = applyPins(
-        snapshot,
-        retainedIds,
-        people,
-        config.options,
-      )
+      const retainedIds = [...new Set(state.connectedIds)]
+      snapshot = applyRetainedConnections(snapshot, retainedIds, people, config.options)
       return {
         ...state,
         snapshot: applyStages(
@@ -424,20 +400,6 @@ export function boardReducer(
         helpfulness,
         snapshot: applyStages(state.snapshot, stages),
       }
-    }
-
-    case 'pinNode': {
-      // Pinning retains a person on the canvas across snapshot rebuilds. The
-      // pinned node (and its warm-path chain back to the viewer) is
-      // re-materialized after every selectNode rebuild via `applyPins`, so a
-      // click on another 1st-degree connector no longer collapses this branch.
-      // Orthogonal to `connectNode`: pinning is a display preference and
-      // requires no commitment from the viewer. Idempotent.
-      if (state.pinnedIds.includes(action.id)) return state
-      // 1st-degree nodes are always on the canvas regardless, so a pin there
-      // is recorded but materially a no-op. We still store it so the UI can
-      // reflect the pinned state and the action is consistently idempotent.
-      return { ...state, pinnedIds: [...state.pinnedIds, action.id] }
     }
 
     case 'clearSelection':

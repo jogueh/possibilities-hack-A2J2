@@ -95,7 +95,7 @@ Scaffolding only; no feature logic. Unblocks every other step.
   `alignmentColors` (W1 mock); Steps 1–3. **Provides:** `NodeSidebar`, `CareerTimelineSlot`
   placeholder (→ W4).
 
-### Step 5 — 2nd-degree preview + Add-to-web  (`w3/05-second-degree`) — DEPENDENT
+### Step 5 — 2nd-degree preview + Add-to-web  (`w3/05-second-degree`) — DEPENDENT  _(REMOVED in #95 — the preview list and Add-to-web button were dropped in favor of on-canvas warm-path offshoots. Historical.)_
 - Add "People [Name] can introduce you to" section: up to 3 pre-loaded 2nd-degree nodes from
   store; each row avatar/name/role/reason; **"Add to web"** → `addSecondDegreeNode(node)`;
   button → "Added ✓" (disabled). Omit section if none.

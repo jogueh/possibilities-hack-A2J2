@@ -1,9 +1,9 @@
 "use client";
 // W4-OWNED (stretch s11). "Linked up" button for the W3 node sidebar Actions bar.
 // Logging a real-world LinkedIn-style "linked up" with this person strengthens
-// the tie: the mount site wires `onLog` to a boardState `logMeetup` dispatch,
-// which bumps the rendered edge to full strength and so warms/thickens the
-// edge via the s12 visuals.
+// the tie: the mount site wires `onLog` to a boardState `setStage('met')` dispatch,
+// which bumps the rendered edge to the "met" stage strength and so warms/thickens
+// the edge via the s12 visuals.
 //
 // Store-agnostic by design: it owns the button UI and the confirmation toast,
 // but never imports a store — the W3 mount site supplies `onLog`. No API call,
@@ -31,7 +31,7 @@ interface MetUpButtonProps {
   logged?: boolean;
   /**
    * Called once when the user logs a meetup. The mount site wires this to a
-   * boardState `logMeetup` dispatch, e.g. `onLog={() => onLogMeetup(node.id)}`.
+   * boardState `setStage('met')` dispatch, e.g. `onLog={() => onLogMeetup(node.id)}`.
    */
   onLog: () => void;
 }
