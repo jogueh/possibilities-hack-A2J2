@@ -11,8 +11,8 @@ const people: PersonInput[] = [
   { id: 'a', name: 'Ada Lovelace', degree: 1 },
   { id: 'b', name: 'Bob Smith', degree: 1 },
   { id: 'c', name: 'Carol Danvers', degree: 2, via: 'a' },
-  // c2/c3 are siblings of c — same parent 'a'. Used to verify that pinning
-  // only c does NOT also retain its siblings after a branch switch.
+  // c2/c3 are siblings of c — same parent 'a'. Used to verify that
+  // connected-node retention does NOT also retain siblings after a branch switch.
   { id: 'c2', name: 'Cara Stark', degree: 2, via: 'a' },
   { id: 'c3', name: 'Cleo Vance', degree: 2, via: 'a' },
   { id: 'e', name: 'Eve Polastri', degree: 2, via: 'b' },
@@ -47,6 +47,20 @@ describe('boardReducer', () => {
     expect(s.snapshot.nodes.map((n) => n.id).sort()).toEqual(['a', 'b'])
     expect(s.snapshot.goal?.raw).toBe('Become a PM')
     expect(s.selectedId).toBeNull()
+  })
+
+  it('does not fall back to demo people after the API maps an empty result', () => {
+    let seeded = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Seeded demo' })
+    seeded = reduce(seeded, { type: 'submitGoal' })
+
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Mapped empty' })
+    s = reduce(s, { type: 'submitGoalWithPeople', people: [] })
+    expect(s.snapshot.nodes).toEqual([])
+
+    s = { ...s, snapshot: { ...seeded.snapshot, goal: s.snapshot.goal } }
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+
+    expect(s.snapshot.nodes).toEqual([])
   })
 
   it('expands and selects a 1st-degree node on selectNode', () => {
@@ -318,86 +332,6 @@ describe('boardReducer', () => {
       STAGE_STRENGTH.advocate,
     )
     expect(s.snapshot.edges.find((e) => e.id === 'a__c')!.strength).toBe(bridgeBefore.strength)
-  })
-
-  it('pinNode keeps a 2nd-degree person on the canvas across branch switches', () => {
-    // Expand 'a' to reveal its 2nd-degree 'c'. Without pinning, clicking 'b'
-    // would collapse 'a's expansion and drop 'c'. Pin 'c' first, then verify
-    // it survives the rebuild.
-    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
-    s = reduce(s, { type: 'submitGoal' })
-    s = reduce(s, { type: 'selectNode', id: 'a' })
-    expect(s.snapshot.nodes.some((n) => n.id === 'c')).toBe(true)
-
-    s = reduce(s, { type: 'pinNode', id: 'c' })
-    expect(s.pinnedIds).toEqual(['c'])
-
-    // Switch to 'b' — this normally rebuilds the snapshot from seeded + b's
-    // expansion only. 'c' must survive thanks to the pin.
-    s = reduce(s, { type: 'selectNode', id: 'b' })
-    expect(s.snapshot.nodes.some((n) => n.id === 'e')).toBe(true) // b's child
-    expect(s.snapshot.nodes.some((n) => n.id === 'c')).toBe(true) // pinned a's child
-    // The connector 'a' is also still on the canvas as a 1st-degree node, so
-    // the visible warm path back to the viewer is preserved.
-    expect(s.snapshot.nodes.some((n) => n.id === 'a')).toBe(true)
-  })
-
-  it('pinning ONE sibling does not drag the other siblings back onto the canvas after a branch switch', () => {
-    // Expand 'a' to reveal c, c2, c3 (all 2nd-degree children of 'a'). Pin
-    // only 'c'. Click 'b'. The branch collapses, but only the pinned 'c'
-    // should re-appear — c2 and c3 must stay collapsed.
-    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
-    s = reduce(s, { type: 'submitGoal' })
-    s = reduce(s, { type: 'selectNode', id: 'a' })
-    expect(s.snapshot.nodes.map((n) => n.id).sort()).toEqual(
-      ['a', 'b', 'c', 'c2', 'c3'].sort(),
-    )
-
-    s = reduce(s, { type: 'pinNode', id: 'c' })
-    s = reduce(s, { type: 'selectNode', id: 'b' })
-
-    expect(s.snapshot.nodes.some((n) => n.id === 'c')).toBe(true) // pinned
-    expect(s.snapshot.nodes.some((n) => n.id === 'c2')).toBe(false) // sibling
-    expect(s.snapshot.nodes.some((n) => n.id === 'c3')).toBe(false) // sibling
-  })
-
-  it('pinning a 3rd-degree person also retains its 2nd-degree connector (full warm-path chain)', () => {
-    // Walk to depth 3: expand 'a' -> connect 'c' -> click 'c' to reveal 'd'.
-    // Pin 'd'. Then click 'b' and verify both 'c' (2nd) and 'd' (3rd) survive,
-    // but the sibling 2nd-degrees of 'c' (c2, c3) do NOT.
-    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
-    s = reduce(s, { type: 'submitGoal' })
-    s = reduce(s, { type: 'selectNode', id: 'a' })
-    s = reduce(s, { type: 'connectNode', id: 'c' })
-    s = reduce(s, { type: 'selectNode', id: 'c' })
-    expect(s.snapshot.nodes.some((n) => n.id === 'd')).toBe(true)
-
-    s = reduce(s, { type: 'pinNode', id: 'd' })
-    s = reduce(s, { type: 'selectNode', id: 'b' })
-
-    expect(s.snapshot.nodes.some((n) => n.id === 'd')).toBe(true)
-    expect(s.snapshot.nodes.some((n) => n.id === 'c')).toBe(true)
-    expect(s.snapshot.nodes.some((n) => n.id === 'e')).toBe(true) // b's branch
-    // 'c's siblings (c2, c3) should NOT come along.
-    expect(s.snapshot.nodes.some((n) => n.id === 'c2')).toBe(false)
-    expect(s.snapshot.nodes.some((n) => n.id === 'c3')).toBe(false)
-  })
-
-  it('pinNode is idempotent, orthogonal to connect, and resets on a new goal', () => {
-    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
-    s = reduce(s, { type: 'submitGoal' })
-    s = reduce(s, { type: 'selectNode', id: 'a' })
-    s = reduce(s, { type: 'pinNode', id: 'c' })
-    s = reduce(s, { type: 'pinNode', id: 'c' }) // idempotent
-    expect(s.pinnedIds).toEqual(['c'])
-    // Pinning does NOT promote to connected — those are independent
-    // commitments. 'c' remains a dotted suggestion until the viewer connects.
-    expect(s.connectedIds).not.toContain('c')
-    expect(s.snapshot.edges.find((e) => e.id === 'a__c')?.isDotted).toBe(true)
-    // Mapping a new goal clears pins.
-    s = reduce(s, { type: 'setGoalText', value: 'New goal' })
-    s = reduce(s, { type: 'submitGoal' })
-    expect(s.pinnedIds).toEqual([])
   })
 
   it('keeps a stage-strengthened edge after the web is re-expanded', () => {
