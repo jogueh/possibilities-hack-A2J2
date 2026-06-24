@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { WebNode } from "@/types/web";
 import { useWebStore } from "@/store/useWebStore";
 import { ALIGNMENT_LABELS, alignmentColor } from "@/lib/alignmentColors";
+import { photoUrlForUser } from "@/lib/avatarPhoto";
 import { LI } from "@/lib/linkedinTokens";
 
 interface SecondDegreePreviewProps {
@@ -39,6 +40,7 @@ export function SecondDegreePreview({ parentNode, parentName }: SecondDegreePrev
       </h3>
       {children.map((child) => {
         const isAdded = added.has(child.id);
+        const photoUrl = child.photo ?? photoUrlForUser(child.userId);
         return (
           <div
             key={child.id}
@@ -46,6 +48,8 @@ export function SecondDegreePreview({ parentNode, parentName }: SecondDegreePrev
           >
             <div
               style={{
+                position: "relative",
+                overflow: "hidden",
                 width: 40,
                 height: 40,
                 borderRadius: "50%",
@@ -59,6 +63,18 @@ export function SecondDegreePreview({ parentNode, parentName }: SecondDegreePrev
               }}
             >
               {child.avatarInitials}
+              {/* Photo overlays the initials; a failed load stays transparent so
+                  the initials behind it remain visible as the fallback. */}
+              <span
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  backgroundImage: `url(${JSON.stringify(photoUrl)})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                }}
+              />
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 600, fontSize: 14 }}>{child.label}</div>
