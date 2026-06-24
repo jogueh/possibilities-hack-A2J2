@@ -66,6 +66,19 @@ export function activityRingLabel(status: ActivityStatus): string {
   return ACTIVITY_RING_LABELS[status]
 }
 
+/**
+ * Truncates a label to `max` characters with a trailing ellipsis so node
+ * captions (name / headline) keep a bounded width and never overlap their
+ * neighbours on the canvas. The full text stays available for accessibility
+ * (markers expose it via `aria-label`). Pure and deterministic.
+ */
+export function truncateLabel(text: string, max: number): string {
+  if (max <= 0) return ''
+  if (text.length <= max) return text
+  if (max === 1) return '…'
+  return `${text.slice(0, max - 1).trimEnd()}…`
+}
+
 const round2 = (n: number): number => Math.round(n * 100) / 100
 
 const clamp = (n: number, min: number, max: number): number =>
@@ -90,8 +103,8 @@ export function edgeStrokeDasharray(isDotted: boolean): string | undefined {
 export function layoutNodes(nodes: WebNode[], options: LayoutOptions): WebNode[] {
   const { width, height } = options
   const minDim = Math.min(width, height)
-  const ring1 = options.ring1Radius ?? minDim * 0.22
-  const ring2 = options.ring2Radius ?? minDim * 0.4
+  const ring1 = options.ring1Radius ?? minDim * 0.23
+  const ring2 = options.ring2Radius ?? minDim * 0.46
   const center = { x: width / 2, y: height / 2 }
 
   const place = (group: WebNode[], radius: number): WebNode[] => {
@@ -133,14 +146,22 @@ export function placeNearParent(
   options: LayoutOptions,
 ): { x: number; y: number } {
   const minDim = Math.min(options.width, options.height)
+  const ring1 = options.ring1Radius ?? minDim * 0.23
+  // Distance the warm-path cluster sits beyond its parent. Tuned to clear the
+  // parent's circle AND its caption so 2nd-degree nodes never overlap the
+  // 1st-degree ring. When an explicit ring2 is supplied (tests / custom
+  // layouts) we derive it from the ring gap; otherwise we use a fixed outward
+  // distance scaled to the canvas.
   const clusterRadius = options.ring2Radius
-    ? Math.max(48, (options.ring2Radius - (options.ring1Radius ?? minDim * 0.22)) * 0.8)
-    : minDim * 0.16
+    ? Math.max(80, (options.ring2Radius - ring1) * 0.9)
+    : Math.max(120, minDim * 0.22)
 
   // Outward direction from the centre through the parent.
   const baseAngle = Math.atan2(parent.y - center.y, parent.x - center.x)
-  // Total fan width (~80°); a lone child sits directly outward from the parent.
-  const spread = Math.PI / 2.2
+  // Narrow fan (~60°) keeps siblings radially outward instead of swinging them
+  // sideways toward neighbouring 1st-degree nodes. A lone child sits directly
+  // outward from the parent.
+  const spread = Math.PI / 3
   const offset = count <= 1 ? 0 : (index / (count - 1) - 0.5) * spread
   const angle = baseAngle + offset
 

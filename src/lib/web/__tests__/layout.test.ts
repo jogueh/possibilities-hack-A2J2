@@ -5,9 +5,14 @@ import {
   placeNearParent,
   tierColor,
   tierRadius,
+  truncateLabel,
   edgeStrokeWidth,
   edgeStrokeDasharray,
   TIER_COLORS,
+  ACTIVITY_RING_COLORS,
+  ACTIVITY_RING_LABELS,
+  activityRingColor,
+  activityRingLabel,
 } from '@/lib/web/layout'
 import type { WebNode, DegreeLevel, AlignmentTier } from '@/types/web'
 
@@ -54,6 +59,23 @@ describe('edge styling', () => {
   it('only dotted edges get a dash array', () => {
     expect(edgeStrokeDasharray(true)).toBe('4 4')
     expect(edgeStrokeDasharray(false)).toBeUndefined()
+  })
+})
+
+describe('truncateLabel', () => {
+  it('returns short text unchanged', () => {
+    expect(truncateLabel('Bob Smith', 18)).toBe('Bob Smith')
+  })
+
+  it('truncates long text with a trailing ellipsis within the limit', () => {
+    const out = truncateLabel('Product Manager at Tech Innovators Inc.', 22)
+    expect(out.length).toBeLessThanOrEqual(22)
+    expect(out.endsWith('…')).toBe(true)
+  })
+
+  it('handles degenerate limits', () => {
+    expect(truncateLabel('anything', 0)).toBe('')
+    expect(truncateLabel('anything', 1)).toBe('…')
   })
 })
 
@@ -148,5 +170,21 @@ describe('deriveEdges', () => {
     )
     expect(edges).toHaveLength(1)
     expect(edges[0].strength).toBe(1)
+  })
+})
+
+describe('activity ring mapping', () => {
+  it('maps each activity status to its ring colour', () => {
+    expect(activityRingColor('active')).toBe('#3B82F6')
+    expect(activityRingColor('moderate')).toBe('#F59E0B')
+    expect(activityRingColor('inactive')).toBe('#EF4444')
+    expect(activityRingColor('active')).toBe(ACTIVITY_RING_COLORS.active)
+  })
+
+  it('maps each activity status to its tooltip label', () => {
+    expect(activityRingLabel('active')).toBe('Great time to reach out')
+    expect(activityRingLabel('moderate')).toBe('Worth a nudge')
+    expect(activityRingLabel('inactive')).toBe('Lead with shared context')
+    expect(activityRingLabel('inactive')).toBe(ACTIVITY_RING_LABELS.inactive)
   })
 })
