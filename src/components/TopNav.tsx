@@ -12,6 +12,7 @@ import {
   BellOutlined,
   CaretDownOutlined,
   AppstoreOutlined,
+  DeploymentUnitOutlined,
 } from "@ant-design/icons";
 import type { ReactNode } from "react";
 
@@ -28,6 +29,7 @@ type Tab = {
 const tabs: Tab[] = [
   { href: "/", label: "Home", icon: <HomeFilled />, exact: true },
   { href: "/network", label: "My Network", icon: <TeamOutlined /> },
+  { href: "/web", label: "Career GPS", icon: <DeploymentUnitOutlined /> },
   { href: "/jobs", label: "Jobs", icon: <ShopOutlined /> },
   { href: "/messaging", label: "Messaging", icon: <MessageOutlined /> },
   {
