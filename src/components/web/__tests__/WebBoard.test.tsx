@@ -94,10 +94,14 @@ afterEach(() => {
 })
 
 describe('WebBoard', () => {
-  it('shows the empty prompt before a goal is set', () => {
+  it('shows the user at the centre of an empty web before a goal is set', () => {
     const { container, getByText } = render(<WebBoard />)
-    expect(getByText(/No goal yet/i)).toBeInTheDocument()
-    expect(container.querySelector('[data-testid="web-canvas"]')).toBeNull()
+    // The empty state now seeds a single self ("You") node at the centre via the
+    // canvas (alwaysShowSelf) instead of a blank placeholder, so the web is
+    // never empty even before a goal is mapped.
+    expect(container.querySelector('[data-testid="web-canvas"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="web-self"]')).not.toBeNull()
+    expect(getByText('You')).toBeInTheDocument()
   })
 
   it('maps the web from the /api/web/generate response when a goal is submitted', async () => {

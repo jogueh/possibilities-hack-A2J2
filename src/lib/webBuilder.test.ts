@@ -693,3 +693,59 @@ describe('buildWeb — WebNode shape', () => {
     expect(one).toEqual(two)
   })
 })
+
+describe('buildWeb — node headline + activity status', () => {
+  const job = (over: Partial<import('@/types/data').Job> = {}): import('@/types/data').Job => ({
+    id: 'job_1',
+    company: 'Tech Innovators Inc.',
+    location: 'San Francisco, CA',
+    position: 'Product Manager',
+    salary_range: { from: '100', to: '200' },
+    industry: 'Technology',
+    level: 'Senior',
+    easy_apply: true,
+    description: '',
+    ...over,
+  })
+
+  it('sets the headline to "<role> at <company>" from the most recent job', () => {
+    const conn = makeUser('a', { job_history: [job()] })
+    const viewer = makeUser('viewer', { connections: ['a'] })
+    const { nodes } = buildWeb({
+      viewerUserId: 'viewer',
+      parsedGoal: goal,
+      candidates: [viewer, conn],
+      scorer: scorerByMap({ a: 90 }),
+    })
+    expect(nodes[0].headline).toBe('Product Manager at Tech Innovators Inc.')
+  })
+
+  it('omits the headline when the member has no job history', () => {
+    const conn = makeUser('a', { job_history: [] })
+    const viewer = makeUser('viewer', { connections: ['a'] })
+    const { nodes } = buildWeb({
+      viewerUserId: 'viewer',
+      parsedGoal: goal,
+      candidates: [viewer, conn],
+      scorer: scorerByMap({ a: 90 }),
+    })
+    expect(nodes[0].headline).toBeUndefined()
+  })
+
+  it('derives the activity ring from posts cadence (3+ active, 2 moderate, <2 inactive)', () => {
+    const active = makeUser('a', { posts_activity: ['p', 'p', 'p'] })
+    const moderate = makeUser('b', { posts_activity: ['p', 'p'] })
+    const inactive = makeUser('c', { posts_activity: ['p'] })
+    const viewer = makeUser('viewer', { connections: ['a', 'b', 'c'] })
+    const { nodes } = buildWeb({
+      viewerUserId: 'viewer',
+      parsedGoal: goal,
+      candidates: [viewer, active, moderate, inactive],
+      scorer: scorerByMap({ a: 90, b: 80, c: 70 }),
+    })
+    const byId = new Map(nodes.map((n) => [n.id, n]))
+    expect(byId.get('a')?.activityStatus).toBe('active')
+    expect(byId.get('b')?.activityStatus).toBe('moderate')
+    expect(byId.get('c')?.activityStatus).toBe('inactive')
+  })
+})
