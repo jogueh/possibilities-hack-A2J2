@@ -27,10 +27,6 @@ interface NodeSidebarProps {
   atConnectionLimit?: boolean;
   /** Surfaces the "Upgrade to Premium" prompt (free-tier connection cap reached). */
   onUpgrade?: () => void;
-  /** True when the viewer has pinned this node to the canvas (W1 board state). */
-  pinned?: boolean;
-  /** Pins the open node to the canvas across snapshot rebuilds; receives its graph id. */
-  onPin?: (nodeId: string) => void;
   /** Logs a real-world meetup with this node; receives its graph id (strengthens the edge). */
   onLogMeetup?: (nodeId: string) => void;
   /** True when board state says the selected node's meetup has already been logged. */
@@ -63,8 +59,6 @@ export function NodeSidebar({
   onConnect,
   atConnectionLimit,
   onUpgrade,
-  pinned,
-  onPin,
   onLogMeetup,
   metUpLogged,
 }: NodeSidebarProps) {
@@ -316,8 +310,6 @@ export function NodeSidebar({
             onConnect={() => onConnect?.(node.id)}
             atConnectionLimit={atConnectionLimit}
             onUpgrade={onUpgrade}
-            pinned={pinned}
-            onPin={() => onPin?.(node.id)}
             nodeId={node.id}
             metUpLogged={metUpLogged}
             onLogMeetup={() => onLogMeetup?.(node.id)}

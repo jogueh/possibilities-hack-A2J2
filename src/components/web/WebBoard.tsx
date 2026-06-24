@@ -101,7 +101,6 @@ export default function WebBoard() {
   const selected = snapshot.nodes.find((n) => n.id === selectedId) ?? null
   const isEmpty = snapshot.state === 'empty'
   const selectedConnected = selected ? state.connectedIds.includes(selected.id) : false
-  const selectedPinned = selected ? state.pinnedIds.includes(selected.id) : false
   const selectedMetUpLogged = selected ? state.metUpIds.includes(selected.id) : false
   const atConnectionLimit = state.connectedIds.length >= CONNECTION_LIMIT
   const loading = status === 'loading'
@@ -306,8 +305,6 @@ export default function WebBoard() {
               onConnect={(id) => dispatch({ type: 'connectNode', id })}
               atConnectionLimit={atConnectionLimit}
               onUpgrade={() => dispatch({ type: 'showUpgrade', reason: 'connection' })}
-              pinned={selectedPinned}
-              onPin={(id) => dispatch({ type: 'pinNode', id })}
               onLogMeetup={(id) => dispatch({ type: 'logMeetup', id })}
               onClose={() => dispatch({ type: 'clearSelection' })}
             />

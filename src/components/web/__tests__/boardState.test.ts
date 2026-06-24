@@ -123,7 +123,7 @@ describe('boardReducer', () => {
     expect(reduce(s, { type: 'reset' }).snapshot.state).toBe('empty')
   })
 
-  it('connectNode solidifies the dotted bridge to a 2nd-degree person', () => {
+  it('connectNode solidifies the dotted bridge to a 2nd-degree person AND auto-pins', () => {
     let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
     s = reduce(s, { type: 'submitGoal' })
     s = reduce(s, { type: 'selectNode', id: 'a' }) // expands a -> reveals c via dotted bridge
@@ -133,17 +133,24 @@ describe('boardReducer', () => {
     s = reduce(s, { type: 'connectNode', id: 'c' })
     const bridge = s.snapshot.edges.find((e) => e.id === bridgeId)!
     expect(s.connectedIds).toContain('c')
+    // Connecting now implicitly pins the person (the old "Add to web" button
+    // is gone — connecting is meant to be the only "keep this person on my
+    // canvas" gesture).
+    expect(s.pinnedIds).toContain('c')
     expect(bridge.isDotted).toBe(false) // turns solid (blue)
     expect(bridge.strength).toBeGreaterThanOrEqual(0.9) // strengthened
   })
 
-  it('keeps a connection solid after the connector is re-expanded', () => {
+  it('keeps a connection solid AND visible after the connector is re-expanded', () => {
     let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
     s = reduce(s, { type: 'submitGoal' })
     s = reduce(s, { type: 'selectNode', id: 'a' })
     s = reduce(s, { type: 'connectNode', id: 'c' })
     // Visit b, then return to a (rebuilds a's expansion from scratch).
     s = reduce(s, { type: 'selectNode', id: 'b' })
+    // Even mid-branch-switch, the auto-pinned 'c' survives the rebuild that
+    // collapses a's expansion (this is the whole point of the auto-pin).
+    expect(s.snapshot.nodes.some((n) => n.id === 'c')).toBe(true)
     s = reduce(s, { type: 'selectNode', id: 'a' })
     expect(s.snapshot.edges.find((e) => e.id === 'a__c')?.isDotted).toBe(false)
   })

@@ -40,13 +40,13 @@ export interface BoardState {
   /** Ids of people the viewer has logged a real-world meetup with (edge -> full strength). */
   metUpIds: string[]
   /**
-   * Ids of people the viewer has explicitly pinned to the canvas via
-   * "Add to web". Their warm-path chain back to the viewer is re-applied
-   * after every snapshot rebuild, so pinning preserves a 2nd-degree (or
-   * deeper) node even when the viewer clicks a different 1st-degree
-   * connector that would otherwise collapse this branch. Pinning is
-   * orthogonal to connecting — you can pin a suggestion without committing
-   * to connect with them.
+   * Ids of people whose warm-path chain back to the viewer is re-applied after
+   * every snapshot rebuild, so they survive a click on a different 1st-degree
+   * connector that would otherwise collapse this branch. Auto-populated when
+   * the viewer connects with a 2nd+-degree person (since "I just connected
+   * with them, keep them on my canvas" is almost always the desired UX);
+   * `pinNode` is still exposed for cases where the surrounding UI wants to
+   * pin without connecting.
    */
   pinnedIds: string[]
   /**
@@ -320,11 +320,14 @@ export function boardReducer(
     case 'connectNode': {
       // Connecting reaches a 2nd+-degree person through their warm-path bridge:
       // record the link, turn the dotted bridge into a solid strengthened (blue)
-      // edge, and unlock the next layer of suggestions reachable through them.
-      // The next-layer reveal happens lazily on the next `selectNode` click on
-      // that node — we do not eagerly expand here, so connecting is a clean
-      // commitment action that the viewer can take without rearranging the
-      // canvas. Idempotent — connecting again is a no-op.
+      // edge, AND implicitly pin them to the canvas so navigating to another
+      // branch doesn't make them disappear. Pinning used to be a separate
+      // "Add to web" action; folding it into connect removes the redundant
+      // button — connecting almost always means "I want this person to stay
+      // visible". The next-layer reveal still happens lazily on the next
+      // `selectNode` click on this node (no eager expansion here, so connecting
+      // remains a clean commitment action that doesn't rearrange the canvas).
+      // Idempotent — connecting again is a no-op.
       if (state.connectedIds.includes(action.id)) return state
       // Free-tier connection cap: once the viewer has CONNECTION_LIMIT
       // connections, attempting another surfaces the upgrade prompt instead of
@@ -333,9 +336,13 @@ export function boardReducer(
         return { ...state, upgradePrompt: 'connection' }
       }
       const connectedIds = [...state.connectedIds, action.id]
+      const pinnedIds = state.pinnedIds.includes(action.id)
+        ? state.pinnedIds
+        : [...state.pinnedIds, action.id]
       return {
         ...state,
         connectedIds,
+        pinnedIds,
         snapshot: applyMeetups(
           applyConnections(state.snapshot, connectedIds),
           state.metUpIds,
