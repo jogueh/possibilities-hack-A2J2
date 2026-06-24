@@ -43,6 +43,11 @@ export default function WebNodeMarker({
     ? activityRingColor(node.activityStatus)
     : tierColor(node.alignmentTier)
   const activityTooltip = node.activityStatus ? activityRingLabel(node.activityStatus) : undefined
+  const baseLabel = node.headline ? `${node.label}, ${node.headline}` : node.label
+  // Fold the activity nudge into the accessible name: the `<g>`'s aria-label
+  // overrides the SVG `<title>`, so screen-reader users would otherwise miss the
+  // ring's meaning that sighted users get from the hover tooltip.
+  const ariaLabel = activityTooltip ? `${baseLabel}. ${activityTooltip}` : baseLabel
   const interactive = Boolean(onSelect)
   const hasJobOverlap = Boolean(decoration?.hasJobOverlap)
 
@@ -59,7 +64,7 @@ export default function WebNodeMarker({
       className={hasJobOverlap ? 'node-job-overlap' : undefined}
       data-job-overlap={hasJobOverlap ? 'true' : undefined}
       role={interactive ? 'button' : undefined}
-      aria-label={node.headline ? `${node.label}, ${node.headline}` : node.label}
+      aria-label={ariaLabel}
       aria-pressed={interactive ? selected : undefined}
       tabIndex={interactive ? 0 : undefined}
       style={{ cursor: interactive ? 'pointer' : 'default', outline: 'none' }}
@@ -82,7 +87,7 @@ export default function WebNodeMarker({
         </g>
       )}
 
-      {/* Avatar disc + alignment ring */}
+      {/* Avatar disc + activity-status ring (falls back to alignment-tier colour) */}
       <circle r={r} fill="#eef3f8" stroke={ring} strokeWidth={selected ? 4 : 3} />
       <text
         textAnchor="middle"

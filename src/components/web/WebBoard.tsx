@@ -211,7 +211,7 @@ export default function WebBoard() {
               Your Network Web
             </Typography.Title>
             <Typography.Text type="secondary">
-              Interactively reranking your relationships.
+              Interactively rerank your relationships.
               <br />
               Expand your web, reinforce its roots.
             </Typography.Text>
