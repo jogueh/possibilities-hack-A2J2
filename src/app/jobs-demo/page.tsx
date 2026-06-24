@@ -4,7 +4,7 @@
 // jobs-discovery flow can be exercised end-to-end via `npm run dev` →
 // http://localhost:3000/jobs-demo. See plan.md
 import { useEffect, useState } from "react";
-import { JobsPanel } from "@/components/JobsPanel";
+import { JobsPanel, JOBS_PANEL_WIDTH } from "@/components/JobsPanel";
 import { JobsPanelToggle } from "@/components/JobsPanelToggle";
 import { __setMockWebState } from "@/mocks/useWebStore";
 import { MOCK_USERS } from "@/mocks/userApi";
