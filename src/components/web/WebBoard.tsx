@@ -104,7 +104,7 @@ export default function WebBoard() {
   // NodeSidebar still uses the legacy `metUpLogged` prop name; any stage (met+)
   // should disable that old one-shot meetup control.
   const selectedHasStage = selected ? state.stages[selected.id] !== undefined : false
-  const atConnectionLimit = state.connectedIds.length >= CONNECTION_LIMIT
+  const atConnectionLimit = !state.premium && state.connectedIds.length >= CONNECTION_LIMIT
   const loading = status === 'loading'
 
   // Collapsible side cards (chevron toggles) — purely presentational.
@@ -261,15 +261,48 @@ export default function WebBoard() {
       {/* ── Center column: the network web ──────────────────────────────── */}
       <Card style={{ flex: 1, minWidth: 0 }}>
         <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-          <div>
-            <Typography.Title level={4} style={{ marginTop: 0, marginBottom: 4 }}>
-              Your Web
-            </Typography.Title>
-            <Typography.Text type="secondary">
-              Interactively re-rank your relationships.
-              <br />
-              Expand your web, reinforce its roots.
-            </Typography.Text>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              gap: 12,
+            }}
+          >
+            <div>
+              <Typography.Title level={4} style={{ marginTop: 0, marginBottom: 4 }}>
+                Your Web
+              </Typography.Title>
+              <Typography.Text type="secondary">
+                Interactively re-rank your relationships.
+                <br />
+                Expand your web, reinforce its roots.
+              </Typography.Text>
+            </div>
+
+            {/* Demo-only Premium toggle: one switch bypasses every free-tier
+                gate (connection cap + deeper expansion, messaging
+                non-connections). Lets the live demo flip between the upsell
+                story and the unlocked experience. */}
+            <button
+              type="button"
+              onClick={() => dispatch({ type: 'togglePremium' })}
+              aria-pressed={state.premium}
+              title="Demo toggle — bypass all free-tier limits"
+              style={{
+                flexShrink: 0,
+                cursor: 'pointer',
+                borderRadius: 16,
+                padding: '4px 12px',
+                fontSize: 13,
+                fontWeight: 600,
+                border: `1px solid ${state.premium ? '#B8860B' : '#d0d7de'}`,
+                background: state.premium ? '#FFF4D6' : 'transparent',
+                color: state.premium ? '#8A6100' : '#57606a',
+              }}
+            >
+              {state.premium ? '⭐ Premium: ON' : 'Premium: OFF'}
+            </button>
           </div>
 
           <div style={{ display: 'flex', gap: 16, alignItems: 'stretch' }}>
@@ -307,6 +340,7 @@ export default function WebBoard() {
               onConnect={(id) => dispatch({ type: 'connectNode', id })}
               atConnectionLimit={atConnectionLimit}
               onUpgrade={() => dispatch({ type: 'showUpgrade', reason: 'connection' })}
+              premium={state.premium}
               onLogMeetup={(id) => dispatch({ type: 'setStage', id, stage: 'met' })}
               onClose={() => dispatch({ type: 'clearSelection' })}
             />

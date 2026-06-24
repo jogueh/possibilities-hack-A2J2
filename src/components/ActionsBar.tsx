@@ -21,6 +21,8 @@ interface ActionsBarProps {
   atConnectionLimit?: boolean;
   /** Surfaces the "Upgrade to Premium" prompt (free-tier connection cap reached). */
   onUpgrade?: () => void;
+  /** Demo Premium toggle state — when true, messaging non-connections is unlocked. */
+  premium?: boolean;
   /** Graph id of the open node — passed to the "I met up" button as its key. */
   nodeId?: string;
   /** True when board state says the meetup has already been logged for this node. */
@@ -37,6 +39,7 @@ export function ActionsBar({
   onConnect,
   atConnectionLimit,
   onUpgrade,
+  premium,
   nodeId,
   metUpLogged,
   onLogMeetup,
@@ -126,9 +129,9 @@ export function ActionsBar({
         {/* Messaging is free for your connections (1st-degree or accepted
             warm-path connections). For everyone else it is a Premium-only
             action: the InMail button is shown but blocked with a notice
-            prompting the viewer to connect first. (Premium bypass is not
-            implemented — described to the user only.) */}
-        {degree === 1 || connected ? (
+            prompting the viewer to connect first — unless the demo Premium
+            toggle is on, which unlocks messaging anyone. */}
+        {degree === 1 || connected || premium ? (
           <button
             type="button"
             onClick={openMessage}

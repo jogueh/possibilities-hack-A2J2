@@ -83,6 +83,14 @@ export interface BoardState {
    * when no prompt is open. Drives the "Upgrade to Premium" modal in WebBoard.
    */
   upgradePrompt: UpgradeReason | null
+  /**
+   * Demo-only flag that bypasses ALL free-tier premium gating at once: the
+   * connection cap (and the deeper expansion it gates) and messaging
+   * non-connections. Drives the header "Premium" toggle so the live demo can
+   * switch between the free-tier upsell story and the unlocked experience.
+   * Persists across re-prompts; only `reset` clears it.
+   */
+  premium: boolean
 }
 
 export type BoardAction =
@@ -98,6 +106,7 @@ export type BoardAction =
   | { type: 'showUpgrade'; reason: UpgradeReason }
   | { type: 'dismissUpgrade' }
   | { type: 'clearSelection' }
+  | { type: 'togglePremium' }
   | { type: 'reset' }
 
 export interface BoardConfig {
@@ -119,6 +128,7 @@ export function createInitialBoardState(): BoardState {
     status: 'idle',
     error: null,
     upgradePrompt: null,
+    premium: false,
   }
 }
 
@@ -364,8 +374,8 @@ export function boardReducer(
       if (state.connectedIds.includes(action.id)) return state
       // Free-tier connection cap: once the viewer has CONNECTION_LIMIT
       // connections, attempting another surfaces the upgrade prompt instead of
-      // recording the connection (premium is always off in the demo).
-      if (state.connectedIds.length >= CONNECTION_LIMIT) {
+      // recording the connection. The demo Premium toggle bypasses the cap.
+      if (!state.premium && state.connectedIds.length >= CONNECTION_LIMIT) {
         return { ...state, upgradePrompt: 'connection' }
       }
       const connectedIds = [...state.connectedIds, action.id]
@@ -438,6 +448,11 @@ export function boardReducer(
 
     case 'dismissUpgrade':
       return { ...state, upgradePrompt: null }
+
+    case 'togglePremium':
+      // Demo-only: flip the premium layer on/off. Dismisses any open upgrade
+      // prompt so toggling on immediately clears the free-tier wall.
+      return { ...state, premium: !state.premium, upgradePrompt: null }
 
     case 'reset':
       return createInitialBoardState()

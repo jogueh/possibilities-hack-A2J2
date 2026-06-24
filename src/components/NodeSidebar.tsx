@@ -26,6 +26,8 @@ interface NodeSidebarProps {
   atConnectionLimit?: boolean;
   /** Surfaces the "Upgrade to Premium" prompt (free-tier connection cap reached). */
   onUpgrade?: () => void;
+  /** Demo Premium toggle state — when true, messaging non-connections is unlocked. */
+  premium?: boolean;
   /** Logs a real-world meetup with this node; receives its graph id (strengthens the edge). */
   onLogMeetup?: (nodeId: string) => void;
   /** True when board state says the selected node's meetup has already been logged. */
@@ -58,6 +60,7 @@ export function NodeSidebar({
   onConnect,
   atConnectionLimit,
   onUpgrade,
+  premium,
   onLogMeetup,
   metUpLogged,
 }: NodeSidebarProps) {
@@ -310,6 +313,7 @@ export function NodeSidebar({
             onConnect={() => onConnect?.(node.id)}
             atConnectionLimit={atConnectionLimit}
             onUpgrade={onUpgrade}
+            premium={premium}
             nodeId={node.id}
             metUpLogged={metUpLogged}
             onLogMeetup={() => onLogMeetup?.(node.id)}

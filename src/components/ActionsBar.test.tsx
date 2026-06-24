@@ -105,6 +105,13 @@ describe("ActionsBar", () => {
       "Connect with Alice to message them. Premium members can message anyone.",
     );
   });
+
+  it("unlocks messaging non-connections when Premium is on", () => {
+    render(<ActionsBar targetName="Alice" degree={2} premium tip="hi" />);
+    expect(screen.queryByRole("button", { name: /requires connecting first/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Message" }));
+    expect(screen.getByRole("dialog", { name: "Message Alice" })).toBeInTheDocument();
+  });
   it("offers the 'Linked up' button for 1st-degree people and logs the meetup", () => {
     const onLogMeetup = vi.fn();
     render(
