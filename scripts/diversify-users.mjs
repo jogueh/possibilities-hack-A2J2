@@ -12,8 +12,10 @@
 //   - Deterministic + idempotent: every choice is seeded by the member `id`, so
 //     re-running produces identical output.
 //
-// Name flavor: ~half the members get a funny Gen-Z name (Italian "brainrot"
-// memes + popular streamers); the other half get a varied realistic name.
+// Name flavor: every member gets a varied, realistic multicultural name built
+// from the FIRST + LAST pools below. (Earlier revisions gave ~half the members
+// funny Gen-Z "brainrot"/streamer names; those have been removed so profiles
+// read like real people.)
 //
 // Usage:  node scripts/diversify-users.mjs
 //
@@ -69,22 +71,6 @@ function sampleDistinct(rng, pool, k) {
 }
 
 // ── Value pools ──────────────────────────────────────────────────────────────
-// Funny Gen-Z names: Italian "brainrot" memes + popular streamers (clean).
-const FUNNY_NAMES = [
-  "Tralalero Tralala", "Bombardiro Crocodilo", "Tung Tung Tung Sahur",
-  "Lirili Larila", "Ballerina Cappuccina", "Brr Brr Patapim",
-  "Chimpanzini Bananini", "Cappuccino Assassino", "Trippi Troppi",
-  "Bombombini Gusini", "Boneca Ambalabu", "Frigo Camelo",
-  "Glorbo Fruttodrillo", "Trulimero Trulicina", "Bobrito Bandito",
-  "La Vaca Saturno Saturnita", "Girafa Celestre", "Orangutini Ananasini",
-  "Tigrullini Watermellini", "Espresso Signora", "Burbaloni Luliloli",
-  "Zibra Zubra Zibralini", "Rhino Toasterino", "Pomni Pomnini",
-  "IShowSpeed", "MrBeast", "Kai Cenat", "Pokimane", "Ninja",
-  "Jynxzi", "Adin Ross", "Ludwig Ahgren", "Markiplier", "Sketch",
-  "Agent00", "Duke Dennis", "CaseOh", "Ironmouse", "Jasontheween",
-  "Stable Ronaldo", "Plaqueboymax", "Quackity", "Karl Jacobs", "Tubbo",
-];
-
 // Realistic, multicultural first + last name pools (combined on demand).
 const FIRST = [
   "Aaliyah", "Mateo", "Priya", "Wei", "Sofia", "Omar", "Hana", "Diego",
@@ -160,18 +146,11 @@ const POSTS = [
 // ── Rewrite ──────────────────────────────────────────────────────────────────
 const users = JSON.parse(readFileSync(join(dataDir, "user_data.json"), "utf8"));
 
-let funnyCount = 0;
 for (const u of users) {
   const rng = rngFor(u.id);
 
-  // Name: ~50% funny, ~50% realistic (decision drawn first for stable order).
-  const funny = rng() < 0.5;
-  if (funny) {
-    funnyCount++;
-    u.name = pick(rng, FUNNY_NAMES);
-  } else {
-    u.name = `${pick(rng, FIRST)} ${pick(rng, LAST)}`;
-  }
+  // Name: a varied, realistic multicultural full name.
+  u.name = `${pick(rng, FIRST)} ${pick(rng, LAST)}`;
 
   // School history: same entry count, keep degree + graduation_year, swap names.
   const schoolNames = sampleDistinct(rng, UNIVERSITIES, u.school_history.length);
@@ -195,7 +174,6 @@ writeFileSync(
 );
 
 console.log(
-  `Diversified ${users.length} members (${funnyCount} funny / ` +
-    `${users.length - funnyCount} realistic names). ` +
+  `Diversified ${users.length} members with realistic names. ` +
     `Preserved id/job_history/courses/connections.`,
 );
