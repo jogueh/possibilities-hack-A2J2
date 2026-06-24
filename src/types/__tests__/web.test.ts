@@ -29,6 +29,7 @@ describe('web types contract', () => {
       interactionScore: number
       relevanceScore: number
       position: { x: number; y: number }
+      headline?: string
     }>()
   })
 

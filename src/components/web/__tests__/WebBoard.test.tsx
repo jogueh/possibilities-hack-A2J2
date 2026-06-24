@@ -25,7 +25,7 @@ describe('WebBoard', () => {
     fireEvent.click(getByRole('button', { name: /map my web/i }))
 
     const before = container.querySelectorAll('[data-testid^="web-node-"]').length
-    fireEvent.click(container.querySelector('[data-testid="web-node-p_amir"]')!)
+    fireEvent.click(container.querySelector('[data-testid="web-node-p_john"]')!)
     const after = container.querySelectorAll('[data-testid^="web-node-"]').length
 
     expect(after).toBeGreaterThan(before)

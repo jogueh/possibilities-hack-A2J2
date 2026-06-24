@@ -62,9 +62,10 @@ export default function WebCanvas({
               y1={a.y}
               x2={b.x}
               y2={b.y}
-              stroke={edge.isDotted ? '#9aa7b5' : '#b7c0cb'}
+              stroke={edge.isDotted ? '#b9c2cc' : '#4a90d9'}
               strokeWidth={edgeStrokeWidth(edge.strength)}
               strokeDasharray={edgeStrokeDasharray(edge.isDotted)}
+              strokeLinecap="round"
             />
           )
         })}

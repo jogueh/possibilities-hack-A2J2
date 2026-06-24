@@ -30,6 +30,7 @@ export default function WebNodeMarker({
   decoration,
 }: WebNodeMarkerProps) {
   const r = tierRadius(node.alignmentTier)
+  const ring = tierColor(node.alignmentTier)
   const interactive = Boolean(onSelect)
   const hasJobOverlap = Boolean(decoration?.hasJobOverlap)
 
@@ -47,36 +48,54 @@ export default function WebNodeMarker({
       data-job-overlap={hasJobOverlap ? 'true' : undefined}
       transform={`translate(${node.position.x}, ${node.position.y})`}
       role={interactive ? 'button' : undefined}
-      aria-label={node.label}
+      aria-label={node.headline ? `${node.label}, ${node.headline}` : node.label}
       aria-pressed={interactive ? selected : undefined}
       tabIndex={interactive ? 0 : undefined}
       style={{ cursor: interactive ? 'pointer' : 'default' }}
       onClick={interactive ? () => onSelect?.(node.id) : undefined}
       onKeyDown={interactive ? handleKeyDown : undefined}
     >
-      <circle
-        r={r}
-        fill={tierColor(node.alignmentTier)}
-        stroke={selected ? '#004182' : '#ffffff'}
-        strokeWidth={selected ? 3 : 2}
-      />
+      {/* Selection halo */}
+      {selected && (
+        <circle r={r + 5} fill="none" stroke={ring} strokeWidth={2} opacity={0.35} />
+      )}
+
+      {/* Avatar disc + alignment ring */}
+      <circle r={r} fill="#eef3f8" stroke={ring} strokeWidth={selected ? 4 : 3} />
       <text
         textAnchor="middle"
         dominantBaseline="central"
-        fontSize={12}
+        fontSize={r * 0.62}
         fontWeight={600}
-        fill="#ffffff"
+        fill={ring}
       >
         {node.avatarInitials}
       </text>
+
+      {/* 2nd-degree badge */}
+      {node.degree === 2 && (
+        <text x={r + 4} y={-r + 2} fontSize={10} fontWeight={600} fill="#8a94a6">
+          2nd
+        </text>
+      )}
+
+      {/* Name */}
       <text
         textAnchor="middle"
-        y={r + 14}
-        fontSize={11}
-        fill="#42526e"
+        y={r + 16}
+        fontSize={12}
+        fontWeight={600}
+        fill="#1f2937"
       >
         {node.label}
       </text>
+
+      {/* Headline */}
+      {node.headline && (
+        <text textAnchor="middle" y={r + 31} fontSize={10.5} fill="#6b7280">
+          {node.headline}
+        </text>
+      )}
     </g>
   )
 }
