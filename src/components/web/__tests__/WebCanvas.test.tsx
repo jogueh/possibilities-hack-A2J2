@@ -55,17 +55,34 @@ describe('WebCanvas', () => {
     expect(node.textContent).toContain('AL')
   })
 
-  it('styles a strong edge with a gradient stroke and a weak edge with a solid colour', () => {
+  it('renders every normal connection line as flat blue with no gradient', () => {
     const seeded = buildSnapshot(goal, people, options)
     const { container } = render(<WebCanvas snapshot={seeded} />)
-    // `a` has interactionScore 0.9 → strength 0.9 → vibrant tier (gradient stroke).
+    // `a` (interactionScore 0.9) and `b` (0.4) are both ordinary connections —
+    // regardless of strength they render solid LinkedIn blue, no gradient def.
     const strongEdge = container.querySelector('[data-testid="web-edge-self_1__a"]')
-    expect(strongEdge?.getAttribute('stroke')).toBe('url(#edge-grad-self_1__a)')
-    expect(container.querySelector('#edge-grad-self_1__a')).toBeTruthy()
-    // `b` has interactionScore 0.4 → steady tier → solid colour, no gradient def.
+    expect(strongEdge?.getAttribute('stroke')).toBe('#0A66C2')
+    expect(container.querySelector('#edge-grad-self_1__a')).toBeNull()
     const steadyEdge = container.querySelector('[data-testid="web-edge-self_1__b"]')
-    expect(steadyEdge?.getAttribute('stroke')).not.toContain('url(#')
+    expect(steadyEdge?.getAttribute('stroke')).toBe('#0A66C2')
     expect(container.querySelector('#edge-grad-self_1__b')).toBeNull()
+  })
+
+  it('renders a met-up connection line with the violet→pink gradient stroke', () => {
+    const seeded = buildSnapshot(goal, people, options)
+    const metUp = {
+      ...seeded,
+      edges: seeded.edges.map((e) =>
+        e.id === 'self_1__a'
+          ? { ...e, isDotted: false, isMetUp: true, strength: 1 }
+          : e,
+      ),
+    }
+    const { container } = render(<WebCanvas snapshot={metUp} />)
+    const line = container.querySelector('[data-testid="web-edge-self_1__a"]')
+    expect(line?.getAttribute('stroke')).toBe('url(#edge-grad-self_1__a)')
+    // The gradient def IS emitted for a met-up edge.
+    expect(container.querySelector('#edge-grad-self_1__a')).toBeTruthy()
   })
 
   it('draws dotted bridge edges once a node is expanded', () => {

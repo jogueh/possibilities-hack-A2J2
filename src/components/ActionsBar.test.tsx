@@ -150,12 +150,12 @@ describe("ActionsBar", () => {
     expect(screen.getByRole("button", { name: /Met up logged/ })).toBeDisabled();
   });
 
-  it("does not offer the 'I met up' button for 2nd-degree people", () => {
+  it("offers the 'I met up' button for 2nd-degree people too", () => {
     render(
       <ActionsBar targetName="Alice" degree={2} nodeId="c" onLogMeetup={vi.fn()} />,
     );
     expect(
-      screen.queryByRole("button", { name: /I met up with this person/ }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", { name: /I met up with this person/ }),
+    ).toBeInTheDocument();
   });
 });

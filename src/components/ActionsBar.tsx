@@ -197,9 +197,9 @@ export function ActionsBar({
         </div>
       )}
 
-      {/* 1st-degree people are existing connections — logging a real-world meetup
-          with them strengthens the edge on the web (W4 stretch s11). */}
-      {degree === 1 && nodeId && onLogMeetup && (
+      {/* Logging a real-world meetup is offered for everyone on the canvas —
+          it turns that person's connection line purple (W4 stretch s11). */}
+      {nodeId && onLogMeetup && (
         <MetUpButton edgeId={nodeId} logged={metUpLogged} onLog={onLogMeetup} />
       )}
 

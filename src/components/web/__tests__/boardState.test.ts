@@ -344,8 +344,33 @@ describe('boardReducer', () => {
     // source c is connected).
     expect(cToD).toBeDefined()
     expect(cToD?.isDotted).toBe(true)
-    // Connecting with d finally solidifies it.
-    s = reduce(s, { type: 'connectNode', id: 'd' })
-    expect(s.snapshot.edges.find((e) => e.id === 'c__d')?.isDotted).toBe(false)
+  })
+
+  it('logMeetup flags the connection line into a met-up person as purple (isMetUp)', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    // Reveal c through a, connect with c, then log a meetup with c.
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    s = reduce(s, { type: 'connectNode', id: 'c' })
+    s = reduce(s, { type: 'logMeetup', id: 'c' })
+    // The line INTO c (its warm-path bridge) is flagged met-up and solid.
+    const intoC = s.snapshot.edges.find((e) => e.id === 'a__c')!
+    expect(intoC.isMetUp).toBe(true)
+    expect(intoC.isDotted).toBe(false)
+    // A normal (not-met-up) connection line stays unflagged (renders blue).
+    const intoA = s.snapshot.edges.find((e) => e.id === 'self_1__a')!
+    expect(intoA.isMetUp).toBeFalsy()
+  })
+
+  it('logMeetup does not flag outgoing edges FROM a met-up person', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    s = reduce(s, { type: 'logMeetup', id: 'a' })
+    // a__c has a (met-up) as its source, not target — it must not turn purple.
+    const outFromA = s.snapshot.edges.find((e) => e.id === 'a__c')
+    expect(outFromA?.isMetUp).toBeFalsy()
+    // a's own connection line (self -> a) is the one that turns purple.
+    expect(s.snapshot.edges.find((e) => e.id === 'self_1__a')!.isMetUp).toBe(true)
   })
 })

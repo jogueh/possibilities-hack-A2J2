@@ -32,6 +32,13 @@ const MIN_ZOOM = 0.6
 const MAX_ZOOM = 3
 const ZOOM_STEP = 1.2
 
+// A normal connection line renders as flat LinkedIn blue. Only a line into a
+// person the viewer has logged "I met up with this person" gets the warm
+// violet→pink gradient, so logged real-world meetups stand out.
+const NORMAL_EDGE_COLOR = '#0A66C2'
+// Solid fallback colour for a met-up edge if its gradient isn't available.
+const MET_UP_EDGE_COLOR = '#8B5CF6'
+
 const clamp = (n: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, n))
 
@@ -180,7 +187,7 @@ export default function WebCanvas({
           <defs>
             {snapshot.edges.map((edge) => {
               const g = edgeStrengthStyleUnit(edge.strength).gradient
-              if (g === undefined || edge.isDotted) return null
+              if (g === undefined || edge.isDotted || !edge.isMetUp) return null
               const a = positionById.get(edge.source)
               const b = positionById.get(edge.target)
               if (!a || !b) return null
@@ -209,10 +216,12 @@ export default function WebCanvas({
               const style = edgeStrengthStyleUnit(edge.strength)
               const stroke = edge.isDotted
                 ? '#b9c2cc'
-                : style.gradient
-                  ? `url(#edge-grad-${edge.id})`
-                  : style.color
-              const pulse = style.pulse && !edge.isDotted && !reduceMotion
+                : edge.isMetUp
+                  ? style.gradient
+                    ? `url(#edge-grad-${edge.id})`
+                    : MET_UP_EDGE_COLOR
+                  : NORMAL_EDGE_COLOR
+              const pulse = edge.isMetUp && style.pulse && !reduceMotion
               return (
                 <motion.line
                   key={edge.id}
