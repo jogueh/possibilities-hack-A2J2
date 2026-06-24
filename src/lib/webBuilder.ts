@@ -5,16 +5,13 @@ import {
   deriveAlignmentTier,
   scoreUserAgainstGoal as defaultScorer,
 } from '@/lib/scoring'
-// MOCK import — W4 owns the real implementation at `@/lib/connections`. When
-// `src/lib/connections.ts` lands on main, swap this single import line.
-import { getConnectionIds as defaultGetConnectionIds } from '@/mocks/connectionsMock'
 
 // =============================================================================
 // Web builder — pure function implementing the connection-graph-aware ranking
 // algorithm. Separated from the route handler so it can be exhaustively unit
-// tested with injected dependencies (scorer + connection-graph lookup). The
-// production route wires in the real ones from `@/lib/scoring` and
-// `@/lib/connections` (currently `@/mocks/connectionsMock`).
+// tested with an injected scoring function. Connection data is read directly
+// off each candidate's `connections: string[]` field (carried through from
+// `User` via `UserWithJobs`), so there is no separate graph dependency.
 // =============================================================================
 
 export interface BuildWebInput {
@@ -23,13 +20,6 @@ export interface BuildWebInput {
   candidates: UserWithJobs[]
   /** Optional scorer override for tests. Defaults to the real `scoreUserAgainstGoal`. */
   scorer?: (user: UserWithJobs, goal: ParsedGoal) => number
-  /**
-   * Optional connection-graph lookup override for tests. Defaults to the W4
-   * `getConnectionIds` (currently the in-memory mock). Returning `[]` for a
-   * user with no known graph entry yields an empty web — the algorithm never
-   * pads with strangers.
-   */
-  getConnectionIds?: (userId: string) => string[]
 }
 
 export interface BuildWebOutput {
@@ -88,11 +78,11 @@ function edge(source: string, target: string, isDotted: boolean): WebEdge {
  * reflects the viewer's REAL network ranked by goal — it is no longer a
  * goal-scored slice of the entire dataset.
  *
- *   1. 1st-degree pool = `getConnectionIds(viewer)` resolved against the
- *      candidates map (anyone outside the candidates set is silently dropped).
- *      Score each, keep score >= FIRST_DEGREE_MIN_SCORE, sort desc, take top
+ *   1. 1st-degree pool = `viewer.connections` resolved against the candidates
+ *      map (anyone outside the candidates set is silently dropped). Score
+ *      each, keep score >= FIRST_DEGREE_MIN_SCORE, sort desc, take top
  *      FIRST_DEGREE_MAX. Edges viewer -> 1st are SOLID (real connection).
- *   2. 2nd-degree pool per 1st-degree node = that node's connections, minus
+ *   2. 2nd-degree pool per 1st-degree node = that node's `connections`, minus
  *      the viewer and anyone already in the web. Score, filter
  *      >= SECOND_DEGREE_MIN_SCORE, sort desc, take top
  *      SECOND_DEGREE_PER_NODE_MAX. Edges 1st -> 2nd are DOTTED ("people to
@@ -104,16 +94,19 @@ export function buildWeb({
   parsedGoal,
   candidates,
   scorer = defaultScorer,
-  getConnectionIds = defaultGetConnectionIds,
 }: BuildWebInput): BuildWebOutput {
   // O(1) candidate lookup by userId.
   const byId = new Map<string, UserWithJobs>()
   for (const u of candidates) byId.set(u.id, u)
 
+  // Reads the connections array off a candidate; unknown ids return [].
+  const connectionsOf = (id: string): readonly string[] =>
+    byId.get(id)?.connections ?? []
+
   // 1st-degree: viewer's direct connections that exist in the candidate set
   // AND clear the score threshold.
   const directScored: ScoredUser[] = []
-  for (const id of getConnectionIds(viewerUserId)) {
+  for (const id of connectionsOf(viewerUserId)) {
     if (id === viewerUserId) continue
     const user = byId.get(id)
     if (!user) continue
@@ -138,7 +131,7 @@ export function buildWeb({
   // 2nd-degree: friends-of-friends per 1st-degree node, ranked by goal score.
   for (const parent of firstDegree) {
     const candidateScored: ScoredUser[] = []
-    for (const id of getConnectionIds(parent.user.id)) {
+    for (const id of connectionsOf(parent.user.id)) {
       if (inWeb.has(id)) continue
       const user = byId.get(id)
       if (!user) continue

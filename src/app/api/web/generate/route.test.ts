@@ -10,14 +10,13 @@ vi.mock('@openrouter/ai-sdk-provider', () => {
 
 import { POST } from '@/app/api/web/generate/route'
 import { __resetDataCachesForTests, __setUsersForTests } from '@/lib/data'
-import {
-  __resetMockConnectionGraph,
-  __setMockConnectionGraph,
-} from '@/mocks/connectionsMock'
 import type { Job, User } from '@/types/data'
 
-const users: User[] = Array.from({ length: 8 }, (_, i) => ({
-  id: `user_${i}`,
+// Each user is connected to every other user in the fixture set, so the route
+// has a non-empty graph to walk regardless of which viewer the test picks.
+const baseUserIds = Array.from({ length: 8 }, (_, i) => `user_${i}`)
+const users: User[] = baseUserIds.map((id, i) => ({
+  id,
   name: `User ${i}`,
   school_history: [],
   job_history: [`job_${i % 3}`],
@@ -25,7 +24,7 @@ const users: User[] = Array.from({ length: 8 }, (_, i) => ({
   posts_activity: [],
   skills: ['TypeScript'],
   courses: [],
-  connections: [],
+  connections: baseUserIds.filter((other) => other !== id),
 }))
 
 const jobs: Job[] = Array.from({ length: 3 }, (_, i) => ({
@@ -71,19 +70,10 @@ describe('POST /api/web/generate', () => {
     __resetDataCachesForTests()
     __setUsersForTests(users)
     mockDatasetFetch()
-    // Seed a fully-connected (modulo self) mock graph so the route returns a
-    // non-empty web. W4 owns the real `src/lib/connections.ts`; this test
-    // injects a graph through the mock module to keep the integration self-
-    // contained.
-    const allIds = [...users.map((u) => u.id), 'user_4579']
-    const graph: Record<string, string[]> = {}
-    for (const id of allIds) graph[id] = allIds.filter((other) => other !== id)
-    __setMockConnectionGraph(graph)
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
-    __resetMockConnectionGraph()
     if (ORIGINAL_KEY === undefined) delete process.env.OPENROUTER_API_KEY
     else process.env.OPENROUTER_API_KEY = ORIGINAL_KEY
   })
@@ -120,7 +110,9 @@ describe('POST /api/web/generate', () => {
         posts_activity: [],
         skills: [],
         courses: [],
-        connections: [],
+        // Connect the default viewer to every fixture user so the route has
+        // a non-empty web to walk for this default-userId test.
+        connections: baseUserIds,
       },
     ]
     __resetDataCachesForTests()
