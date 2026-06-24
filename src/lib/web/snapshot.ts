@@ -11,6 +11,7 @@ import {
   deriveEdges,
   layoutNodes,
   placeNearParent,
+  resolveCollisions,
   type LayoutOptions,
   type Relationship,
 } from '@/lib/web/layout'
@@ -152,9 +153,18 @@ export function expandNode(
   )
 
   const center = { x: options.width / 2, y: options.height / 2 }
+  // Initial fanned-out cluster positions next to the parent…
+  const clustered = ordered.map((p, i) =>
+    placeNearParent(parent.position, center, i, ordered.length, options),
+  )
+  // …then push them apart from everything already on the canvas (and the self
+  // centre + each other) so freshly-revealed connections never physically
+  // overlap existing people.
+  const obstacles = [center, ...snapshot.nodes.map((n) => n.position)]
+  const resolved = resolveCollisions(obstacles, clustered, undefined, center)
   const newNodes: WebNode[] = ordered.map((p, i) => ({
     ...toNode(p),
-    position: placeNearParent(parent.position, center, i, ordered.length, options),
+    position: resolved[i],
   }))
   const nodes = [...snapshot.nodes, ...newNodes]
 

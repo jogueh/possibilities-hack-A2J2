@@ -53,7 +53,20 @@ function initialsFromName(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
+/**
+ * Resolves the node headline ("position at company") from the member's first
+ * resolvable job, so the live web shows each person's role under their name —
+ * matching the curated `web_people` fallback. Returns undefined when the member
+ * has no jobs (the headline field is optional on WebNode).
+ */
+function headlineOf(user: UserWithJobs): string | undefined {
+  const job = user.job_history?.[0]
+  if (!job) return undefined
+  return `${job.position} at ${job.company}`
+}
+
 function toNode(user: UserWithJobs, degree: DegreeLevel, score: number): WebNode {
+  const headline = headlineOf(user)
   return {
     id: user.id,
     userId: user.id,
@@ -71,6 +84,7 @@ function toNode(user: UserWithJobs, degree: DegreeLevel, score: number): WebNode
     // Server emits placeholder positions — W1 owns the layout algorithm and
     // recomputes positions client-side when nodes change.
     position: { x: 0, y: 0 },
+    ...(headline ? { headline } : {}),
   }
 }
 
@@ -196,9 +210,17 @@ export function buildWeb({
   }
 
   // 3rd-degree: one hop further out from each 2nd-degree node, so the viewer can
-  // "keep going" past the warm-path frontier once they connect. Same ranking +
-  // threshold as the 2nd-degree pass; dotted edges from the 2nd-degree parent.
-  // Only emitted when the caller opts into a deeper web (`maxDegree >= 3`).
+  // "keep going" past the warm-path frontier once they connect. Dotted edges from
+  // the 2nd-degree parent. Only emitted when the caller opts into a deeper web
+  // (`maxDegree >= 3`).
+  //
+  // Unlike the 2nd-degree pass, this applies a WEAK-MATCH FALLBACK (mirroring the
+  // 1st-degree logic): if none of a 2nd-degree node's connections clear the
+  // SECOND_DEGREE_MIN_SCORE threshold, we still surface its top
+  // SECOND_DEGREE_PER_NODE_MAX connections by score. Without this, connecting
+  // with a 2nd-degree person whose friends are weak goal-matches would reveal
+  // nothing when you expand them, so the web would "stop" right after a
+  // connection — exactly the dead end we want to avoid.
   if (maxDegree >= 3) {
     for (const parent of secondDegree) {
       const candidateScored: ScoredUser[] = []
@@ -206,12 +228,15 @@ export function buildWeb({
         if (inWeb.has(id)) continue
         const user = byId.get(id)
         if (!user) continue
-        const score = scorer(user, parsedGoal)
-        if (score < SECOND_DEGREE_MIN_SCORE) continue
-        candidateScored.push({ user, score })
+        candidateScored.push({ user, score: scorer(user, parsedGoal) })
       }
       candidateScored.sort((a, b) => b.score - a.score)
-      const picked = candidateScored.slice(0, SECOND_DEGREE_PER_NODE_MAX)
+      const qualifying = candidateScored.filter(
+        (s) => s.score >= SECOND_DEGREE_MIN_SCORE,
+      )
+      const picked = (
+        qualifying.length > 0 ? qualifying : candidateScored
+      ).slice(0, SECOND_DEGREE_PER_NODE_MAX)
       for (const m of picked) {
         inWeb.add(m.user.id)
         nodes.push(toNode(m.user, 3, m.score))

@@ -88,4 +88,23 @@ describe('expandNode', () => {
     const empty = buildSnapshot(null, people, options)
     expect(expandNode(empty, 'a', people, options)).toBe(empty)
   })
+
+  it('places revealed nodes so they do not overlap existing nodes or each other', () => {
+    // `a` has two 2nd-degree connections (c, d). After expanding, no two nodes
+    // (including the self centre) should sit closer than the collision minimum.
+    const seeded = buildSnapshot(goal, people, options)
+    const expanded = expandNode(seeded, 'a', people, options)
+    const center = { x: options.width / 2, y: options.height / 2 }
+    const points = [center, ...expanded.nodes.map((n) => n.position)]
+    const MIN = 92
+    for (let i = 0; i < points.length; i++) {
+      for (let j = i + 1; j < points.length; j++) {
+        const d = Math.hypot(
+          points[i].x - points[j].x,
+          points[i].y - points[j].y,
+        )
+        expect(d).toBeGreaterThanOrEqual(MIN - 0.5)
+      }
+    }
+  })
 })

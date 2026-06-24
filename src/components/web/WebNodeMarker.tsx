@@ -3,7 +3,7 @@
 import type { KeyboardEvent } from 'react'
 import { motion } from 'framer-motion'
 import type { WebNode } from '@/types/web'
-import { tierColor, tierRadius, truncateLabel, wrapLabel, activityRingColor, activityRingLabel } from '@/lib/web/layout'
+import { tierColor, tierRadius, truncateLabel, wrapWords, activityRingColor, activityRingLabel } from '@/lib/web/layout'
 
 /**
  * Per-node visual decorations injected by sibling workflows. Workflow 1 owns the
@@ -23,10 +23,10 @@ export interface WebNodeMarkerProps {
   decoration?: NodeDecoration
 }
 
-// The name caption stays on one line (capped width). The headline wraps across
-// lines so the full role is shown without overflowing the node's width.
+// The name caption stays on one line (capped width). The headline wraps two
+// words per line so the full role is shown under the node without overflowing.
 const NAME_MAX = 18
-const HEADLINE_WRAP = 16
+const HEADLINE_WORDS_PER_LINE = 2
 const HEADLINE_LINE_HEIGHT = 13
 
 // Presentational SVG marker for a single person node.
@@ -117,10 +117,10 @@ export default function WebNodeMarker({
         {truncateLabel(node.label, NAME_MAX)}
       </text>
 
-      {/* Headline — width-constrained: wraps across lines so the full role
-          (e.g. "Product Manager at Tech Innovators Inc.") is always shown. */}
+      {/* Headline — width-constrained: wraps two words per line so the full
+          role (e.g. "Product Manager at Tech Innovators Inc.") is always shown. */}
       {node.headline &&
-        wrapLabel(node.headline, HEADLINE_WRAP).map((line, i) => (
+        wrapWords(node.headline, HEADLINE_WORDS_PER_LINE).map((line, i) => (
           <text
             key={i}
             textAnchor="middle"

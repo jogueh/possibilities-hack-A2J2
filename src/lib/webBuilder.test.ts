@@ -4,7 +4,7 @@ import {
   DEFAULT_EDGE_STRENGTH,
   FIRST_DEGREE_MAX,
 } from '@/lib/webBuilder'
-import type { UserWithJobs } from '@/types/data'
+import type { Job, UserWithJobs } from '@/types/data'
 import type { ParsedGoal } from '@/types/goal'
 
 // ---------- Fixtures ----------
@@ -13,6 +13,21 @@ const goal: ParsedGoal = {
   intent: 'find SWE in SF',
   targetRole: 'Software Engineer',
   targetLocation: 'San Francisco, CA',
+}
+
+function makeJob(overrides: Partial<Job> = {}): Job {
+  return {
+    id: 'job_1',
+    company: 'Innovatech',
+    location: 'San Francisco, CA',
+    position: 'Software Engineer',
+    salary_range: { from: '100k', to: '150k' },
+    industry: 'Software',
+    level: 'Mid',
+    easy_apply: true,
+    description: '',
+    ...overrides,
+  }
 }
 
 function makeUser(
@@ -537,5 +552,67 @@ describe('buildWeb — 3rd-degree selection (maxDegree: 3)', () => {
       scorer: scorerByMap({ active1: 90 }),
     })
     expect(nodes.find((n) => n.id === 'active1')?.activityStatus).toBe('active')
+  })
+
+  it('keeps revealing a 2nd-degree node\'s connections even when none clear the 70 threshold (weak-match fallback)', () => {
+    // viewer -> friend (1st) -> fof (2nd). `fof`'s own connections are all weak
+    // goal-matches (< 70). The 2nd-degree pass would drop them, but the
+    // 3rd-degree pass must still surface the top SECOND_DEGREE_PER_NODE_MAX so
+    // the web can "keep going" once the viewer connects with `fof`.
+    const viewer = makeUser('viewer', { connections: ['friend'] })
+    const friend = makeUser('friend', { connections: ['fof'] })
+    const fof = makeUser('fof', { connections: ['w1', 'w2', 'w3', 'w4'] })
+    const weaks = ['w1', 'w2', 'w3', 'w4'].map((id) => makeUser(id))
+    const { nodes, edges } = buildWeb({
+      viewerUserId: 'viewer',
+      parsedGoal: goal,
+      candidates: [viewer, friend, fof, ...weaks],
+      // friend + fof clear thresholds; the 3rd-degree pool is all weak.
+      scorer: scorerByMap({ friend: 90, fof: 85, w1: 30, w2: 20, w3: 10, w4: 5 }),
+      maxDegree: 3,
+    })
+    const thirdIds = nodes.filter((n) => n.degree === 3).map((n) => n.id)
+    // Top 3 weak connections by score, capped at SECOND_DEGREE_PER_NODE_MAX.
+    expect(thirdIds).toEqual(['w1', 'w2', 'w3'])
+    // Each is bridged (dotted) from the 2nd-degree parent `fof`.
+    expect(
+      thirdIds.every((id) =>
+        edges.some((e) => e.id === `fof__${id}` && e.isDotted),
+      ),
+    ).toBe(true)
+  })
+})
+
+describe('buildWeb — node headlines', () => {
+  it('resolves a "position at company" headline from the member\'s first job', () => {
+    const viewer = makeUser('viewer', { connections: ['a'] })
+    const a = makeUser('a', {
+      name: 'Alice Anderson',
+      job_history: [
+        makeJob({ position: 'Product Manager', company: 'Tech Innovators Inc.' }),
+        makeJob({ position: 'Analyst', company: 'Old Co' }),
+      ],
+    })
+    const { nodes } = buildWeb({
+      viewerUserId: 'viewer',
+      parsedGoal: goal,
+      candidates: [viewer, a],
+      scorer: scorerByMap({ a: 80 }),
+    })
+    expect(nodes.find((n) => n.id === 'a')?.headline).toBe(
+      'Product Manager at Tech Innovators Inc.',
+    )
+  })
+
+  it('omits the headline when the member has no resolvable job', () => {
+    const viewer = makeUser('viewer', { connections: ['a'] })
+    const a = makeUser('a', { job_history: [] })
+    const { nodes } = buildWeb({
+      viewerUserId: 'viewer',
+      parsedGoal: goal,
+      candidates: [viewer, a],
+      scorer: scorerByMap({ a: 80 }),
+    })
+    expect(nodes.find((n) => n.id === 'a')?.headline).toBeUndefined()
   })
 })
