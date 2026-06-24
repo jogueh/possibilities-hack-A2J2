@@ -71,7 +71,9 @@ export function layoutNodes(nodes: WebNode[], options: LayoutOptions): WebNode[]
 
   const place = (group: WebNode[], radius: number): WebNode[] => {
     const ordered = [...group].sort(
-      (a, b) => b.relevanceScore - a.relevanceScore || a.id.localeCompare(b.id),
+      (a, b) =>
+        b.relevanceScore - a.relevanceScore ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
     )
     const count = Math.max(ordered.length, 1)
     return ordered.map((node, i) => {

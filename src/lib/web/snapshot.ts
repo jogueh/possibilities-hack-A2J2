@@ -30,6 +30,8 @@ export interface PersonInput {
 const DEFAULT_INTERACTION = 0.3
 const DEFAULT_RELEVANCE = 0.5
 
+const clamp01 = (n: number): number => Math.min(1, Math.max(0, n))
+
 export function initialsFromName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) return '?'
@@ -63,7 +65,7 @@ function selfEdges(selfId: string, degree1: WebNode[]): WebEdge[] {
     id: `${selfId}__${n.id}`,
     source: selfId,
     target: n.id,
-    strength: n.interactionScore,
+    strength: clamp01(n.interactionScore),
     isDotted: false,
   }))
 }
@@ -120,7 +122,7 @@ export function expandNode(
     (p) => p.degree === 2 && p.via === nodeId && !existingIds.has(p.id),
   )
   if (newPeople.length === 0) {
-    return { ...snapshot, state: 'expanded' }
+    return snapshot
   }
 
   const nodes = layoutNodes(
