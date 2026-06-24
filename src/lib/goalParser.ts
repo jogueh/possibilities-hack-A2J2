@@ -12,9 +12,17 @@ import type { ParsedGoal } from '@/types/goal'
 // Goal parser
 // =============================================================================
 // Path A (LLM): OpenRouter via Vercel AI SDK using structured JSON output mode.
+// The LLM emits the multi-value `target*s` arrays (expanding regional / role
+// concepts), optional exclusion lists for implicit "not this" phrasing
+// ("west coast" → excludeLocations: east-coast cities), free-form `concepts`
+// tags, and optional per-query `weightOverrides` that rebalance the scorer for
+// the specific query intent (e.g. "find people in SF" → bump `location`).
+//
 // Path B (fallback): deterministic keyword scan over the known role/industry/
 // location vocabulary in the dataset. Used when OPENROUTER_API_KEY is unset,
 // the network fails, the request times out, or the LLM returns unparsable JSON.
+// The fallback only populates the structured fields it can identify; the LLM
+// path produces much richer ParsedGoal payloads.
 //
 // The endpoint never throws — callers always get a valid ParsedGoal.
 // =============================================================================
@@ -23,7 +31,31 @@ import type { ParsedGoal } from '@/types/goal'
 export { LLM_TIMEOUT_MS }
 export const GOAL_PARSER_MODEL = OPENROUTER_MODEL
 
+// Weight override schema — every key optional + bounded so the LLM can't
+// destabilize scoring with extreme values. Defaults live in @/lib/scoring.
+const weightOverridesSchema = z
+  .object({
+    role: z.number().min(0).max(100).optional(),
+    industry: z.number().min(0).max(100).optional(),
+    location: z.number().min(0).max(100).optional(),
+    skills: z.number().min(0).max(100).optional(),
+    activity: z.number().min(0).max(100).optional(),
+  })
+  .optional()
+
 const goalSchema = z.object({
+  // Multi-value canonical fields — the LLM is asked to populate these.
+  targetRoles: z.array(z.string()).optional(),
+  targetIndustries: z.array(z.string()).optional(),
+  targetLocations: z.array(z.string()).optional(),
+  excludeRoles: z.array(z.string()).optional(),
+  excludeIndustries: z.array(z.string()).optional(),
+  excludeLocations: z.array(z.string()).optional(),
+  concepts: z.array(z.string()).optional(),
+  weightOverrides: weightOverridesSchema,
+  // Singular deprecated aliases — accepted so older LLM responses or future
+  // model regressions still parse, but the prompt steers the model toward the
+  // plural fields.
   targetRole: z.string().optional(),
   targetIndustry: z.string().optional(),
   targetLocation: z.string().optional(),
@@ -90,11 +122,17 @@ export function parseGoalFallback(raw: string): ParsedGoal {
   const targetRole = findCanonical(raw, KNOWN_ROLES)
   const targetIndustry = findCanonical(raw, KNOWN_INDUSTRIES)
   const targetLocation = findCanonical(raw, KNOWN_LOCATIONS)
+  // Populate BOTH the plural arrays (canonical surface) and the singular
+  // aliases (backwards-compat) so consumers that read either keep working.
   return {
     intent: raw,
-    ...(targetRole ? { targetRole } : {}),
-    ...(targetIndustry ? { targetIndustry } : {}),
-    ...(targetLocation ? { targetLocation } : {}),
+    ...(targetRole ? { targetRole, targetRoles: [targetRole] } : {}),
+    ...(targetIndustry
+      ? { targetIndustry, targetIndustries: [targetIndustry] }
+      : {}),
+    ...(targetLocation
+      ? { targetLocation, targetLocations: [targetLocation] }
+      : {}),
   }
 }
 
@@ -121,15 +159,39 @@ function buildPrompt(raw: string): string {
   // tests (`does not include any salary terminology in the prompt`).
   const scrubbed = scrubForPrompt(raw)
   return [
-    'Extract the user\'s career goal into structured fields.',
-    'Return ONLY a JSON object matching the schema; if a field is unknown, omit it.',
+    'You extract a structured search filter from a free-text career goal.',
+    'Return ONLY a JSON object matching the schema. Omit fields you cannot infer.',
     '',
     `User goal: """${scrubbed}"""`,
     '',
-    'Examples of valid values:',
-    '- targetRole: "Software Engineer", "Product Manager", "Data Scientist"',
-    '- targetIndustry: "Technology", "Finance", "Healthcare"',
-    '- targetLocation: "San Francisco, CA", "New York, NY", "Austin, TX"',
+    'Rules:',
+    '1. EXPAND regional or category concepts into the concrete values they imply.',
+    '   - "west coast" → targetLocations: ["San Francisco, CA", "Seattle, WA", "Portland, OR", "Los Angeles, CA", "San Diego, CA"]',
+    '   - "bay area"   → targetLocations: ["San Francisco, CA", "Mountain View, CA", "Palo Alto, CA", "Oakland, CA"]',
+    '   - "east coast" → targetLocations: ["New York, NY", "Boston, MA", "Washington, DC", "Philadelphia, PA"]',
+    '   - "ML"         → targetRoles: ["Machine Learning Engineer", "Data Scientist", "ML Researcher"]',
+    '   - "fintech"    → targetIndustries: ["Finance", "Banking", "Payments"]',
+    '   Always emit the plural target*s arrays. Singular target* fields are deprecated.',
+    '',
+    '2. SURFACE implicit exclusions.',
+    '   - "west coast jobs" implies excludeLocations: ["New York, NY", "Boston, MA", "Chicago, IL", "Washington, DC"]',
+    '   - "individual contributor, not a manager" → excludeRoles: ["Manager", "Director", "VP"]',
+    '   - "non-finance" → excludeIndustries: ["Finance"]',
+    '',
+    '3. EMIT concept tags for anything that does not fit the structured slots:',
+    '   "remote", "startup", "senior", "open-source", "early-stage", "scale-up", "non-profit", ...',
+    '   These get bonus-matched against candidate skills + posts.',
+    '',
+    '4. REBALANCE the scorer with weightOverrides when the user emphasizes a',
+    '   specific signal. The default weights are role:35, industry:20, location:20,',
+    '   skills:15, activity:10 (sum 100).',
+    '   - "find people in SF" (location-driven) → { location: 50, role: 20, industry: 10 }',
+    '   - "find ML engineers"  (role-driven)    → { role: 50, location: 10, industry: 15 }',
+    '   - "fintech connections" (industry)      → { industry: 40, role: 25 }',
+    '   - Goals with no emphasis → omit weightOverrides entirely.',
+    '   Values are clamped to [0, 100]; they do NOT need to sum to 100.',
+    '',
+    '5. NEVER infer or output compensation, pay, or company-size info.',
   ].join('\n')
 }
 
@@ -144,7 +206,20 @@ async function runLLM(raw: string): Promise<ParsedGoal | null> {
       prompt: buildPrompt(raw),
       abortSignal: controller.signal,
     })
-    return { ...object, intent: raw }
+    // Backfill the deprecated singular aliases from the plural arrays when
+    // the LLM only emitted the plural form. Lets consumers that haven't
+    // migrated (e.g. `filterRelevantJobs`) keep reading either field.
+    const merged: ParsedGoal = { ...object, intent: raw }
+    if (!merged.targetRole && merged.targetRoles?.[0]) {
+      merged.targetRole = merged.targetRoles[0]
+    }
+    if (!merged.targetIndustry && merged.targetIndustries?.[0]) {
+      merged.targetIndustry = merged.targetIndustries[0]
+    }
+    if (!merged.targetLocation && merged.targetLocations?.[0]) {
+      merged.targetLocation = merged.targetLocations[0]
+    }
+    return merged
   } catch (e) {
     // Visible-on-fallback: surface upstream errors (rate limits, timeouts,
     // malformed JSON) in the server log so the operator can tell the LLM was

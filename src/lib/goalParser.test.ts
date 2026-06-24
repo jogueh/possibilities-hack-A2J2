@@ -139,4 +139,46 @@ describe('parseGoal (LLM path with mocked generateObject)', () => {
     expect(r.targetRole).toBe('Product Manager')
     expect(r.targetLocation).toBe('Austin, TX')
   })
+
+  it('preserves array fields (targetRoles, targetLocations, excludes, concepts, weightOverrides)', async () => {
+    // The big win of the new schema: the LLM can EXPAND "west coast" to a
+    // list of cities and surface the implicit east-coast exclusion AND
+    // rebalance the scorer to weight location more.
+    generateObjectMock.mockResolvedValueOnce({
+      object: {
+        targetRoles: ['Software Engineer', 'Machine Learning Engineer'],
+        targetIndustries: ['Technology'],
+        targetLocations: [
+          'San Francisco, CA',
+          'Seattle, WA',
+          'Portland, OR',
+          'Los Angeles, CA',
+        ],
+        excludeLocations: ['New York, NY', 'Boston, MA'],
+        concepts: ['startup', 'remote-friendly'],
+        weightOverrides: { location: 40, role: 30 },
+      },
+    } as unknown as Awaited<ReturnType<typeof generateObject>>)
+
+    const r = await parseGoal('SWE or ML west coast startup')
+    expect(r.targetRoles).toEqual([
+      'Software Engineer',
+      'Machine Learning Engineer',
+    ])
+    expect(r.targetLocations).toEqual([
+      'San Francisco, CA',
+      'Seattle, WA',
+      'Portland, OR',
+      'Los Angeles, CA',
+    ])
+    expect(r.excludeLocations).toEqual(['New York, NY', 'Boston, MA'])
+    expect(r.concepts).toEqual(['startup', 'remote-friendly'])
+    expect(r.weightOverrides).toEqual({ location: 40, role: 30 })
+    // Backwards-compat: singular aliases get backfilled from the first
+    // entry of each plural so older consumers (`filterRelevantJobs`) keep
+    // matching.
+    expect(r.targetRole).toBe('Software Engineer')
+    expect(r.targetIndustry).toBe('Technology')
+    expect(r.targetLocation).toBe('San Francisco, CA')
+  })
 })
