@@ -66,6 +66,22 @@ describe("MetUpButton", () => {
     expect(onLog).toHaveBeenCalledTimes(2);
   });
 
+  it("uses controlled logged state when provided", () => {
+    const onLog = vi.fn();
+    const first = render(<MetUpButton edgeId="e1" onLog={() => {}} />);
+    fireEvent.click(screen.getByRole("button"));
+    first.unmount();
+
+    const { rerender } = render(<MetUpButton edgeId="e1" logged={false} onLog={onLog} />);
+    const btn = screen.getByRole("button", { name: /i met up with this person/i });
+    expect(btn).toBeEnabled();
+    fireEvent.click(btn);
+    expect(onLog).toHaveBeenCalledTimes(1);
+
+    rerender(<MetUpButton edgeId="e1" logged onLog={onLog} />);
+    expect(screen.getByRole("button", { name: /met up logged/i })).toBeDisabled();
+  });
+
   it("__resetMetUpLog clears the session log", () => {
     const first = render(<MetUpButton edgeId="e1" onLog={() => {}} />);
     fireEvent.click(screen.getByRole("button"));

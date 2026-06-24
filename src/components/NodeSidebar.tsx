@@ -22,6 +22,10 @@ interface NodeSidebarProps {
   connected?: boolean;
   /** Promotes a 2nd-degree node to a connection on the web; receives its graph id. */
   onConnect?: (nodeId: string) => void;
+  /** Logs a real-world meetup with this node; receives its graph id (strengthens the edge). */
+  onLogMeetup?: (nodeId: string) => void;
+  /** True when board state says the selected node's meetup has already been logged. */
+  metUpLogged?: boolean;
 }
 
 // Cache the AI tip per userId so re-opening the same node never re-calls the LLM.
@@ -43,7 +47,7 @@ function targetSummary(jobs: { position: string; company: string }[]): string {
   return jobs.map((j) => `${j.position} at ${j.company}`).join("; ");
 }
 
-export function NodeSidebar({ node, onClose, connected, onConnect }: NodeSidebarProps) {
+export function NodeSidebar({ node, onClose, connected, onConnect, onLogMeetup, metUpLogged }: NodeSidebarProps) {
   const goal = useWebStore((s) => s.goal);
   const parsedGoal = useWebStore((s) => s.parsedGoal);
   const viewerProfile = useWebStore((s) => s.viewerProfile);
@@ -276,6 +280,9 @@ export function NodeSidebar({ node, onClose, connected, onConnect }: NodeSidebar
             degree={node.degree}
             connected={connected}
             onConnect={() => onConnect?.(node.id)}
+            nodeId={node.id}
+            metUpLogged={metUpLogged}
+            onLogMeetup={() => onLogMeetup?.(node.id)}
           />
         </div>
       )}
