@@ -2,7 +2,9 @@
 
 import type { WebSnapshot } from '@/types/web'
 import { edgeStrokeDasharray, edgeStrokeWidth } from '@/lib/web/layout'
-import WebNodeMarker from './WebNodeMarker'
+import WebNodeMarker, { type NodeDecoration } from './WebNodeMarker'
+
+export type { NodeDecoration }
 
 export interface WebCanvasProps {
   snapshot: WebSnapshot
@@ -10,6 +12,13 @@ export interface WebCanvasProps {
   height?: number
   selectedId?: string | null
   onNodeSelect?: (id: string) => void
+  /**
+   * Per-node decorations keyed by `WebNode.id`, injected by sibling workflows
+   * (e.g. Workflow 4 sets `{ hasJobOverlap: true }` for connections that match
+   * relevant jobs). Workflow 1 only routes them to the markers; the flag data
+   * and ring styling are owned by the injecting workflow.
+   */
+  nodeDecorations?: Record<string, NodeDecoration>
 }
 
 const SELF_RADIUS = 30
@@ -21,6 +30,7 @@ export default function WebCanvas({
   height = 520,
   selectedId = null,
   onNodeSelect,
+  nodeDecorations,
 }: WebCanvasProps) {
   const center = { x: width / 2, y: height / 2 }
 
@@ -82,6 +92,7 @@ export default function WebCanvas({
             node={node}
             selected={selectedId === node.id}
             onSelect={onNodeSelect}
+            decoration={nodeDecorations?.[node.id]}
           />
         ))}
       </g>
