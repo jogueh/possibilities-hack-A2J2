@@ -16,6 +16,12 @@ export interface WebNode {
   interactionScore: number
   relevanceScore: number
   position: { x: number; y: number }
+  /**
+   * Optional headline shown under the node name (e.g. "Software Engineer at
+   * Innovatech"). Additive/optional so sibling workflows that don't supply it
+   * remain compatible; Workflow 2 can populate it from resolved job data.
+   */
+  headline?: string
 }
 
 export interface WebEdge {

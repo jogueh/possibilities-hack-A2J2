@@ -23,6 +23,8 @@ export interface PersonInput {
   alignmentTier?: AlignmentTier
   interactionScore?: number
   relevanceScore?: number
+  /** Optional headline (role at company) shown under the node name. */
+  headline?: string
   /** For 2nd-degree people: the 1st-degree connector (warm-path bridge) id. */
   via?: string
 }
@@ -57,6 +59,7 @@ function toNode(p: PersonInput): WebNode {
     interactionScore: p.interactionScore ?? DEFAULT_INTERACTION,
     relevanceScore,
     position: { x: 0, y: 0 },
+    ...(p.headline ? { headline: p.headline } : {}),
   }
 }
 

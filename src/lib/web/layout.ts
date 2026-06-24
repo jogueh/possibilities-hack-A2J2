@@ -28,9 +28,9 @@ export const TIER_COLORS: Record<AlignmentTier, string> = {
 
 /** Alignment-tier → node circle radius (px). */
 export const TIER_RADIUS: Record<AlignmentTier, number> = {
-  strong: 26,
-  moderate: 20,
-  weak: 16,
+  strong: 30,
+  moderate: 26,
+  weak: 22,
 }
 
 export function tierColor(tier: AlignmentTier): string {
