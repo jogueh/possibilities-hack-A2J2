@@ -1,6 +1,6 @@
 "use client";
 // W3-OWNED. Node profile sidebar: shell + header + experience + commonalities + AI tip.
-// 2nd-degree preview (Step 5) and Actions bar (Step 6) slot in below. See plan.md
+// The Actions bar (connect / message / "Linked up") slots in below. See plan.md
 import { useEffect, useRef, useState } from "react";
 import type { WebNode } from "@/types/web";
 import type { SharedContext } from "@/types/sharedContext";
@@ -34,8 +34,16 @@ interface NodeSidebarProps {
   metUpLogged?: boolean;
 }
 
-// Cache the AI tip per userId so re-opening the same node never re-calls the LLM.
+// Cache the AI tip per (userId + goal) so re-opening the same node never re-calls
+// the LLM, but a NEW goal recomputes the tip (the talking point is goal-specific).
 const tipCache = new Map<string, string>();
+
+// Composite cache key: the same person yields a different tip under a different
+// goal, so the goal text must be part of the key (keying by userId alone served
+// stale tips after a re-prompt).
+function tipKeyFor(userId: string, goalRaw: string): string {
+  return `${userId}::${goalRaw}`;
+}
 
 // Test/dev helper (NOT part of the planned W1 API).
 export function __resetNodeSidebarTipCache() {
@@ -72,7 +80,7 @@ export function NodeSidebar({
   // setState synchronously inside an effect (React 19 cascading-render rule).
   const [loaded, setLoaded] = useState<{ userId: string; user: UserWithJobs } | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
-  const [tipState, setTipState] = useState<{ userId: string; tip: string } | null>(null);
+  const [tipState, setTipState] = useState<{ key: string; tip: string } | null>(null);
 
   const panelRef = useRef<HTMLDivElement>(null);
   const userId = node?.userId ?? null;
@@ -115,17 +123,19 @@ export function NodeSidebar({
   const commonalities: SharedContext[] =
     user && viewerProfile ? getSharedContext(viewerProfile, user) : [];
 
-  // Fetch the AI talking point once per userId (cached). Cached value is read at render
-  // time; the effect only performs the async fetch on a cache miss.
+  // Fetch the AI talking point once per (userId + goal) (cached). Cached value is
+  // read at render time; the effect only performs the async fetch on a cache miss.
   useEffect(() => {
     if (!user || !userId || !parsedGoal) return;
-    if (tipCache.has(userId)) return;
+    const goalRaw = goal?.raw ?? "";
+    const key = tipKeyFor(userId, goalRaw);
+    if (tipCache.has(key)) return;
     let cancelled = false;
     fetch("/api/node/talking-points", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        goalRaw: goal?.raw ?? "",
+        goalRaw,
         viewerSummary: viewerSummary(viewerProfile),
         targetSummary: targetSummary(relevantJobs),
         sharedContext: commonalities,
@@ -134,24 +144,25 @@ export function NodeSidebar({
       .then((r) => r.json())
       .then((d: { tip?: string }) => {
         const t = d.tip ?? "Mention your shared background.";
-        tipCache.set(userId, t);
-        if (!cancelled) setTipState({ userId, tip: t });
+        tipCache.set(key, t);
+        if (!cancelled) setTipState({ key, tip: t });
       })
       .catch(() => {
         const t = "Mention your shared background.";
-        tipCache.set(userId, t);
-        if (!cancelled) setTipState({ userId, tip: t });
+        tipCache.set(key, t);
+        if (!cancelled) setTipState({ key, tip: t });
       });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, userId, parsedGoal]);
+  }, [user, userId, parsedGoal, goal?.raw]);
 
+  const tipKey = userId ? tipKeyFor(userId, goal?.raw ?? "") : null;
   const tip =
-    userId && tipCache.has(userId)
-      ? tipCache.get(userId)!
-      : tipState?.userId === userId
+    tipKey && tipCache.has(tipKey)
+      ? tipCache.get(tipKey)!
+      : tipState?.key === tipKey
         ? tipState.tip
         : null;
 

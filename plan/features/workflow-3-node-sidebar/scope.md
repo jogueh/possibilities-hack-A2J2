@@ -81,9 +81,9 @@ Rendered as small LinkedIn-style chips. Show up to 3; hide overflow silently (no
 - Model: `openai/gpt-4o-mini` via OpenRouter
 - Rendered as a highlighted callout: `💬 Try: "[tip]"`
 - Timeout: if no response in 5s → show static fallback: `"Mention your shared background in [top shared skill or school]."`
-- **Cache per `userId`** in component state — do not re-call LLM on re-open of same node
+- **Cache per `userId` + goal** in component state — do not re-call LLM on re-open of same node under the same goal; a new goal recomputes the (goal-specific) tip
 
-### 6. 2nd-Degree Preview
+### 6. 2nd-Degree Preview  _(REMOVED in #95 — superseded by the on-canvas warm-path offshoots; the sidebar no longer renders a preview list or an "Add to web" button. Kept below for historical context.)_
 - Section header: "People [Name] can introduce you to"
 - Lists up to 3 pre-loaded 2nd-degree nodes from the Zustand store (already returned by W2)
 - Each item: initials avatar, name, most recent role, brief alignment reason (e.g. "Also works in fintech")

@@ -146,8 +146,8 @@ const initialState = useWebStore.getState()
 
 /**
  * TEST-ONLY: partial overwrite of store state, including action fields.
- * Used by component tests (NodeSidebar, JobsPanel, SecondDegreePreview) to
- * stub `addSecondDegreeNode` with a spy and to preload nodes/edges/goal.
+ * Used by component tests (NodeSidebar, JobsPanel) to stub store actions with a
+ * spy and to preload nodes/edges/goal.
  */
 export function __setMockWebState(partial: Partial<WebStoreState>): void {
   useWebStore.setState(partial)

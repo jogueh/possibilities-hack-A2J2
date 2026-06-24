@@ -149,7 +149,7 @@ describe("NodeSidebar", () => {
     expect(screen.getAllByTestId("commonality-chip").length).toBeGreaterThan(0);
   });
 
-  it("caches the AI talking point per userId across re-opens", async () => {
+  it("caches the AI talking point per userId+goal across re-opens", async () => {
     const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>;
     const tipCalls = () =>
       fetchMock.mock.calls.filter(
@@ -170,5 +170,29 @@ describe("NodeSidebar", () => {
     await screen.findByText("Alice Nguyen");
 
     expect(tipCalls()).toBe(tipCallsAfterFirst);
+  });
+
+  it("recomputes the AI talking point when the goal changes", async () => {
+    const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>;
+    const tipCalls = () =>
+      fetchMock.mock.calls.filter(
+        ([url]) =>
+          typeof url === "string" && url.includes("/api/node/talking-points"),
+      ).length;
+
+    render(<NodeSidebar node={node} onClose={() => {}} />);
+    await act(async () => deferred.resolve!(target));
+    await waitFor(() => expect(screen.getByTestId("talking-point")).toBeInTheDocument());
+    const tipCallsAfterFirstGoal = tipCalls();
+
+    // Re-prompt with a DIFFERENT goal — the tip is goal-specific, so the cache
+    // must miss and a fresh talking-point call must fire for the same person.
+    act(() => {
+      __setMockWebState({
+        goal: { raw: "Pivot into product management", userId: "user_4579" },
+        parsedGoal: { intent: "Pivot into product management", targetRole: "Product Manager" },
+      });
+    });
+    await waitFor(() => expect(tipCalls()).toBe(tipCallsAfterFirstGoal + 1));
   });
 });
