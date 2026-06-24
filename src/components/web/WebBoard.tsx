@@ -91,6 +91,7 @@ export default function WebBoard() {
   const selected = snapshot.nodes.find((n) => n.id === selectedId) ?? null
   const isEmpty = snapshot.state === 'empty'
   const selectedConnected = selected ? state.connectedIds.includes(selected.id) : false
+  const selectedPinned = selected ? state.pinnedIds.includes(selected.id) : false
   const loading = status === 'loading'
 
   // Collapsible side cards (chevron toggles) — purely presentational.
@@ -287,6 +288,8 @@ export default function WebBoard() {
               node={selected}
               connected={selectedConnected}
               onConnect={(id) => dispatch({ type: 'connectNode', id })}
+              pinned={selectedPinned}
+              onPin={(id) => dispatch({ type: 'pinNode', id })}
               onClose={() => dispatch({ type: 'clearSelection' })}
             />
           </div>

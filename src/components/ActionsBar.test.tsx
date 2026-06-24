@@ -85,4 +85,31 @@ describe("ActionsBar", () => {
     const connected = screen.getByRole("button", { name: "Connected ✓" });
     expect(connected).toBeDisabled();
   });
+
+  it("renders an Add-to-web button for 2nd+-degree people", () => {
+    render(<ActionsBar targetName="Alice" degree={2} />);
+    expect(screen.getByRole("button", { name: "Add to web" })).toBeInTheDocument();
+  });
+
+  it("hides the Add-to-web button for 1st-degree people (already on the canvas)", () => {
+    render(<ActionsBar targetName="Alice" degree={1} />);
+    expect(screen.queryByRole("button", { name: "Add to web" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Pinned to web" })).not.toBeInTheDocument();
+  });
+
+  it("invokes onPin and shows a confirmation toast when Add-to-web is clicked", () => {
+    const onPin = vi.fn();
+    render(<ActionsBar targetName="Alice" degree={2} onPin={onPin} />);
+    fireEvent.click(screen.getByRole("button", { name: "Add to web" }));
+    expect(onPin).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("status")).toHaveTextContent("Alice added to your web");
+  });
+
+  it("shows a disabled Added state once pinned", () => {
+    render(<ActionsBar targetName="Alice" degree={2} pinned />);
+    expect(screen.queryByRole("button", { name: "Add to web" })).not.toBeInTheDocument();
+    const pinned = screen.getByRole("button", { name: "Pinned to web" });
+    expect(pinned).toBeDisabled();
+    expect(pinned).toHaveTextContent("Added to web ✓");
+  });
 });

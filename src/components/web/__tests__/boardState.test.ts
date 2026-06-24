@@ -156,4 +156,61 @@ describe('boardReducer', () => {
     s = reduce(s, { type: 'submitGoal' })
     expect(s.connectedIds).toEqual([])
   })
+
+  it('pinNode keeps a 2nd-degree person on the canvas across branch switches', () => {
+    // Expand 'a' to reveal its 2nd-degree 'c'. Without pinning, clicking 'b'
+    // would collapse 'a's expansion and drop 'c'. Pin 'c' first, then verify
+    // it survives the rebuild.
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    expect(s.snapshot.nodes.some((n) => n.id === 'c')).toBe(true)
+
+    s = reduce(s, { type: 'pinNode', id: 'c' })
+    expect(s.pinnedIds).toEqual(['c'])
+
+    // Switch to 'b' — this normally rebuilds the snapshot from seeded + b's
+    // expansion only. 'c' must survive thanks to the pin.
+    s = reduce(s, { type: 'selectNode', id: 'b' })
+    expect(s.snapshot.nodes.some((n) => n.id === 'e')).toBe(true) // b's child
+    expect(s.snapshot.nodes.some((n) => n.id === 'c')).toBe(true) // pinned a's child
+    // The connector 'a' is also still on the canvas as a 1st-degree node, so
+    // the visible warm path back to the viewer is preserved.
+    expect(s.snapshot.nodes.some((n) => n.id === 'a')).toBe(true)
+  })
+
+  it('pinning a 3rd-degree person also retains its 2nd-degree connector (full warm-path chain)', () => {
+    // Walk to depth 3: expand 'a' -> connect 'c' -> click 'c' to reveal 'd'.
+    // Pin 'd'. Then click 'b' and verify both 'c' (2nd) and 'd' (3rd) survive.
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    s = reduce(s, { type: 'connectNode', id: 'c' })
+    s = reduce(s, { type: 'selectNode', id: 'c' })
+    expect(s.snapshot.nodes.some((n) => n.id === 'd')).toBe(true)
+
+    s = reduce(s, { type: 'pinNode', id: 'd' })
+    s = reduce(s, { type: 'selectNode', id: 'b' })
+
+    expect(s.snapshot.nodes.some((n) => n.id === 'd')).toBe(true)
+    expect(s.snapshot.nodes.some((n) => n.id === 'c')).toBe(true)
+    expect(s.snapshot.nodes.some((n) => n.id === 'e')).toBe(true) // b's branch
+  })
+
+  it('pinNode is idempotent, orthogonal to connect, and resets on a new goal', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    s = reduce(s, { type: 'pinNode', id: 'c' })
+    s = reduce(s, { type: 'pinNode', id: 'c' }) // idempotent
+    expect(s.pinnedIds).toEqual(['c'])
+    // Pinning does NOT promote to connected — those are independent
+    // commitments. 'c' remains a dotted suggestion until the viewer connects.
+    expect(s.connectedIds).not.toContain('c')
+    expect(s.snapshot.edges.find((e) => e.id === 'a__c')?.isDotted).toBe(true)
+    // Mapping a new goal clears pins.
+    s = reduce(s, { type: 'setGoalText', value: 'New goal' })
+    s = reduce(s, { type: 'submitGoal' })
+    expect(s.pinnedIds).toEqual([])
+  })
 })
