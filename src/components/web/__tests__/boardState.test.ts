@@ -156,4 +156,36 @@ describe('boardReducer', () => {
     s = reduce(s, { type: 'submitGoal' })
     expect(s.connectedIds).toEqual([])
   })
+
+  it('logMeetup strengthens the edge to a 1st-degree person to full strength', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    const selfEdgeId = 'self_1__a'
+    expect(s.snapshot.edges.find((e) => e.id === selfEdgeId)!.strength).toBeLessThan(1)
+
+    s = reduce(s, { type: 'logMeetup', id: 'a' })
+    expect(s.metUpIds).toContain('a')
+    expect(s.snapshot.edges.find((e) => e.id === selfEdgeId)!.strength).toBe(1)
+  })
+
+  it('keeps a meetup-strengthened edge after the web is re-expanded', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'logMeetup', id: 'a' })
+    // Visit b (rebuilds the seeded snapshot) then return to a.
+    s = reduce(s, { type: 'selectNode', id: 'b' })
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    expect(s.snapshot.edges.find((e) => e.id === 'self_1__a')!.strength).toBe(1)
+  })
+
+  it('logMeetup is idempotent and resets on a new goal', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'logMeetup', id: 'a' })
+    s = reduce(s, { type: 'logMeetup', id: 'a' })
+    expect(s.metUpIds).toEqual(['a'])
+    s = reduce(s, { type: 'setGoalText', value: 'New goal' })
+    s = reduce(s, { type: 'submitGoal' })
+    expect(s.metUpIds).toEqual([])
+  })
 })

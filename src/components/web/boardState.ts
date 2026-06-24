@@ -13,6 +13,11 @@ import {
 // 2nd-degree person it reaches, so the (now solid) line reads as a strong link.
 const CONNECTED_STRENGTH = 0.9
 
+// Tie strength applied to a node's solid edge once the viewer logs a real-world
+// meetup ("I met up with this person"). Meeting in person is the strongest
+// signal, so the edge jumps to full strength (vibrant) via the s12 visuals.
+const MET_UP_STRENGTH = 1
+
 export type BoardStatus = 'idle' | 'loading' | 'error'
 
 export interface BoardState {
@@ -21,6 +26,8 @@ export interface BoardState {
   goalText: string
   /** Ids of people the viewer has connected with (dotted bridge -> solid link). */
   connectedIds: string[]
+  /** Ids of people the viewer has logged a real-world meetup with (edge -> full strength). */
+  metUpIds: string[]
   /**
    * Resolved people for the current goal — populated from `/api/web/generate`
    * by the WebBoard. Empty until a goal is mapped. `selectNode` reads from
@@ -40,6 +47,7 @@ export type BoardAction =
   | { type: 'mapError'; error: string }
   | { type: 'selectNode'; id: string }
   | { type: 'connectNode'; id: string }
+  | { type: 'logMeetup'; id: string }
   | { type: 'clearSelection' }
   | { type: 'reset' }
 
@@ -55,6 +63,7 @@ export function createInitialBoardState(): BoardState {
     selectedId: null,
     goalText: '',
     connectedIds: [],
+    metUpIds: [],
     people: [],
     status: 'idle',
     error: null,
@@ -75,6 +84,25 @@ function applyConnections(
   const edges = snapshot.edges.map((e) =>
     e.isDotted && (connected.has(e.target) || connected.has(e.source))
       ? { ...e, isDotted: false, strength: Math.max(e.strength, CONNECTED_STRENGTH) }
+      : e,
+  )
+  return { ...snapshot, edges }
+}
+
+/**
+ * Strengthens every solid edge touching a person the viewer has logged a meetup
+ * with, bumping it to full strength. Idempotent (uses `Math.max`) so it can be
+ * re-applied after a snapshot rebuild without over-accumulating.
+ */
+function applyMeetups(
+  snapshot: WebSnapshot,
+  metUpIds: string[],
+): WebSnapshot {
+  if (metUpIds.length === 0) return snapshot
+  const metUp = new Set(metUpIds)
+  const edges = snapshot.edges.map((e) =>
+    !e.isDotted && (metUp.has(e.target) || metUp.has(e.source))
+      ? { ...e, strength: Math.max(e.strength, MET_UP_STRENGTH) }
       : e,
   )
   return { ...snapshot, edges }
@@ -107,6 +135,7 @@ export function boardReducer(
         snapshot: buildSnapshot(goal, people, config.options),
         selectedId: null,
         connectedIds: [],
+        metUpIds: [],
         status: 'idle',
         error: null,
       }
@@ -124,6 +153,7 @@ export function boardReducer(
         snapshot: buildSnapshot(goal, action.people, config.options),
         selectedId: null,
         connectedIds: [],
+        metUpIds: [],
         people: action.people,
         status: 'idle',
         error: null,
@@ -170,7 +200,10 @@ export function boardReducer(
       // but the canvas does not reveal further suggestions until they accept.
       return {
         ...state,
-        snapshot: applyConnections(snapshot, state.connectedIds),
+        snapshot: applyMeetups(
+          applyConnections(snapshot, state.connectedIds),
+          state.metUpIds,
+        ),
         selectedId: action.id,
       }
     }
@@ -188,7 +221,23 @@ export function boardReducer(
       return {
         ...state,
         connectedIds,
-        snapshot: applyConnections(state.snapshot, connectedIds),
+        snapshot: applyMeetups(
+          applyConnections(state.snapshot, connectedIds),
+          state.metUpIds,
+        ),
+      }
+    }
+
+    case 'logMeetup': {
+      // Logging a real-world meetup strengthens the solid edge to this person to
+      // full strength, so it renders thick/vibrant (s12 visuals). Idempotent —
+      // logging again is a no-op.
+      if (state.metUpIds.includes(action.id)) return state
+      const metUpIds = [...state.metUpIds, action.id]
+      return {
+        ...state,
+        metUpIds,
+        snapshot: applyMeetups(state.snapshot, metUpIds),
       }
     }
 

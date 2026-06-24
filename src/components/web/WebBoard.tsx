@@ -287,6 +287,7 @@ export default function WebBoard() {
               node={selected}
               connected={selectedConnected}
               onConnect={(id) => dispatch({ type: 'connectNode', id })}
+              onLogMeetup={(id) => dispatch({ type: 'logMeetup', id })}
               onClose={() => dispatch({ type: 'clearSelection' })}
             />
           </div>
