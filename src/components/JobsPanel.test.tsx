@@ -112,6 +112,29 @@ describe("JobsPanel", () => {
     expect(openSpy).toHaveBeenCalledWith("user_4579");
   });
 
+  it("shows the 'Recently in your field' badge only when a connection is recently in field", async () => {
+    state.matches = [
+      {
+        job: job({ id: "fresh" }),
+        relevanceScore: 90,
+        webConnections: [
+          { userId: "u1", name: "Fresh Grad", role: "Engineer", recentlyInField: true },
+        ],
+      },
+      {
+        job: job({ id: "stale" }),
+        relevanceScore: 80,
+        webConnections: [
+          { userId: "u2", name: "Veteran", role: "Engineer", recentlyInField: false },
+        ],
+      },
+    ];
+    render(<JobsPanel open onClose={() => {}} />);
+    await screen.findAllByTestId("job-card");
+    expect(screen.getAllByTestId("recently-in-field-badge")).toHaveLength(1);
+    expect(screen.getByText("Recently in your field")).toBeTruthy();
+  });
+
   it("never renders salary data", async () => {
     state.matches = [
       { job: job({ id: "j1", salary_range: { from: "999111", to: "999222" } }), relevanceScore: 80, webConnections: [] },

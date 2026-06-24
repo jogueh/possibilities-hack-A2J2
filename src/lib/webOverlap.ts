@@ -19,6 +19,41 @@ function sameCompany(a: string, b: string): boolean {
   return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
+/** "Recently in your field" window: graduated within this many years. */
+export const RECENTLY_IN_FIELD_YEARS = 3;
+
+/**
+ * Most recent (latest) graduation year across a user's school history, or
+ * undefined if they have no schools on record.
+ */
+export function mostRecentGraduationYear(
+  user: UserWithJobs,
+): number | undefined {
+  let latest: number | undefined;
+  for (const s of user.school_history ?? []) {
+    if (typeof s.graduation_year !== "number") continue;
+    if (latest === undefined || s.graduation_year > latest) {
+      latest = s.graduation_year;
+    }
+  }
+  return latest;
+}
+
+/**
+ * True when the user's most recent graduation was within the last
+ * `RECENTLY_IN_FIELD_YEARS` years (and not in the future) — i.e. they have
+ * fresh, relevant context. `currentYear` is injectable for deterministic tests.
+ */
+export function isRecentlyInField(
+  user: UserWithJobs,
+  currentYear: number = new Date().getFullYear(),
+): boolean {
+  const gradYear = mostRecentGraduationYear(user);
+  if (gradYear === undefined) return false;
+  const diff = currentYear - gradYear;
+  return diff >= 0 && diff <= RECENTLY_IN_FIELD_YEARS;
+}
+
 /**
  * For a single user, return the role they held at `company`, or undefined if
  * they never worked there. Uses the first matching job in their history.
@@ -43,6 +78,7 @@ export function roleAtCompany(
 export function findWebOverlap(
   job: Job,
   webUsers: UserWithJobs[],
+  currentYear: number = new Date().getFullYear(),
 ): WebConnectionRef[] {
   if (!job.company.trim()) return [];
 
@@ -50,7 +86,12 @@ export function findWebOverlap(
   for (const user of webUsers) {
     const role = roleAtCompany(user, job.company);
     if (!role) continue;
-    refs.push({ userId: user.id, name: user.name, role });
+    refs.push({
+      userId: user.id,
+      name: user.name,
+      role,
+      recentlyInField: isRecentlyInField(user, currentYear),
+    });
   }
   return refs;
 }

@@ -241,6 +241,7 @@ interface JobCardProps {
 function JobCard({ match, expanded, onToggle, onOpenConnection }: JobCardProps) {
   const { job, relevanceScore, webConnections } = match;
   const tier = deriveAlignmentTier(relevanceScore);
+  const hasRecentInsider = webConnections.some((c) => c.recentlyInField);
 
   return (
     <article
@@ -306,6 +307,22 @@ function JobCard({ match, expanded, onToggle, onOpenConnection }: JobCardProps) 
               }}
             >
               Easy Apply
+            </span>
+          )}
+          {hasRecentInsider && (
+            <span
+              data-testid="recently-in-field-badge"
+              title="A connection here graduated within the last 3 years — fresh, relevant context"
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: LI.green,
+                border: `1px solid ${LI.green}`,
+                borderRadius: 12,
+                padding: "2px 8px",
+              }}
+            >
+              Recently in your field
             </span>
           )}
         </div>
