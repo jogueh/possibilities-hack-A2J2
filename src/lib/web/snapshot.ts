@@ -141,11 +141,23 @@ export function revealPerson(
   if (!parent) return snapshot
 
   const center = { x: options.width / 2, y: options.height / 2 }
+
+  // Count how many siblings of this person are already on the canvas (i.e.
+  // other children of `via` that exist via dotted bridge edges). The new
+  // marker must claim the NEXT slot in the parent's fan — using
+  // (count=1, index=0) would land us on top of the existing siblings.
+  // We bump the apparent `count` to include the new arrival so the fan
+  // re-centres around it.
+  const siblingCount = snapshot.edges.reduce(
+    (n, e) => (e.source === person.via && e.target !== person.id ? n + 1 : n),
+    0,
+  )
+  const nextIndex = siblingCount
+  const fanCount = siblingCount + 1
+
   const newNode: WebNode = {
     ...toNode(person),
-    // Single child sits directly outward from the parent — matches the
-    // expandNode lone-child layout (`count === 1` -> offset 0).
-    position: placeNearParent(parent.position, center, 0, 1, options),
+    position: placeNearParent(parent.position, center, nextIndex, fanCount, options),
   }
   const nodes = [...snapshot.nodes, newNode]
 

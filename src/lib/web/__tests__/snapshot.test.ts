@@ -119,6 +119,18 @@ describe('revealPerson', () => {
     expect(bridge).toMatchObject({ source: 'a', isDotted: true })
   })
 
+  it('places sibling reveals at distinct positions (no overlap)', () => {
+    // Revealing two siblings of the same parent in succession should put
+    // them at DIFFERENT positions. Using the lone-child position for each
+    // would land them on top of each other.
+    const seeded = buildSnapshot(goal, people, options)
+    const withC = revealPerson(seeded, people.find((p) => p.id === 'c')!, options)
+    const withBoth = revealPerson(withC, people.find((p) => p.id === 'd')!, options)
+    const c = withBoth.nodes.find((n) => n.id === 'c')!
+    const d = withBoth.nodes.find((n) => n.id === 'd')!
+    expect(c.position).not.toEqual(d.position)
+  })
+
   it('is a no-op if the person is already in the snapshot', () => {
     const seeded = buildSnapshot(goal, people, options)
     const expanded = expandNode(seeded, 'a', people, options)
