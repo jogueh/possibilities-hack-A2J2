@@ -116,30 +116,30 @@ describe("ActionsBar", () => {
     expect(pinned).toHaveTextContent("Added to web ✓");
   });
 
-  it("offers the 'I met up' button for 1st-degree people and logs the meetup", () => {
+  it("offers the 'Linked up' button for 1st-degree people and logs the meetup", () => {
     const onLogMeetup = vi.fn();
     render(
       <ActionsBar targetName="Alice" degree={1} nodeId="a" onLogMeetup={onLogMeetup} />,
     );
-    const metUp = screen.getByRole("button", { name: /I met up with this person/ });
+    const metUp = screen.getByRole("button", { name: /Linked up with this person/ });
     fireEvent.click(metUp);
     expect(onLogMeetup).toHaveBeenCalledTimes(1);
     // Disables itself once logged.
-    expect(screen.getByRole("button", { name: /Met up logged/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /✓ Linked up/ })).toBeDisabled();
   });
 
   it("uses board-controlled logged state for the meetup button", () => {
     const first = render(
       <ActionsBar targetName="Alice" degree={1} nodeId="a" onLogMeetup={vi.fn()} />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /I met up with this person/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Linked up with this person/ }));
     first.unmount();
 
     const onLogMeetup = vi.fn();
     const { rerender } = render(
       <ActionsBar targetName="Alice" degree={1} nodeId="a" metUpLogged={false} onLogMeetup={onLogMeetup} />,
     );
-    const enabled = screen.getByRole("button", { name: /I met up with this person/ });
+    const enabled = screen.getByRole("button", { name: /Linked up with this person/ });
     expect(enabled).toBeEnabled();
     fireEvent.click(enabled);
     expect(onLogMeetup).toHaveBeenCalledTimes(1);
@@ -147,15 +147,15 @@ describe("ActionsBar", () => {
     rerender(
       <ActionsBar targetName="Alice" degree={1} nodeId="a" metUpLogged onLogMeetup={onLogMeetup} />,
     );
-    expect(screen.getByRole("button", { name: /Met up logged/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /✓ Linked up/ })).toBeDisabled();
   });
 
-  it("offers the 'I met up' button for 2nd-degree people too", () => {
+  it("offers the 'Linked up' button for 2nd-degree people too", () => {
     render(
       <ActionsBar targetName="Alice" degree={2} nodeId="c" onLogMeetup={vi.fn()} />,
     );
     expect(
-      screen.getByRole("button", { name: /I met up with this person/ }),
+      screen.getByRole("button", { name: /Linked up with this person/ }),
     ).toBeInTheDocument();
   });
 });

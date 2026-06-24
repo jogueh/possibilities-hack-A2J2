@@ -9,7 +9,7 @@ describe("MetUpButton", () => {
 
   it("renders an enabled prompt before any meetup is logged", () => {
     render(<MetUpButton edgeId="e1" onLog={() => {}} />);
-    const btn = screen.getByRole("button", { name: /i met up with this person/i });
+    const btn = screen.getByRole("button", { name: /linked up with this person/i });
     expect(btn).toBeEnabled();
     expect(btn).toHaveAttribute("aria-pressed", "false");
   });
@@ -17,15 +17,15 @@ describe("MetUpButton", () => {
   it("calls onLog once and shows the confirmation toast on click", () => {
     const onLog = vi.fn();
     render(<MetUpButton edgeId="e1" onLog={onLog} />);
-    fireEvent.click(screen.getByRole("button", { name: /i met up/i }));
+    fireEvent.click(screen.getByRole("button", { name: /linked up with this person/i }));
     expect(onLog).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("status")).toHaveTextContent("🤝 Connection logged!");
+    expect(screen.getByRole("status")).toHaveTextContent("🔗 Linked up!");
   });
 
   it("disables itself for the session after logging", () => {
     render(<MetUpButton edgeId="e1" onLog={() => {}} />);
-    fireEvent.click(screen.getByRole("button", { name: /i met up/i }));
-    const btn = screen.getByRole("button", { name: /met up logged/i });
+    fireEvent.click(screen.getByRole("button", { name: /linked up with this person/i }));
+    const btn = screen.getByRole("button", { name: /✓ Linked up/i });
     expect(btn).toBeDisabled();
     expect(btn).toHaveAttribute("aria-pressed", "true");
   });
@@ -47,7 +47,7 @@ describe("MetUpButton", () => {
     first.unmount();
 
     render(<MetUpButton edgeId="e1" onLog={onLog} />);
-    const btn = screen.getByRole("button", { name: /met up logged/i });
+    const btn = screen.getByRole("button", { name: /✓ Linked up/i });
     expect(btn).toBeDisabled();
     fireEvent.click(btn);
     expect(onLog).toHaveBeenCalledTimes(1); // not logged a second time
@@ -60,7 +60,7 @@ describe("MetUpButton", () => {
 
     // A different edge starts enabled.
     rerender(<MetUpButton edgeId="e2" onLog={onLog} />);
-    const btn = screen.getByRole("button", { name: /i met up/i });
+    const btn = screen.getByRole("button", { name: /linked up with this person/i });
     expect(btn).toBeEnabled();
     fireEvent.click(btn);
     expect(onLog).toHaveBeenCalledTimes(2);
@@ -73,13 +73,13 @@ describe("MetUpButton", () => {
     first.unmount();
 
     const { rerender } = render(<MetUpButton edgeId="e1" logged={false} onLog={onLog} />);
-    const btn = screen.getByRole("button", { name: /i met up with this person/i });
+    const btn = screen.getByRole("button", { name: /linked up with this person/i });
     expect(btn).toBeEnabled();
     fireEvent.click(btn);
     expect(onLog).toHaveBeenCalledTimes(1);
 
     rerender(<MetUpButton edgeId="e1" logged onLog={onLog} />);
-    expect(screen.getByRole("button", { name: /met up logged/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /✓ Linked up/i })).toBeDisabled();
   });
 
   it("__resetMetUpLog clears the session log", () => {
@@ -90,7 +90,7 @@ describe("MetUpButton", () => {
 
     render(<MetUpButton edgeId="e1" onLog={() => {}} />);
     expect(
-      screen.getByRole("button", { name: /i met up with this person/i }),
+      screen.getByRole("button", { name: /linked up with this person/i }),
     ).toBeEnabled();
   });
 });
