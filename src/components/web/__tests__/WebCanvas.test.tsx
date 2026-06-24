@@ -46,6 +46,19 @@ describe('WebCanvas', () => {
     expect(node.textContent).toContain('AL')
   })
 
+  it('styles a strong edge with a gradient stroke and a weak edge with a solid colour', () => {
+    const seeded = buildSnapshot(goal, people, options)
+    const { container } = render(<WebCanvas snapshot={seeded} />)
+    // `a` has interactionScore 0.9 → strength 0.9 → vibrant tier (gradient stroke).
+    const strongEdge = container.querySelector('[data-testid="web-edge-self_1__a"]')
+    expect(strongEdge?.getAttribute('stroke')).toBe('url(#edge-grad-self_1__a)')
+    expect(container.querySelector('#edge-grad-self_1__a')).toBeTruthy()
+    // `b` has interactionScore 0.4 → steady tier → solid colour, no gradient def.
+    const steadyEdge = container.querySelector('[data-testid="web-edge-self_1__b"]')
+    expect(steadyEdge?.getAttribute('stroke')).not.toContain('url(#')
+    expect(container.querySelector('#edge-grad-self_1__b')).toBeNull()
+  })
+
   it('draws dotted bridge edges once a node is expanded', () => {
     const expanded = expandNode(buildSnapshot(goal, people, options), 'a', people, options)
     const { container } = render(<WebCanvas snapshot={expanded} />)
