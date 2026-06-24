@@ -85,7 +85,7 @@ function toNode(p: PersonInput): WebNode {
     interactionScore: p.interactionScore ?? DEFAULT_INTERACTION,
     relevanceScore,
     position: { x: 0, y: 0 },
-    photo: p.photo ?? photoUrlForUser(p.userId ?? p.id),
+    photo: p.photo ?? photoUrlForUser(p.userId ?? p.id, p.name),
     ...(p.headline ? { headline: p.headline } : {}),
     ...(p.activityStatus ? { activityStatus: p.activityStatus } : {}),
   }

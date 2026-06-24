@@ -21,8 +21,24 @@ import { dirname, join } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const userDataPath = join(__dirname, "..", "src", "data", "user_data.json");
+const genderNamesPath = join(__dirname, "..", "src", "data", "gender-names.json");
 
 const PORTRAITS_PER_GENDER = 100;
+
+// Name lists are shared with `src/lib/avatarPhoto.ts` via `src/data/gender-names.json`
+// to eliminate drift between the script and runtime name→gender mapping.
+const { maleNames, femaleNames } = JSON.parse(readFileSync(genderNamesPath, "utf8"));
+const MALE_NAMES = new Set(maleNames);
+const FEMALE_NAMES = new Set(femaleNames);
+
+function genderForName(name) {
+  if (!name) return null;
+  const first = name.trim().split(/\s+/)[0]?.toLowerCase();
+  if (!first) return null;
+  if (MALE_NAMES.has(first)) return "men";
+  if (FEMALE_NAMES.has(first)) return "women";
+  return null;
+}
 
 function hashId(id) {
   let h = 0x811c9dc5;
@@ -33,16 +49,16 @@ function hashId(id) {
   return h >>> 0;
 }
 
-function photoUrlForUser(userId) {
+function photoUrlForUser(userId, name) {
   const h = hashId(userId);
-  const gender = h % 2 === 0 ? "men" : "women";
+  const gender = genderForName(name) ?? (h % 2 === 0 ? "men" : "women");
   const index = Math.floor(h / 2) % PORTRAITS_PER_GENDER;
   return `https://randomuser.me/api/portraits/${gender}/${index}.jpg`;
 }
 
 const users = JSON.parse(readFileSync(userDataPath, "utf8"));
 for (const user of users) {
-  user.photo = photoUrlForUser(user.id);
+  user.photo = photoUrlForUser(user.id, user.name);
 }
 writeFileSync(userDataPath, JSON.stringify(users, null, 4) + "\n");
 
