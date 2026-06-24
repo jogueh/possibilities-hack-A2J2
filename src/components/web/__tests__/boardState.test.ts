@@ -200,6 +200,36 @@ describe('boardReducer', () => {
     expect(s.upgradePrompt).toBeNull()
   })
 
+  it('togglePremium bypasses the connection cap and persists across re-prompts', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    expect(s.premium).toBe(false)
+    // Reach the free-tier cap, then turn Premium on.
+    s = reduce(s, { type: 'connectNode', id: 'c' })
+    s = reduce(s, { type: 'connectNode', id: 'c2' })
+    s = reduce(s, { type: 'connectNode', id: 'c3' })
+    s = reduce(s, { type: 'togglePremium' })
+    expect(s.premium).toBe(true)
+    // A 4th+ connection now goes through with no upgrade prompt.
+    s = reduce(s, { type: 'connectNode', id: 'e' })
+    expect(s.connectedIds).toEqual(['c', 'c2', 'c3', 'e'])
+    expect(s.upgradePrompt).toBeNull()
+    // Premium survives a new goal (only `reset` clears it).
+    s = reduce(s, { type: 'setGoalText', value: 'New goal' })
+    s = reduce(s, { type: 'submitGoal' })
+    expect(s.premium).toBe(true)
+    s = reduce(s, { type: 'reset' })
+    expect(s.premium).toBe(false)
+  })
+
+  it('togglePremium clears an open upgrade prompt', () => {
+    let s = reduce(createInitialBoardState(), { type: 'showUpgrade', reason: 'connection' })
+    expect(s.upgradePrompt).toBe('connection')
+    s = reduce(s, { type: 'togglePremium' })
+    expect(s.premium).toBe(true)
+    expect(s.upgradePrompt).toBeNull()
+  })
+
   it('connecting a 2nd-degree does NOT solidify the 3rd-degree bridges below them (target-only)', () => {
     // Expand a -> reveal c (2nd). Connect to c (solidifies a__c). Click c to
     // reveal d (3rd). The c__d bridge MUST stay dotted: d is not yet
