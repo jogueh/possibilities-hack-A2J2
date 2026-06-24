@@ -197,11 +197,17 @@ describe("excludes (soft downrank)", () => {
       targetRoles: ["Software Engineer"],
       excludeRoles: ["Manager"],
     };
-    // Synthesize a user with a manager title in their job history.
+    // Synthesize a user who BOTH matches the target role (so role bonus is
+    // applied) AND trips the exclude (so we can see the subtraction). With
+    // the strength-based scorer the role bonus needs a real distinctive-token
+    // match — "Software Engineering Manager" satisfies both at once.
     const manager = {
       ...userBobWithJobs,
       job_history: [
-        { ...userBobWithJobs.job_history[0], position: "Engineering Manager" },
+        {
+          ...userBobWithJobs.job_history[0],
+          position: "Software Engineering Manager",
+        },
       ],
     };
     const baseline = scoreUserAgainstGoal(manager, {
@@ -210,6 +216,90 @@ describe("excludes (soft downrank)", () => {
     });
     const withExclude = scoreUserAgainstGoal(manager, goal);
     expect(baseline - withExclude).toBe(WEIGHTS.role);
+  });
+});
+
+describe("phrase-strength role/industry matching", () => {
+  // The key regression: a DevOps Engineer must NOT match a "Software
+  // Engineer" goal at the strong tier just because both contain the word
+  // "engineer". Same idea for "Sales Engineer", "Mechanical Engineer", etc.
+  const sweGoal: ParsedGoal = {
+    intent: "swe roles",
+    targetRoles: ["Software Engineer"],
+  };
+
+  it("matchesRole rejects a generic-only collision (DevOps vs Software Engineer)", () => {
+    expect(matchesRole("DevOps Engineer", sweGoal)).toBe(false);
+    expect(matchesRole("Sales Engineer", sweGoal)).toBe(false);
+    expect(matchesRole("Mechanical Engineer", sweGoal)).toBe(false);
+  });
+
+  it("matchesRole still accepts a distinctive-token match", () => {
+    expect(matchesRole("Senior Software Engineer", sweGoal)).toBe(true);
+    expect(matchesRole("Software Architect", sweGoal)).toBe(true);
+    expect(matchesRole("Backend Software Developer", sweGoal)).toBe(true);
+  });
+
+  it("seniority qualifiers alone are not enough (Senior Manager vs Software Engineer)", () => {
+    expect(matchesRole("Senior Manager", sweGoal)).toBe(false);
+    expect(matchesRole("Lead Manager", sweGoal)).toBe(false);
+  });
+
+  it("a generic-only target (Engineer) caps its own match strength", () => {
+    const generic: ParsedGoal = { intent: "engineers", targetRoles: ["Engineer"] };
+    // The bonus is capped at GENERIC_TOKEN_WEIGHT (15%) which falls below
+    // the 40% match threshold — the LLM is expected to be more specific.
+    expect(matchesRole("DevOps Engineer", generic)).toBe(false);
+    expect(matchesRole("Software Engineer", generic)).toBe(false);
+  });
+
+  it("a DevOps Engineer earns far less of the role weight than a Software Engineer", () => {
+    const devops = {
+      ...userBobWithJobs,
+      job_history: [
+        { ...userBobWithJobs.job_history[0], position: "DevOps Engineer" },
+      ],
+    };
+    const swe = {
+      ...userBobWithJobs,
+      job_history: [
+        { ...userBobWithJobs.job_history[0], position: "Software Engineer" },
+      ],
+    };
+    const sweScore = scoreUserAgainstGoal(swe, sweGoal);
+    const devopsScore = scoreUserAgainstGoal(devops, sweGoal);
+    // The SWE should beat the DevOps Engineer by roughly 85% of the role
+    // weight (the distinctive "software" token contributes the missing 0.85).
+    expect(sweScore - devopsScore).toBeGreaterThan(WEIGHTS.role * 0.7);
+  });
+
+  it("scoreJobAgainstGoal: SWE goal ranks a true SWE job strong and a DevOps job weak", () => {
+    // A realistic goal has more than just a role — once industry + location
+    // are also targeted, a true SWE job at the right industry/location
+    // fills the full signal budget and lands in the strong tier, while a
+    // DevOps job at the same place only earns generic-token credit on role
+    // and lands in the weak tier.
+    const fullGoal: ParsedGoal = {
+      intent: "swe roles in tech in SF",
+      targetRoles: ["Software Engineer"],
+      targetIndustries: ["Technology"],
+      targetLocations: ["San Francisco, CA"],
+    };
+    const sweJob = {
+      ...jobAcmeSwe,
+      position: "Software Engineer",
+      industry: "Technology",
+      location: "San Francisco, CA",
+    };
+    const devopsJob = { ...sweJob, position: "DevOps Engineer" };
+    const sweScore = scoreJobAgainstGoal(sweJob, fullGoal);
+    const devopsScore = scoreJobAgainstGoal(devopsJob, fullGoal);
+    expect(deriveAlignmentTier(sweScore)).toBe("strong");
+    // The DevOps job still earns industry + location, but its role
+    // contribution is tiny (only "engineer" matches), so it should NOT
+    // reach the strong tier from spurious role credit alone.
+    expect(deriveAlignmentTier(devopsScore)).not.toBe("strong");
+    expect(sweScore).toBeGreaterThan(devopsScore);
   });
 });
 

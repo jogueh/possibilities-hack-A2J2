@@ -34,12 +34,129 @@ function tokens(value: string): string[] {
     .filter((t) => t.length > 2);
 }
 
-/** True if any keyword of `needle` appears in `haystack` (case-insensitive). */
-function keywordOverlap(haystack: string, needle?: string): boolean {
-  if (!needle) return false;
-  const hay = normalize(haystack);
-  return tokens(needle).some((t) => hay.includes(t));
+/**
+ * "Generic" role tokens that on their own are weak signals: they appear in
+ * dozens of distinct roles ("DevOps Engineer", "Sales Engineer", "Mechanical
+ * Engineer"…) so a haystack containing just "engineer" should NOT earn the
+ * full role weight against a target like "Software Engineer". Distinctive
+ * tokens ("software", "devops", "marketing", "machine") carry the real signal.
+ *
+ * Used by `phraseStrength` to weight matched tokens — generic-only matches
+ * earn a tiny fraction of the weight, full distinctive matches earn 1.0.
+ */
+const GENERIC_ROLE_TOKENS = new Set<string>([
+  // role suffixes / common nouns
+  "engineer",
+  "engineering",
+  "engineers",
+  "developer",
+  "developers",
+  "development",
+  "manager",
+  "management",
+  "specialist",
+  "analyst",
+  "consultant",
+  "coordinator",
+  "associate",
+  "assistant",
+  "professional",
+  "officer",
+  "representative",
+  // seniority qualifiers
+  "senior",
+  "junior",
+  "lead",
+  "principal",
+  "staff",
+  "head",
+  "chief",
+  "director",
+  "intern",
+  "trainee",
+  "entry",
+  "mid",
+  "level",
+  // structural words that survive the 3-char filter
+  "the",
+  "and",
+  "for",
+  "with",
+  "from",
+  "into",
+  "jobs",
+  "job",
+  "role",
+  "roles",
+]);
+
+/**
+ * Weight assigned to a generic token when matched. 0.15 means matching only
+ * "engineer" earns 15% of full credit, while matching "software" earns 100%.
+ * Combined with `MIN_POSSIBLE_WEIGHT` below this means a 1-token target whose
+ * only token is generic ("Engineer" alone) can never score above 15%.
+ */
+const GENERIC_TOKEN_WEIGHT = 0.15;
+
+/**
+ * Minimum value of the denominator in `phraseStrength`. Without this, a
+ * target made entirely of generic tokens (e.g. "Engineer") would score 1.0
+ * any time it matched, defeating the down-weighting. Pinning the denominator
+ * at 1.0 keeps generic-only targets bounded at `GENERIC_TOKEN_WEIGHT`.
+ */
+const MIN_POSSIBLE_WEIGHT = 1.0;
+
+function tokenWeight(token: string): number {
+  return GENERIC_ROLE_TOKENS.has(token) ? GENERIC_TOKEN_WEIGHT : 1.0;
 }
+
+/**
+ * Computes how strongly `phrase`'s tokens are present in `haystack`,
+ * weighted by token signal. Returns a value in [0, 1]:
+ *   - 1.0 when every distinctive token in `phrase` appears in `haystack`
+ *   - low (~0.13) when only generic tokens like "engineer" match
+ *   - 0 when nothing matches
+ *
+ * This is the core fix for the boolean substring matcher: previously
+ * "DevOps Engineer" and "Software Engineer" both scored the same full
+ * role weight because "engineer" alone was enough. Now the haystack must
+ * also share the distinctive token ("software", "devops"…) to earn it.
+ */
+export function phraseStrength(haystack: string, phrase: string): number {
+  const phraseTokens = tokens(phrase);
+  if (phraseTokens.length === 0) return 0;
+  const hay = normalize(haystack);
+  let earned = 0;
+  let possible = 0;
+  for (const t of phraseTokens) {
+    const w = tokenWeight(t);
+    possible += w;
+    if (hay.includes(t)) earned += w;
+  }
+  return earned / Math.max(possible, MIN_POSSIBLE_WEIGHT);
+}
+
+/** Maximum `phraseStrength` of `haystack` against any of the candidate phrases. */
+export function bestPhraseStrength(
+  haystack: string,
+  phrases: string[],
+): number {
+  let best = 0;
+  for (const p of phrases) {
+    const s = phraseStrength(haystack, p);
+    if (s > best) best = s;
+  }
+  return best;
+}
+
+/**
+ * Threshold above which a phrase-strength counts as a "match" in the boolean
+ * back-compat helpers (`matchesRole`, `matchesIndustry`). 0.4 sits comfortably
+ * above the generic-only floor (~0.13) so a haystack must share at least one
+ * distinctive token, while still admitting partial multi-token matches like
+ * "Software Architect" vs "Software Engineer" (strength ≈ 0.87).
+ */
+const MATCH_STRENGTH_THRESHOLD = 0.4;
 
 // ---------------------------------------------------------------------------
 // Array-aware accessors. The LLM emits the plural fields; we fall back to the
@@ -92,15 +209,28 @@ function locationOverlaps(candidate: string, target: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Per-signal matchers — true when ANY of the target values matches.
+// Per-signal strength matchers — return 0–1 indicating how well the candidate
+// matches ANY of the target values. The boolean `matchesX` wrappers below are
+// kept for the existing call sites (jobMatches filtering, fixtures, tests).
 // ---------------------------------------------------------------------------
 
+export function roleMatchStrength(text: string, goal: ParsedGoal): number {
+  return bestPhraseStrength(text, targetRoles(goal));
+}
+
+export function industryMatchStrength(
+  industry: string,
+  goal: ParsedGoal,
+): number {
+  return bestPhraseStrength(industry, targetIndustries(goal));
+}
+
 export function matchesRole(text: string, goal: ParsedGoal): boolean {
-  return targetRoles(goal).some((role) => keywordOverlap(text, role));
+  return roleMatchStrength(text, goal) >= MATCH_STRENGTH_THRESHOLD;
 }
 
 export function matchesIndustry(industry: string, goal: ParsedGoal): boolean {
-  return targetIndustries(goal).some((ind) => keywordOverlap(industry, ind));
+  return industryMatchStrength(industry, goal) >= MATCH_STRENGTH_THRESHOLD;
 }
 
 export function matchesLocation(location: string, goal: ParsedGoal): boolean {
@@ -114,13 +244,29 @@ export function matchesLocation(location: string, goal: ParsedGoal): boolean {
 // matching signal's weight from the final score rather than disqualifying
 // the candidate outright, so a great role + skill match can still surface
 // even with a wrong-coast location (downranked, not hidden).
+//
+// Excludes use FULL-PHRASE substring match (not phrase-strength) because they
+// are intentional, user-supplied signals where every word is meant to count:
+//   - excludeRoles: ["Manager"] should fire on every role containing "manager"
+//   - excludeRoles: ["Software Engineer"] should fire ONLY on roles literally
+//     containing "software engineer" (not on "DevOps Engineer" via shared
+//     "engineer" — that would be the same false-positive trap we just fixed
+//     for the role bonus, in reverse).
+
+function phraseAppearsIn(haystack: string, phrase: string): boolean {
+  const needle = normalize(phrase);
+  if (needle.length === 0) return false;
+  return normalize(haystack).includes(needle);
+}
 
 function excludedByRole(text: string, goal: ParsedGoal): boolean {
-  return (goal.excludeRoles ?? []).some((r) => keywordOverlap(text, r));
+  return (goal.excludeRoles ?? []).some((r) => phraseAppearsIn(text, r));
 }
 
 function excludedByIndustry(industry: string, goal: ParsedGoal): boolean {
-  return (goal.excludeIndustries ?? []).some((i) => keywordOverlap(industry, i));
+  return (goal.excludeIndustries ?? []).some((i) =>
+    phraseAppearsIn(industry, i),
+  );
 }
 
 function excludedByLocation(location: string, goal: ParsedGoal): boolean {
@@ -195,16 +341,53 @@ export function deriveActivityStatus(user: User | UserWithJobs): ActivityStatus 
 // User scoring (consumed by W2 to seed the web)
 // ---------------------------------------------------------------------------
 
-function skillsOverlap(skills: string[], goal: ParsedGoal): boolean {
-  const target = [
+/**
+ * Bidirectional skill ↔ target strength: a skill counts as aligned if it
+ * either appears in a target phrase ("Software Engineering" → "Software
+ * Engineer" target) or contains a target phrase ("Python" skill against an
+ * intent that mentions Python). Returns max over every (skill, phrase) pair.
+ *
+ * Bidirectional matching matters because skills are usually 1–2 tokens but
+ * target phrases vary in length: a 1-token skill against a 3-token target
+ * needs the target→skill direction to surface, and a 3-token skill against
+ * a 1-token target needs the skill→target direction.
+ */
+function skillsStrength(skills: string[], goal: ParsedGoal): number {
+  if (skills.length === 0) return 0;
+  const phrases = [
     ...targetRoles(goal),
     ...targetIndustries(goal),
     ...(goal.concepts ?? []),
-    goal.intent,
-  ]
-    .filter(Boolean)
-    .join(" ");
-  return skills.some((skill) => keywordOverlap(target, skill));
+    goal.intent ?? "",
+  ].filter((p) => p && p.trim().length > 0);
+  if (phrases.length === 0) return 0;
+  let best = 0;
+  for (const skill of skills) {
+    for (const phrase of phrases) {
+      const s = Math.max(
+        phraseStrength(phrase, skill),
+        phraseStrength(skill, phrase),
+      );
+      if (s > best) best = s;
+    }
+  }
+  return best;
+}
+
+/** Best `phraseStrength` of any `text` against any of the goal's target phrases. */
+function bestStrengthAcross(
+  texts: string[],
+  pick: (g: ParsedGoal) => string[],
+  goal: ParsedGoal,
+): number {
+  const phrases = pick(goal);
+  if (phrases.length === 0 || texts.length === 0) return 0;
+  let best = 0;
+  for (const t of texts) {
+    const s = bestPhraseStrength(t, phrases);
+    if (s > best) best = s;
+  }
+  return best;
 }
 
 /**
@@ -214,6 +397,12 @@ function skillsOverlap(skills: string[], goal: ParsedGoal): boolean {
  * on `parsedGoal.weightOverrides` rebalance any of these. Exclusion lists on
  * the goal subtract the matching signal's weight when the user trips them
  * (soft downrank — a great match elsewhere can still surface).
+ *
+ * Each signal contributes `weight × strength` rather than an all-or-nothing
+ * bonus, so a haystack that matches only on a generic token like "engineer"
+ * earns roughly 15% of the role weight instead of the full amount. This is
+ * what stops a "DevOps Engineer" from showing up as a strong-aligned match
+ * for a "Software Engineer" goal.
  */
 export function scoreUserAgainstGoal(
   user: UserWithJobs,
@@ -222,18 +411,16 @@ export function scoreUserAgainstGoal(
   const w = effectiveWeights(parsedGoal);
   let score = 0;
 
-  if (user.job_history.some((j) => matchesRole(j.position, parsedGoal))) {
-    score += w.role;
-  }
-  if (user.job_history.some((j) => matchesIndustry(j.industry, parsedGoal))) {
-    score += w.industry;
-  }
+  const positions = user.job_history.map((j) => j.position);
+  const industries = user.job_history.map((j) => j.industry);
+
+  score += w.role * bestStrengthAcross(positions, targetRoles, parsedGoal);
+  score +=
+    w.industry * bestStrengthAcross(industries, targetIndustries, parsedGoal);
   if (matchesLocation(user.current_location, parsedGoal)) {
     score += w.location;
   }
-  if (skillsOverlap(user.skills, parsedGoal)) {
-    score += w.skills;
-  }
+  score += w.skills * skillsStrength(user.skills, parsedGoal);
 
   const activity = deriveActivityStatus(user);
   if (activity === "active") score += w.activity;
@@ -241,12 +428,10 @@ export function scoreUserAgainstGoal(
 
   // Soft exclusions: a candidate who trips an exclusion loses the matching
   // signal's weight. Applied AFTER the bonuses so the deduction is meaningful.
-  if (user.job_history.some((j) => excludedByRole(j.position, parsedGoal))) {
+  if (positions.some((p) => excludedByRole(p, parsedGoal))) {
     score -= w.role;
   }
-  if (
-    user.job_history.some((j) => excludedByIndustry(j.industry, parsedGoal))
-  ) {
+  if (industries.some((i) => excludedByIndustry(i, parsedGoal))) {
     score -= w.industry;
   }
   if (excludedByLocation(user.current_location, parsedGoal)) {
@@ -266,6 +451,7 @@ export function scoreUserAgainstGoal(
  * apply; they are re-weighted to sum to 100 so job scores stay comparable to
  * user scores on the same 0–100 / alignmentTier scale. Per-query weight
  * overrides and exclusion lists are honoured the same way as for user scoring.
+ * Each signal contributes `weight × strength` (see `scoreUserAgainstGoal`).
  */
 export function scoreJobAgainstGoal(job: Job, goal: ParsedGoal): number {
   const w = effectiveWeights(goal);
@@ -276,8 +462,8 @@ export function scoreJobAgainstGoal(job: Job, goal: ParsedGoal): number {
   const scale = 100 / total;
 
   let score = 0;
-  if (matchesRole(job.position, goal)) score += w.role;
-  if (matchesIndustry(job.industry, goal)) score += w.industry;
+  score += w.role * roleMatchStrength(job.position, goal);
+  score += w.industry * industryMatchStrength(job.industry, goal);
   if (matchesLocation(job.location, goal)) score += w.location;
 
   // Soft exclusions — same idea as for users.
