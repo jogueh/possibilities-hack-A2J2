@@ -1,8 +1,9 @@
 "use client";
-// W4-OWNED (stretch s11). "I met up" button for the W3 node sidebar Actions bar.
-// Logging a real-world meetup strengthens the tie: the mount site wires `onLog`
-// to a boardState `logMeetup` dispatch, which bumps the rendered edge to full
-// strength and so warms/thickens the edge via the s12 visuals.
+// W4-OWNED (stretch s11). "Linked up" button for the W3 node sidebar Actions bar.
+// Logging a real-world LinkedIn-style "linked up" with this person strengthens
+// the tie: the mount site wires `onLog` to a boardState `logMeetup` dispatch,
+// which bumps the rendered edge to full strength and so warms/thickens the
+// edge via the s12 visuals.
 //
 // Store-agnostic by design: it owns the button UI and the confirmation toast,
 // but never imports a store — the W3 mount site supplies `onLog`. No API call,
@@ -54,7 +55,7 @@ export function MetUpButton({ edgeId, logged: loggedProp, onLog }: MetUpButtonPr
     if (logged) return;
     if (!controlled) loggedMeetups.add(edgeId);
     onLog();
-    setToast("🤝 Connection logged!");
+    setToast("🔗 Linked up!");
   };
 
   return (
@@ -71,12 +72,12 @@ export function MetUpButton({ edgeId, logged: loggedProp, onLog }: MetUpButtonPr
           padding: "8px 0",
           fontWeight: 600,
           background: "transparent",
-          color: logged ? LI.textSecondary : LI.green,
-          border: `1px solid ${logged ? LI.border : LI.green}`,
+          color: logged ? LI.textSecondary : LI.blue,
+          border: `1px solid ${logged ? LI.border : LI.blue}`,
           cursor: logged ? "default" : "pointer",
         }}
       >
-        {logged ? "✓ Met up logged" : "🤝 I met up with this person"}
+        {logged ? "✓ Linked up" : "🔗 Linked up with this person"}
       </button>
 
       {toast && (
@@ -86,7 +87,7 @@ export function MetUpButton({ edgeId, logged: loggedProp, onLog }: MetUpButtonPr
             position: "fixed",
             bottom: 24,
             right: 24,
-            background: LI.green,
+            background: LI.blue,
             color: "#fff",
             padding: "10px 16px",
             borderRadius: 8,
