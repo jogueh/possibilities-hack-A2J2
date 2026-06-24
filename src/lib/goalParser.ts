@@ -67,10 +67,22 @@ const goalSchema = z.object({
 // dataset value, so the fallback returns values the scorer can match on.
 
 const KNOWN_ROLES: Array<{ canonical: string; aliases: string[] }> = [
-  { canonical: 'Software Engineer', aliases: ['software engineer', 'swe', 'software developer', 'developer', 'engineer'] },
+  { canonical: 'Software Engineer', aliases: ['software engineer', 'swe', 'software developer', 'developer'] },
   { canonical: 'Data Scientist', aliases: ['data scientist', 'data science', 'ml engineer', 'machine learning'] },
   { canonical: 'Product Manager', aliases: ['product manager', 'pm'] },
-  { canonical: 'UX Designer', aliases: ['ux designer', 'ux', 'designer', 'user experience'] },
+  {
+    canonical: "UX Designer",
+    aliases: [
+      "ux designer",
+      "ux",
+      "designer",
+      "user experience",
+      "design",
+      "design job",
+      "product designer",
+      "ui designer",
+    ],
+  },
   { canonical: 'DevOps Engineer', aliases: ['devops', 'site reliability', 'sre'] },
   { canonical: 'Marketing Specialist', aliases: ['marketing'] },
   { canonical: 'Financial Analyst', aliases: ['financial analyst', 'finance analyst'] },

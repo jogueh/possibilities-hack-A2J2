@@ -19,9 +19,18 @@ import {
 } from "@/test/fixtures";
 
 describe("signal primitives", () => {
-  it("matchesRole is case-insensitive keyword match", () => {
+  it("matchesRole requires a non-generic role token overlap", () => {
     expect(matchesRole("Senior Software Engineer", goalSwe)).toBe(true);
     expect(matchesRole("Marketing Specialist", goalSwe)).toBe(false);
+
+    const productGoal: ParsedGoal = {
+      intent: "PM",
+      targetRoles: ["Product Manager"],
+    };
+    expect(matchesRole("Product Manager", productGoal)).toBe(true);
+    expect(matchesRole("Senior Product Manager", productGoal)).toBe(true);
+    expect(matchesRole("Group Product Manager", productGoal)).toBe(true);
+    expect(matchesRole("Customer Service Manager", productGoal)).toBe(false);
   });
 
   it("matchesIndustry tokenizes the goal industry", () => {
@@ -29,10 +38,51 @@ describe("signal primitives", () => {
     expect(matchesIndustry("Healthcare", goalSwe)).toBe(false);
   });
 
-  it("matchesLocation matches on a shared token", () => {
+  it("matchesLocation requires all city tokens when the goal has a city", () => {
     expect(matchesLocation("Mountain View, CA", goalSwe)).toBe(true);
-    expect(matchesLocation("San Francisco, CA", goalSwe)).toBe(true);
+    expect(matchesLocation("San Francisco, CA", goalSwe)).toBe(false);
+    expect(matchesLocation("Mountain House, CA", goalSwe)).toBe(false);
     expect(matchesLocation("Boston, MA", goalSwe)).toBe(false);
+  });
+
+  it("matchesLocation ignores state-only overlap when the goal has a city", () => {
+    const goal: ParsedGoal = {
+      intent: "find SF people",
+      targetLocations: ["San Francisco, CA"],
+    };
+    expect(matchesLocation("San Francisco, CA", goal)).toBe(true);
+    expect(matchesLocation("San Francisco", goal)).toBe(true);
+    expect(matchesLocation("Los Angeles, CA", goal)).toBe(false);
+    // A different city sharing a token ("san") must NOT match — all city
+    // tokens are required, and "San Jose" is missing "francisco".
+    expect(matchesLocation("San Jose, CA", goal)).toBe(false);
+  });
+
+  it("matchesLocation rejects same-city matches in the wrong state", () => {
+    const goal: ParsedGoal = {
+      intent: "find Portland Oregon people",
+      targetLocations: ["Portland, OR"],
+    };
+    expect(matchesLocation("Portland, OR", goal)).toBe(true);
+    expect(matchesLocation("Portland, ME", goal)).toBe(false);
+  });
+
+  it("matchesLocation allows state overlap for state-only goals", () => {
+    const caGoal: ParsedGoal = {
+      intent: "find California people",
+      targetLocations: ["CA"],
+    };
+    expect(matchesLocation("San Francisco, CA", caGoal)).toBe(true);
+    expect(matchesLocation("Los Angeles, CA", caGoal)).toBe(true);
+    expect(matchesLocation("Seattle, WA", caGoal)).toBe(false);
+
+    const washingtonGoal: ParsedGoal = {
+      intent: "find Washington people",
+      targetLocations: ["Washington"],
+    };
+    expect(matchesLocation("Seattle, WA", washingtonGoal)).toBe(true);
+    expect(matchesLocation("Portland, OR", washingtonGoal)).toBe(false);
+    expect(matchesLocation("Washington, DC", washingtonGoal)).toBe(false);
   });
 
   it("location matcher returns false when goal has no location", () => {
@@ -103,6 +153,28 @@ describe("scoreUserAgainstGoal", () => {
       WEIGHTS.location + WEIGHTS.activity / 2,
     );
   });
+
+  it("caps role-specific user scores below moderate when the role mismatches", () => {
+    const goal: ParsedGoal = {
+      intent: "PM in tech SF",
+      targetRoles: ["Product Manager"],
+      targetIndustries: ["Technology"],
+      targetLocations: ["San Francisco, CA"],
+    };
+    const offRoleUser: UserWithJobs = {
+      ...userBobWithJobs,
+      job_history: [{ ...jobAcmeSwe, position: "Software Engineer" }],
+      current_location: "San Francisco, CA",
+      posts_activity: ["a", "b", "c"],
+      skills: ["Product Management"],
+    };
+
+    expect(matchesRole("Software Engineer", goal)).toBe(false);
+    expect(scoreUserAgainstGoal(offRoleUser, goal)).toBeLessThan(40);
+    expect(deriveAlignmentTier(scoreUserAgainstGoal(offRoleUser, goal))).toBe(
+      "weak",
+    );
+  });
 });
 
 describe("scoreJobAgainstGoal", () => {
@@ -125,6 +197,26 @@ describe("scoreJobAgainstGoal", () => {
     expect(score).toBeGreaterThan(0);
     expect(score).toBeLessThan(100);
   });
+
+  it("caps role-specific job scores below moderate when the role mismatches", () => {
+    const goal: ParsedGoal = {
+      intent: "PM in tech SF",
+      targetRoles: ["Product Manager"],
+      targetIndustries: ["Technology"],
+      targetLocations: ["San Francisco, CA"],
+    };
+    const offRoleJob = {
+      ...jobAcmeSwe,
+      position: "Customer Service Manager",
+      industry: "Technology",
+      location: "San Francisco, CA",
+    };
+
+    expect(scoreJobAgainstGoal(offRoleJob, goal)).toBeLessThan(40);
+    expect(deriveAlignmentTier(scoreJobAgainstGoal(offRoleJob, goal))).toBe(
+      "weak",
+    );
+  });
 });
 
 describe("multi-value goal fields", () => {
@@ -140,7 +232,7 @@ describe("multi-value goal fields", () => {
     };
     expect(matchesLocation("Seattle, WA", goal)).toBe(true);
     expect(matchesLocation("Portland, OR", goal)).toBe(true);
-    expect(matchesLocation("Mountain View, CA", goal)).toBe(true); // CA token match
+    expect(matchesLocation("Mountain View, CA", goal)).toBe(false);
     expect(matchesLocation("Boston, MA", goal)).toBe(false);
     expect(matchesLocation("New York, NY", goal)).toBe(false);
   });
@@ -201,7 +293,10 @@ describe("excludes (soft downrank)", () => {
     const manager = {
       ...userBobWithJobs,
       job_history: [
-        { ...userBobWithJobs.job_history[0], position: "Engineering Manager" },
+        {
+          ...userBobWithJobs.job_history[0],
+          position: "Software Engineer Manager",
+        },
       ],
     };
     const baseline = scoreUserAgainstGoal(manager, {
@@ -258,6 +353,32 @@ describe("weightOverrides", () => {
     );
   });
 
+  it("does not cap user scores for a role mismatch when role weight is 0", () => {
+    const goal: ParsedGoal = {
+      intent: "location-led PM search",
+      targetRoles: ["Product Manager"],
+      targetIndustries: ["Technology"],
+      targetLocations: ["San Francisco, CA"],
+      weightOverrides: {
+        role: 0,
+        industry: 50,
+        location: 50,
+        skills: 0,
+        activity: 0,
+      },
+    };
+    const user: UserWithJobs = {
+      ...userBobWithJobs,
+      job_history: [{ ...jobAcmeSwe, position: "Software Engineer" }],
+      current_location: "San Francisco, CA",
+      posts_activity: [],
+      skills: [],
+    };
+
+    expect(matchesRole("Software Engineer", goal)).toBe(false);
+    expect(scoreUserAgainstGoal(user, goal)).toBe(100);
+  });
+
   it("scoreJobAgainstGoal returns 0 when all job-relevant weights are 0", () => {
     const goal: ParsedGoal = {
       intent: "x",
@@ -265,5 +386,23 @@ describe("weightOverrides", () => {
       weightOverrides: { role: 0, industry: 0, location: 0 },
     };
     expect(scoreJobAgainstGoal(jobAcmeSwe, goal)).toBe(0);
+  });
+
+  it("does not cap job scores for a role mismatch when role weight is 0", () => {
+    const goal: ParsedGoal = {
+      intent: "location-led PM jobs",
+      targetRoles: ["Product Manager"],
+      targetIndustries: ["Technology"],
+      targetLocations: ["San Francisco, CA"],
+      weightOverrides: { role: 0, industry: 50, location: 50 },
+    };
+    const job = {
+      ...jobAcmeSwe,
+      position: "Software Engineer",
+      industry: "Technology",
+      location: "San Francisco, CA",
+    };
+
+    expect(scoreJobAgainstGoal(job, goal)).toBe(100);
   });
 });
