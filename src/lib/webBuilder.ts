@@ -83,19 +83,25 @@ function edge(source: string, target: string, isDotted: boolean): WebEdge {
  *      map (anyone outside the candidates set is silently dropped). Score
  *      each, keep score >= FIRST_DEGREE_MIN_SCORE, sort desc, take top
  *      FIRST_DEGREE_MAX. Edges viewer -> 1st are SOLID (real connection).
- *   1a. COLD-START FALLBACK: if the viewer has no direct connections in the
- *       candidate set, seed the 1st-degree pool with structural suggestions
- *       from `suggestConnections(...)` (warm 2nd-degree, then hubs), then
- *       apply the same score / threshold / cap ranking on top. These are not
- *       real edges in the dataset, but the user still sees them as solid
- *       1st-degree edges in the UI — purely a discovery-floor for new users.
+ *   1a. WEAK-MATCH FALLBACK: if the viewer HAS connections but none clear
+ *       the threshold, we still show the top FIRST_DEGREE_MAX of their
+ *       connections by score. The threshold is only a quality filter for
+ *       1st-degree when the viewer has at least one strong match — without
+ *       this fallback a goal like "find people in SF" (location-only signal,
+ *       caps at ~30 points) would render an empty web even though the user
+ *       has connections. The `alignmentTier` on each node already conveys
+ *       the weak match visually.
+ *   1b. COLD-START FALLBACK: if the viewer has NO direct connections in the
+ *       candidate set (new / unknown viewer), seed the 1st-degree pool with
+ *       structural suggestions from `suggestConnections(...)` (warm 2nd-
+ *       degree, then hubs). The score threshold IS enforced on this path so
+ *       we don't recommend irrelevant strangers — these aren't real edges.
  *   2. 2nd-degree pool per 1st-degree node = that node's `connections`, minus
  *      the viewer and anyone already in the web. Score, filter
  *      >= SECOND_DEGREE_MIN_SCORE, sort desc, take top
  *      SECOND_DEGREE_PER_NODE_MAX. Edges 1st -> 2nd are DOTTED ("people to
  *      meet" via a warm path). A user appears at most once across the web.
- *   3. No padding beyond the cold-start fallback. No edges to strangers
- *      outside the candidates set.
+ *   3. No edges to strangers outside the candidates set.
  */
 export function buildWeb({
   viewerUserId,
@@ -111,32 +117,39 @@ export function buildWeb({
   const connectionsOf = (id: string): readonly string[] =>
     byId.get(id)?.connections ?? []
 
-  // 1st-degree pool: the viewer's real connections present in the candidate
-  // set. Cold-start fallback: if there are none (new / unknown viewer),
-  // structural suggestions from `suggestConnections` seed the pool so the
-  // user never sees a fully-empty web. These suggestions are goal-agnostic
-  // and get ranked by score below — same threshold + cap as real connections.
+  // 1st-degree pool starts as the viewer's real direct connections. Cold-start
+  // (`isColdStart`) only fires when there are NONE — in that case suggestions
+  // from `suggestConnections` seed the pool and the score threshold is treated
+  // as binding (don't show irrelevant strangers).
   const viewerMember = byId.get(viewerUserId)
-  let firstDegreePoolIds: string[] = [...connectionsOf(viewerUserId)]
-  if (firstDegreePoolIds.length === 0) {
-    firstDegreePoolIds = suggestConnections(
-      viewerMember,
-      byId,
-      FIRST_DEGREE_MAX,
-    )
-  }
+  const directIds = connectionsOf(viewerUserId)
+  const isColdStart = directIds.length === 0
+  const firstDegreePoolIds: string[] = isColdStart
+    ? suggestConnections(viewerMember, byId, FIRST_DEGREE_MAX)
+    : [...directIds]
 
   const directScored: ScoredUser[] = []
   for (const id of firstDegreePoolIds) {
     if (id === viewerUserId) continue
     const user = byId.get(id)
     if (!user) continue
-    const score = scorer(user, parsedGoal)
-    if (score < FIRST_DEGREE_MIN_SCORE) continue
-    directScored.push({ user, score })
+    directScored.push({ user, score: scorer(user, parsedGoal) })
   }
   directScored.sort((a, b) => b.score - a.score)
-  const firstDegree = directScored.slice(0, FIRST_DEGREE_MAX)
+
+  // Strict path: filter to scores clearing the threshold, then cap at MAX.
+  const qualifying = directScored.filter(
+    (s) => s.score >= FIRST_DEGREE_MIN_SCORE,
+  )
+  // Weak-match fallback only fires for the real-connections path: if at
+  // least one connection clears the threshold OR we're on the cold-start
+  // path (where the suggestions are strangers, so weak matches should be
+  // dropped), keep the strict result. Otherwise, surface the viewer's
+  // top-MAX connections by score so the web isn't empty.
+  const firstDegree =
+    qualifying.length > 0 || isColdStart
+      ? qualifying.slice(0, FIRST_DEGREE_MAX)
+      : directScored.slice(0, FIRST_DEGREE_MAX)
 
   const nodes: WebNode[] = firstDegree.map(({ user, score }) =>
     toNode(user, 1, score),
