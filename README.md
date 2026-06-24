@@ -1,7 +1,5 @@
-# possibilities-hack-A2J2
+# LinkedIn Web
 PIT Hackathon
-
-## LinkedIn-style prototype with a "Career GPS" connection web
 
 A LinkedIn-inspired prototype built with **Next.js (App Router) + TypeScript + Ant Design 5**. Alongside a static homepage mockup, it includes an interactive **Web** feature: set a career goal and see how your network maps a warm path toward it.
 
