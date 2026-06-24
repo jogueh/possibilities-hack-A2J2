@@ -42,6 +42,11 @@ export default function JobsDemoPage() {
   useEffect(() => {
     __setMockWebState({
       goal: { raw: "Break into software engineering in technology", userId: "user_4579" },
+      parsedGoal: {
+        intent: "Break into software engineering in technology",
+        targetRole: "Software Engineer",
+        targetIndustry: "Technology",
+      },
       viewerProfile: MOCK_USERS.user_4579,
       nodes: [bobNode, aliceNode],
       edges: [],

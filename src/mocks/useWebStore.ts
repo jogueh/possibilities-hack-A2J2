@@ -5,9 +5,11 @@ import { useSyncExternalStore } from "react";
 import { useRef } from "react";
 import type { GoalQuery, WebEdge, WebNode } from "@/mocks/web";
 import type { UserWithJobs } from "@/mocks/data";
+import type { ParsedGoal } from "@/types/goal";
 
 export interface WebStoreState {
   goal: GoalQuery | null;
+  parsedGoal: ParsedGoal | null;
   nodes: WebNode[];
   edges: WebEdge[];
   // Viewer's own resolved profile — W1 fetches once on app load and stores it; W3 reads it.
@@ -19,6 +21,7 @@ export interface WebStoreState {
 
 let state: WebStoreState = {
   goal: null,
+  parsedGoal: null,
   nodes: [],
   edges: [],
   viewerProfile: null,
@@ -88,6 +91,7 @@ export function __setMockWebState(partial: Partial<WebStoreState>) {
 export function __resetMockWebState() {
   state = {
     goal: null,
+    parsedGoal: null,
     nodes: [],
     edges: [],
     viewerProfile: null,

@@ -54,6 +54,10 @@ export default function W3DemoPage() {
   useEffect(() => {
     __setMockWebState({
       goal: { raw: "Break into software engineering", userId: "user_4579" },
+      parsedGoal: {
+        intent: "Break into software engineering",
+        targetRole: "Software Engineer",
+      },
       viewerProfile: MOCK_USERS.user_4579,
       nodes: [aliceNode, bobNode, secondDegree],
       edges,

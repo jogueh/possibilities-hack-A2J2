@@ -19,7 +19,6 @@ import { useEffect, useMemo, useState } from "react";
 import type { JobMatch } from "@/types/job";
 import type { NodeDecoration } from "@/components/web/WebCanvas";
 import { useWebStore } from "@/store/useWebStore";
-import { parseGoalRaw } from "@/mocks/goalParser";
 import { fetchJobMatches } from "@/mocks/jobsApi";
 import { overlappingNodeIds } from "@/lib/webOverlap";
 
@@ -30,13 +29,20 @@ import { overlappingNodeIds } from "@/lib/webOverlap";
  */
 export function useJobOverlapDecorations(): Record<string, NodeDecoration> {
   const goal = useWebStore((s) => s.goal);
+  const parsedGoal = useWebStore((s) => s.parsedGoal);
   const nodes = useWebStore((s) => s.nodes);
 
   const webUserIds = nodes.map((n) => n.userId);
   // Stable key so we only refetch when the goal or the web's membership changes.
-  const requestKey = goal
-    ? `${goal.raw}::${[...webUserIds].sort().join(",")}`
+  const parsedGoalKey = parsedGoal
+    ? [parsedGoal.intent, parsedGoal.targetRole, parsedGoal.targetIndustry, parsedGoal.targetLocation]
+        .filter(Boolean)
+        .join("|")
     : null;
+  const requestKey =
+    goal && parsedGoalKey
+      ? `${goal.raw}::${parsedGoalKey}::${[...webUserIds].sort().join(",")}`
+      : null;
 
   // React 19: never call setState synchronously in an effect — only from the
   // async callback. The key guards against stale responses overwriting newer
@@ -47,9 +53,9 @@ export function useJobOverlapDecorations(): Record<string, NodeDecoration> {
   } | null>(null);
 
   useEffect(() => {
-    if (!goal || !requestKey) return;
+    if (!goal || !parsedGoal || !requestKey) return;
     let cancelled = false;
-    fetchJobMatches(parseGoalRaw(goal.raw), webUserIds)
+    fetchJobMatches(parsedGoal, webUserIds)
       .then((matches) => {
         if (!cancelled) setResult({ key: requestKey, matches });
       })

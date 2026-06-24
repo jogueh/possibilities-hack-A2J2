@@ -10,7 +10,6 @@ import { useEffect, useState } from "react";
 import type { JobMatch } from "@/types/job";
 import type { AlignmentTier } from "@/types/web";
 import { useWebStore } from "@/mocks/useWebStore";
-import { parseGoalRaw } from "@/mocks/goalParser";
 import { fetchJobMatches } from "@/mocks/jobsApi";
 import { deriveAlignmentTier } from "@/lib/scoring";
 import { LI } from "@/lib/linkedinTokens";
@@ -48,10 +47,19 @@ interface JobsPanelProps {
 
 export function JobsPanel({ open, onClose, onOpenConnection }: JobsPanelProps) {
   const goal = useWebStore((s) => s.goal);
+  const parsedGoal = useWebStore((s) => s.parsedGoal);
   const nodes = useWebStore((s) => s.nodes);
 
   const webUserIds = nodes.map((n) => n.userId);
-  const requestKey = goal ? `${goal.raw}::${[...webUserIds].sort().join(",")}` : null;
+  const parsedGoalKey = parsedGoal
+    ? [parsedGoal.intent, parsedGoal.targetRole, parsedGoal.targetIndustry, parsedGoal.targetLocation]
+        .filter(Boolean)
+        .join("|")
+    : null;
+  const requestKey =
+    goal && parsedGoalKey
+      ? `${goal.raw}::${parsedGoalKey}::${[...webUserIds].sort().join(",")}`
+      : null;
 
   // Keyed result written only from the async callback (React 19: never setState
   // synchronously in an effect). `current === null` (for the active key) means a
@@ -63,9 +71,9 @@ export function JobsPanel({ open, onClose, onOpenConnection }: JobsPanelProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!open || !goal || !requestKey) return;
+    if (!open || !goal || !parsedGoal || !requestKey) return;
     let cancelled = false;
-    fetchJobMatches(parseGoalRaw(goal.raw), webUserIds)
+    fetchJobMatches(parsedGoal, webUserIds)
       .then((matches) => {
         if (!cancelled) setResult({ key: requestKey, status: "loaded", matches });
       })

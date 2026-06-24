@@ -76,6 +76,10 @@ beforeEach(() => {
   );
   __setMockWebState({
     goal: { raw: "Break into software engineering", userId: "user_4579" },
+    parsedGoal: {
+      intent: "Break into software engineering",
+      targetRole: "Software Engineer",
+    },
     viewerProfile: userWith({ id: "user_4579", name: "Bob", skills: ["Sales"], current_location: "Austin, TX" }),
   });
 });
