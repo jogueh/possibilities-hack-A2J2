@@ -126,6 +126,8 @@ const US_STATE_ALIASES = new Map([
   ["connecticut", "ct"],
   ["de", "de"],
   ["delaware", "de"],
+  ["dc", "dc"],
+  ["district of columbia", "dc"],
   ["fl", "fl"],
   ["florida", "fl"],
   ["ga", "ga"],
@@ -167,9 +169,17 @@ const US_STATE_ALIASES = new Map([
   ["nv", "nv"],
   ["nevada", "nv"],
   ["nh", "nh"],
+  ["new hampshire", "nh"],
   ["nj", "nj"],
+  ["new jersey", "nj"],
   ["nm", "nm"],
+  ["new mexico", "nm"],
   ["ny", "ny"],
+  ["new york", "ny"],
+  ["nc", "nc"],
+  ["north carolina", "nc"],
+  ["nd", "nd"],
+  ["north dakota", "nd"],
   ["oh", "oh"],
   ["ohio", "oh"],
   ["ok", "ok"],
@@ -179,8 +189,11 @@ const US_STATE_ALIASES = new Map([
   ["pa", "pa"],
   ["pennsylvania", "pa"],
   ["ri", "ri"],
+  ["rhode island", "ri"],
   ["sc", "sc"],
+  ["south carolina", "sc"],
   ["sd", "sd"],
+  ["south dakota", "sd"],
   ["tn", "tn"],
   ["tennessee", "tn"],
   ["tx", "tx"],
@@ -192,11 +205,29 @@ const US_STATE_ALIASES = new Map([
   ["va", "va"],
   ["virginia", "va"],
   ["wa", "wa"],
+  ["washington", "wa"],
+  ["wv", "wv"],
+  ["west virginia", "wv"],
   ["wi", "wi"],
   ["wisconsin", "wi"],
   ["wy", "wy"],
   ["wyoming", "wy"],
 ]);
+
+function normalizedLocationComponent(value: string): string {
+  return normalize(value).replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function locationComponents(location: string): string[] {
+  return location
+    .split(",")
+    .map(normalizedLocationComponent)
+    .filter(Boolean);
+}
+
+function stateAliasForComponent(component: string): string | undefined {
+  return US_STATE_ALIASES.get(component);
+}
 
 function locationParts(location: string): string[] {
   return normalize(location)
@@ -205,15 +236,37 @@ function locationParts(location: string): string[] {
 }
 
 function locationTokenSet(location: string): Set<string> {
+  const components = locationComponents(location);
+
+  if (components.length > 1) {
+    return new Set(locationParts(components[0]));
+  }
+
+  const normalizedLocation = normalizedLocationComponent(location);
+  if (stateAliasForComponent(normalizedLocation)) {
+    return new Set();
+  }
+
   return new Set(locationParts(location).filter((t) => !US_STATE_ALIASES.has(t)));
 }
 
+function stateTokensFromComponent(component: string): string[] {
+  const exactAlias = stateAliasForComponent(component);
+  if (exactAlias) return [exactAlias];
+
+  return locationParts(component)
+    .map((t) => US_STATE_ALIASES.get(t))
+    .filter((t): t is string => Boolean(t));
+}
+
 function stateTokenSet(location: string): Set<string> {
-  return new Set(
-    locationParts(location)
-      .map((t) => US_STATE_ALIASES.get(t))
-      .filter((t): t is string => Boolean(t)),
-  );
+  const components = locationComponents(location);
+
+  if (components.length > 1) {
+    return new Set(components.slice(1).flatMap(stateTokensFromComponent));
+  }
+
+  return new Set(stateTokensFromComponent(normalizedLocationComponent(location)));
 }
 
 function locationOverlaps(candidate: string, target: string): boolean {
@@ -221,7 +274,17 @@ function locationOverlaps(candidate: string, target: string): boolean {
   const targetTokens = locationTokenSet(target);
 
   if (targetTokens.size > 0) {
-    return [...targetTokens].every((t) => candidateTokens.has(t));
+    if (![...targetTokens].every((t) => candidateTokens.has(t))) {
+      return false;
+    }
+
+    const targetStates = stateTokenSet(target);
+    const candidateStates = stateTokenSet(candidate);
+    return (
+      targetStates.size === 0 ||
+      candidateStates.size === 0 ||
+      [...targetStates].some((t) => candidateStates.has(t))
+    );
   }
 
   const candidateStates = stateTokenSet(candidate);

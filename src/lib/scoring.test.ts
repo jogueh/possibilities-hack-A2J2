@@ -58,6 +58,15 @@ describe("signal primitives", () => {
     expect(matchesLocation("San Jose, CA", goal)).toBe(false);
   });
 
+  it("matchesLocation rejects same-city matches in the wrong state", () => {
+    const goal: ParsedGoal = {
+      intent: "find Portland Oregon people",
+      targetLocations: ["Portland, OR"],
+    };
+    expect(matchesLocation("Portland, OR", goal)).toBe(true);
+    expect(matchesLocation("Portland, ME", goal)).toBe(false);
+  });
+
   it("matchesLocation allows state overlap for state-only goals", () => {
     const caGoal: ParsedGoal = {
       intent: "find California people",
@@ -66,6 +75,14 @@ describe("signal primitives", () => {
     expect(matchesLocation("San Francisco, CA", caGoal)).toBe(true);
     expect(matchesLocation("Los Angeles, CA", caGoal)).toBe(true);
     expect(matchesLocation("Seattle, WA", caGoal)).toBe(false);
+
+    const washingtonGoal: ParsedGoal = {
+      intent: "find Washington people",
+      targetLocations: ["Washington"],
+    };
+    expect(matchesLocation("Seattle, WA", washingtonGoal)).toBe(true);
+    expect(matchesLocation("Portland, OR", washingtonGoal)).toBe(false);
+    expect(matchesLocation("Washington, DC", washingtonGoal)).toBe(false);
   });
 
   it("location matcher returns false when goal has no location", () => {
