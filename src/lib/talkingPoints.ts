@@ -94,9 +94,20 @@ export async function generateTalkingPoint(
       abortSignal: controller.signal,
     })
     const tip = object.tip?.trim()
-    if (!tip) return { tip: fallbackTip(req) }
+    if (!tip) {
+      console.warn(
+        '[talkingPoints] LLM returned empty tip, using deterministic fallback',
+      )
+      return { tip: fallbackTip(req) }
+    }
     return { tip }
-  } catch {
+  } catch (e) {
+    // Visible-on-fallback: surface upstream errors so the operator can tell
+    // the LLM was attempted rather than silently skipped.
+    console.warn(
+      '[talkingPoints] LLM call failed, using deterministic fallback:',
+      (e as Error)?.message ?? e,
+    )
     return { tip: fallbackTip(req) }
   } finally {
     clearTimeout(timer)

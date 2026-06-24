@@ -145,7 +145,14 @@ async function runLLM(raw: string): Promise<ParsedGoal | null> {
       abortSignal: controller.signal,
     })
     return { ...object, intent: raw }
-  } catch {
+  } catch (e) {
+    // Visible-on-fallback: surface upstream errors (rate limits, timeouts,
+    // malformed JSON) in the server log so the operator can tell the LLM was
+    // attempted rather than silently skipped.
+    console.warn(
+      '[goalParser] LLM call failed, using keyword fallback:',
+      (e as Error)?.message ?? e,
+    )
     return null
   } finally {
     clearTimeout(timer)
