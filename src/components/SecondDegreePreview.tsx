@@ -40,6 +40,7 @@ export function SecondDegreePreview({ parentNode, parentName }: SecondDegreePrev
       </h3>
       {children.map((child) => {
         const isAdded = added.has(child.id);
+        const photoUrl = child.photo ?? photoUrlForUser(child.userId);
         return (
           <div
             key={child.id}
@@ -69,7 +70,7 @@ export function SecondDegreePreview({ parentNode, parentName }: SecondDegreePrev
                 style={{
                   position: "absolute",
                   inset: 0,
-                  backgroundImage: `url(${child.photo ?? photoUrlForUser(child.userId)})`,
+                  backgroundImage: `url(${JSON.stringify(photoUrl)})`,
                   backgroundSize: "cover",
                   backgroundPosition: "center",
                 }}

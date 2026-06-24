@@ -44,15 +44,27 @@ describe("SecondDegreePreview", () => {
   });
 
   it("renders each child's avatar photo over the initials fallback", () => {
-    __setMockWebState({ nodes: [parent, child], edges: [edge] });
+    const childTwo = n("n3", 2, "Dana");
+    const edgeTwo: WebEdge = {
+      id: "e2",
+      source: "n1",
+      target: "n3",
+      strength: 50,
+      isDotted: true,
+    };
+    __setMockWebState({ nodes: [parent, child, childTwo], edges: [edge, edgeTwo] });
     const { container } = render(
       <SecondDegreePreview parentNode={parent} parentName="Alice" />,
     );
-    const overlay = container.querySelector("span[aria-hidden]");
-    expect(overlay?.getAttribute("style")).toMatch(
-      /url\(["']?https:\/\/randomuser\.me\/api\/portraits\/(men|women)\/\d+\.jpg["']?\)/,
-    );
+    const overlays = container.querySelectorAll("span[aria-hidden]");
+    expect(overlays).toHaveLength(2);
+    overlays.forEach((overlay) => {
+      expect(overlay.getAttribute("style")).toMatch(
+        /url\(["']?https:\/\/randomuser\.me\/api\/portraits\/(men|women)\/\d+\.jpg["']?\)/,
+      );
+    });
     expect(screen.getByText("CA")).toBeInTheDocument(); // initials fallback
+    expect(screen.getByText("DA")).toBeInTheDocument(); // initials fallback
   });
 
   it("dispatches addSecondDegreeNode and shows 'Added ✓' after clicking Add to web", () => {

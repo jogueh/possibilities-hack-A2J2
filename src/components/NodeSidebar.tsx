@@ -212,7 +212,7 @@ export function NodeSidebar({ node, onClose, connected, onConnect, onLogMeetup, 
                 style={{
                   position: "absolute",
                   inset: 0,
-                  backgroundImage: `url(${node.photo ?? user.photo ?? photoUrlForUser(node.userId)})`,
+                  backgroundImage: `url(${JSON.stringify(node.photo ?? user.photo ?? photoUrlForUser(node.userId))})`,
                   backgroundSize: "cover",
                   backgroundPosition: "center",
                 }}
