@@ -412,17 +412,19 @@ describe('boardReducer', () => {
     expect(cToD?.isDotted).toBe(true)
   })
 
-  it('setStage flags the connection line into a staged person as tier-coloured (stage/isMetUp)', () => {
+  it('setStage leaves warm-path bridges unflagged for staged deeper people', () => {
     let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
     s = reduce(s, { type: 'submitGoal' })
     // Reveal c through a, connect with c, then advance c's stage.
     s = reduce(s, { type: 'selectNode', id: 'a' })
     s = reduce(s, { type: 'connectNode', id: 'c' })
     s = reduce(s, { type: 'setStage', id: 'c', stage: 'collaborated' })
-    // The line INTO c (its warm-path bridge) is flagged with the stage and solid.
+    expect(s.stages.c).toBe('collaborated')
+    // The line INTO c is a warm-path bridge, not a self-edge, so it stays
+    // connected but does not receive stage styling.
     const intoC = s.snapshot.edges.find((e) => e.id === 'a__c')!
-    expect(intoC.isMetUp).toBe(true)
-    expect(intoC.stage).toBe('collaborated')
+    expect(intoC.isMetUp).toBeFalsy()
+    expect(intoC.stage).toBeUndefined()
     expect(intoC.isDotted).toBe(false)
     // An un-staged connection line stays unflagged (renders normal blue).
     const intoA = s.snapshot.edges.find((e) => e.id === 'self_1__a')!

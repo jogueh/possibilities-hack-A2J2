@@ -17,7 +17,7 @@ const CONNECTED_STRENGTH = 0.9
 // Tie strength applied to a node's solid edge for each relationship-depth stage
 // ("Connection Depth"). The values are chosen to land each stage in a distinct
 // edge-strength visual tier (see src/lib/edgeStrength.ts): met → steady (blue),
-// collaborated → strong (indigo), advocate → vibrant (purple gradient + pulse).
+// collaborated → strong (indigo + pulse), advocate → vibrant (purple gradient + pulse).
 // Advancing a connection therefore visibly strengthens its edge. `met` subsumes
 // the old "I met up with this person" action (the first rung of the ladder).
 export const STAGE_STRENGTH: Record<ConnectionStage, number> = {
@@ -205,14 +205,13 @@ function walkViaChain(
 }
 
 /**
- * Strengthens the connection line INTO each person the viewer has advanced to a
- * relationship-depth stage (the edge whose target is that person — their
- * self-edge for a 1st-degree connection, or the warm-path bridge for a deeper
- * one). The line is solidified, its strength set to `STAGE_STRENGTH[stage]`
- * (so it renders in a distinct tier per stage — blue/indigo/purple), and it is
- * flagged `stage`/`isMetUp` so the canvas colours it by tier rather than as a
- * normal blue link. Outgoing edges FROM a staged person (introductions to
- * others) are left untouched. Idempotent and safe to re-apply after a rebuild.
+ * Strengthens each staged person's direct self-edge. Warm-path bridges for
+ * deeper people are intentionally left untouched; stage state can be recorded
+ * for them, but only self↔person edges get the visual tier treatment. The line
+ * is solidified, its strength set to `STAGE_STRENGTH[stage]` (so it renders in a
+ * distinct tier per stage — blue/indigo/purple), and it is flagged
+ * `stage`/`isMetUp` so the canvas colours it by tier rather than as a normal
+ * blue link. Idempotent and safe to re-apply after a rebuild.
  *
  * Strength is set directly (not `Math.max`) so advancing is authoritative — the
  * stage is the source of truth for a staged edge's strength, including after the
@@ -225,8 +224,9 @@ function applyStages(
   const ids = Object.keys(stages)
   if (ids.length === 0) return snapshot
   const staged = new Set(ids)
+  const selfId = snapshot.goal?.userId
   const edges = snapshot.edges.map((e) =>
-    staged.has(e.target)
+    selfId && e.source === selfId && staged.has(e.target)
       ? {
           ...e,
           isDotted: false,

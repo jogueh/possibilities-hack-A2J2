@@ -75,7 +75,8 @@ export interface WebEdge {
   /**
    * True when this is the connection line into a person the viewer has logged a
    * real-world meetup with ("I met up with this person"). Rendered purple to
-   * distinguish it from a normal (blue) connection. Set by `applyMeetups`.
+   * distinguish it from a normal (blue) connection. Set by `applyStages` when a
+   * self-edge reaches the `met` stage or beyond.
    */
   isMetUp?: boolean
   /**

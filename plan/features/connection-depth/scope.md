@@ -40,10 +40,10 @@ score or ranking. Instead they surface two ways:
 1. **Edge thickening** — a connection's self-edge strength is driven by its stage:
    | Stage | Edge strength (0..1) | Look |
    |-------|----------------------|------|
-   | _none_ (baseline) | compressed low (~0.12–0.36) | thin grey/blue |
-   | Met | 0.55 | indigo, ~3px |
-   | Collaborated | 0.78 | purple, ~4px |
-   | Advocate | 1.0 | purple gradient + pulse |
+   | _none_ (baseline) | `interactionScore * 0.22` (~0.07 at the default 0.30) | thin blue baseline |
+   | Met | 0.40 | steady blue |
+   | Collaborated | 0.65 | strong indigo + pulse |
+   | Advocate | 0.90 | vibrant purple gradient + pulse |
    Un-staged 1st-degree edges render at a **lowered baseline** so progression is visible
    (compress natural `interactionScore` into the low range; preserves relative order).
 2. **Suggestion re-rank** — deeper/more-helpful connections boost the ranking of the
