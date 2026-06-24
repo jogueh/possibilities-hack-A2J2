@@ -306,9 +306,10 @@ export function boardReducer(
       // For unconnected 2nd+ nodes, fall through with `snapshot = state.snapshot`
       // — selection still updates so the sidebar opens with the "Connect" CTA,
       // but the canvas does not reveal further suggestions until they accept.
+      const retainedIds = [...new Set([...state.pinnedIds, ...state.connectedIds])]
       snapshot = applyPins(
         snapshot,
-        [...new Set([...state.pinnedIds, ...state.connectedIds])],
+        retainedIds,
         people,
         config.options,
       )
