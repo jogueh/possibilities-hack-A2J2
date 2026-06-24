@@ -9,6 +9,7 @@ import type { JobMatch } from "@/types/job";
 import type { AlignmentTier } from "@/types/web";
 import { useWebStore } from "@/store/useWebStore";
 import { fetchJobMatches } from "@/lib/jobMatchesClient";
+import { JOB_BOOST_MIN_CONNECTIONS } from "@/lib/jobMatches";
 import { deriveAlignmentTier } from "@/lib/scoring";
 import { RECENTLY_IN_FIELD_YEARS } from "@/lib/webOverlap";
 import { LI } from "@/lib/linkedinTokens";
@@ -242,6 +243,7 @@ function JobCard({ match, expanded, onToggle, onOpenConnection }: JobCardProps) 
   const { job, relevanceScore, webConnections } = match;
   const tier = deriveAlignmentTier(relevanceScore);
   const hasRecentInsider = webConnections.some((c) => c.recentlyInField);
+  const isBoosted = webConnections.length >= JOB_BOOST_MIN_CONNECTIONS;
 
   return (
     <article
@@ -295,6 +297,22 @@ function JobCard({ match, expanded, onToggle, onOpenConnection }: JobCardProps) 
           >
             {TIER_LABEL[tier]}
           </span>
+          {isBoosted && (
+            <span
+              data-testid="job-boost-badge"
+              title="Boosted because this company has multiple people from your web"
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: LI.surface,
+                background: "#6366F1",
+                borderRadius: 12,
+                padding: "2px 8px",
+              }}
+            >
+              ⚡ {webConnections.length} in your web
+            </span>
+          )}
           {job.easy_apply && (
             <span
               style={{

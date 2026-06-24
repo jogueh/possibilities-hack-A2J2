@@ -98,6 +98,31 @@ describe("JobsPanel", () => {
     expect(screen.getAllByText("Easy Apply")).toHaveLength(1);
   });
 
+  it("shows the job boost badge only for jobs with at least two web connections", async () => {
+    state.matches = [
+      {
+        job: job({ id: "boosted" }),
+        relevanceScore: 60,
+        webConnections: [
+          { userId: "u1", name: "Ada Lovelace", role: "Engineer" },
+          { userId: "u2", name: "Grace Hopper", role: "Engineer" },
+        ],
+      },
+      {
+        job: job({ id: "normal" }),
+        relevanceScore: 90,
+        webConnections: [{ userId: "u3", name: "Katherine Johnson", role: "Engineer" }],
+      },
+    ];
+
+    render(<JobsPanel open onClose={() => {}} />);
+    await screen.findAllByTestId("job-card");
+
+    const badges = screen.getAllByTestId("job-boost-badge");
+    expect(badges).toHaveLength(1);
+    expect(badges[0].textContent).toBe("⚡ 2 in your web");
+  });
+
   it("renders the web-overlap callout with correct pluralization", async () => {
     state.matches = [
       {
