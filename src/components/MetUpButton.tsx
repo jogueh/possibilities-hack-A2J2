@@ -4,13 +4,27 @@
 // to the store's `updateInteractionScore(nodeId, edgeId, 20)`, which bumps the
 // edge `strength` (0–100) and so warms/thickens the edge via the s12 visuals.
 //
-// Store-agnostic by design: it owns the button UI, the once-per-session disabled
-// state, and the confirmation toast, but never imports a store — the W3 mount
-// site supplies `onLog`. No API call, no localStorage; session memory only.
+// Store-agnostic by design: it owns the button UI and the confirmation toast,
+// but never imports a store — the W3 mount site supplies `onLog`. No API call,
+// no localStorage; the once-per-session "already logged" flag lives in a
+// module-level Set keyed by `edgeId`, so it survives the sidebar unmounting and
+// remounting (close + reopen) for the lifetime of the page session.
 import { useEffect, useState } from "react";
 import { LI } from "@/lib/linkedinTokens";
 
+// Edges whose meetup has been logged this session. Module-level (not component
+// state) so the flag persists across sidebar unmount/remount. Mirrors
+// NodeSidebar's module-level tipCache pattern.
+const loggedMeetups = new Set<string>();
+
+// Test/dev helper — clears the session meetup log. NOT part of any planned API.
+export function __resetMetUpLog() {
+  loggedMeetups.clear();
+}
+
 interface MetUpButtonProps {
+  /** Id of the edge this meetup strengthens; also the per-session dedupe key. */
+  edgeId: string;
   /**
    * Called once when the user logs a meetup. Wire this to the store, e.g.
    * `onLog={() => updateInteractionScore(node.id, edgeId, 20)}`.
@@ -18,10 +32,13 @@ interface MetUpButtonProps {
   onLog: () => void;
 }
 
-export function MetUpButton({ onLog }: MetUpButtonProps) {
-  // Session-only: once logged, the button stays disabled for this mount.
-  const [logged, setLogged] = useState(false);
+export function MetUpButton({ edgeId, onLog }: MetUpButtonProps) {
   const [toast, setToast] = useState<string | null>(null);
+
+  // Derived from the module-level log, so a remount (close + reopen) stays
+  // disabled and switching to a different edge re-enables — no extra state to
+  // keep in sync. The click below re-renders via setToast.
+  const logged = loggedMeetups.has(edgeId);
 
   // Auto-dismiss the toast.
   useEffect(() => {
@@ -32,8 +49,8 @@ export function MetUpButton({ onLog }: MetUpButtonProps) {
 
   const handleClick = () => {
     if (logged) return;
+    loggedMeetups.add(edgeId);
     onLog();
-    setLogged(true);
     setToast("🤝 Connection logged!");
   };
 
