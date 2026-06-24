@@ -32,12 +32,11 @@ const MIN_ZOOM = 0.6
 const MAX_ZOOM = 3
 const ZOOM_STEP = 1.2
 
-// A normal connection line renders as flat LinkedIn blue. Only a line into a
-// person the viewer has logged "I met up with this person" gets the warm
-// violet→pink gradient, so logged real-world meetups stand out.
+// A normal connection line renders as flat LinkedIn blue. A line into a person
+// the viewer has advanced up the relationship-depth ladder ("Connection Depth")
+// is coloured by its strength TIER instead — blue (met) → indigo (collaborated)
+// → violet→pink gradient (advocate) — so deeper relationships visibly strengthen.
 const NORMAL_EDGE_COLOR = '#0A66C2'
-// Solid fallback colour for a met-up edge if its gradient isn't available.
-const MET_UP_EDGE_COLOR = '#8B5CF6'
 
 const clamp = (n: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, n))
@@ -219,7 +218,7 @@ export default function WebCanvas({
                 : edge.isMetUp
                   ? style.gradient
                     ? `url(#edge-grad-${edge.id})`
-                    : MET_UP_EDGE_COLOR
+                    : style.color
                   : NORMAL_EDGE_COLOR
               const pulse = edge.isMetUp && style.pulse && !reduceMotion
               // Weaker connections render more transparent (stronger ties read

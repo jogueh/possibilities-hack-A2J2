@@ -21,6 +21,20 @@ export type DegreeLevel = number
  */
 export type ActivityStatus = 'active' | 'moderate' | 'inactive'
 
+/**
+ * Relationship-depth ladder for a connection ("Connection Depth" feature).
+ * The viewer self-advances a connection up these rungs; deeper stages strengthen
+ * the edge and quietly re-rank suggestions. `met` is the first rung — it subsumes
+ * the old "I met up with this person" action. See plan/features/connection-depth/scope.md.
+ */
+export type ConnectionStage = 'met' | 'collaborated' | 'advocate'
+
+/**
+ * Optional tags the viewer may attach when advancing a stage, describing the
+ * value a connection created. Always optional (rating is skippable).
+ */
+export type HelpfulnessTag = 'intro' | 'advice' | 'resource' | 'mentor'
+
 export interface WebNode {
   id: string
   userId: string
@@ -59,11 +73,19 @@ export interface WebEdge {
   strength: number
   isDotted: boolean
   /**
-   * True when this is the connection line into a person the viewer has logged a
-   * real-world meetup with ("I met up with this person"). Rendered purple to
-   * distinguish it from a normal (blue) connection. Set by `applyMeetups`.
+   * True when this direct self-edge has a relationship-depth stage and should be
+   * rendered with its stage tier styling instead of the normal connection style.
+   * `met` subsumes the old "I met up with this person" action.
    */
   isMetUp?: boolean
+  /**
+   * Relationship-depth stage of the connection this edge leads into, when the
+   * viewer has advanced it ("Connection Depth"). Drives the edge's strength tier
+   * (met → steady/blue, collaborated → strong/indigo, advocate → vibrant/purple)
+   * so deeper relationships visibly strengthen the web. Undefined for un-staged
+   * edges (which render at the compressed faint baseline). Set by `applyStages`.
+   */
+  stage?: ConnectionStage
 }
 
 export interface GoalQuery {

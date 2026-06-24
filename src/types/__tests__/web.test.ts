@@ -8,6 +8,7 @@ import type {
   WebEdge,
   GoalQuery,
   WebSnapshot,
+  ConnectionStage,
 } from '@/types/web'
 
 // These are compile-time/type-level assertions that lock the cross-workflow
@@ -45,6 +46,7 @@ describe('web types contract', () => {
       strength: number
       isDotted: boolean
       isMetUp?: boolean
+      stage?: ConnectionStage
     }>()
   })
 

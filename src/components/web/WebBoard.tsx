@@ -101,7 +101,9 @@ export default function WebBoard() {
   const selected = snapshot.nodes.find((n) => n.id === selectedId) ?? null
   const isEmpty = snapshot.state === 'empty'
   const selectedConnected = selected ? state.connectedIds.includes(selected.id) : false
-  const selectedMetUpLogged = selected ? state.metUpIds.includes(selected.id) : false
+  // NodeSidebar still uses the legacy `metUpLogged` prop name; any stage (met+)
+  // should disable that old one-shot meetup control.
+  const selectedHasStage = selected ? state.stages[selected.id] !== undefined : false
   const atConnectionLimit = state.connectedIds.length >= CONNECTION_LIMIT
   const loading = status === 'loading'
 
@@ -301,11 +303,11 @@ export default function WebBoard() {
             <NodeSidebar
               node={selected}
               connected={selectedConnected}
-              metUpLogged={selectedMetUpLogged}
+              metUpLogged={selectedHasStage}
               onConnect={(id) => dispatch({ type: 'connectNode', id })}
               atConnectionLimit={atConnectionLimit}
               onUpgrade={() => dispatch({ type: 'showUpgrade', reason: 'connection' })}
-              onLogMeetup={(id) => dispatch({ type: 'logMeetup', id })}
+              onLogMeetup={(id) => dispatch({ type: 'setStage', id, stage: 'met' })}
               onClose={() => dispatch({ type: 'clearSelection' })}
             />
           </div>

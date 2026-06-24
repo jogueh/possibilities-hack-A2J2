@@ -49,6 +49,15 @@ export interface PersonInput {
 const DEFAULT_INTERACTION = 0.3
 const DEFAULT_RELEVANCE = 0.5
 
+// Un-staged 1st-degree connections start at a deliberately faint edge baseline so
+// the "Connection Depth" ladder has visual headroom: advancing a connection
+// (met → collaborated → advocate) visibly strengthens its edge from a faint
+// baseline up through blue/indigo/purple. Natural `interactionScore` (0..1) is compressed into
+// the faint tier (≤25 on the 0–100 edge-strength scale; see src/lib/edgeStrength.ts)
+// while preserving relative order, so a richer prior interaction still reads as a
+// slightly stronger starting line. Staged edges override this via `applyStages`.
+const BASELINE_EDGE_SCALE = 0.22
+
 const clamp01 = (n: number): number => Math.min(1, Math.max(0, n))
 
 export function initialsFromName(name: string): string {
@@ -87,7 +96,7 @@ function selfEdges(selfId: string, degree1: WebNode[]): WebEdge[] {
     id: `${selfId}__${n.id}`,
     source: selfId,
     target: n.id,
-    strength: clamp01(n.interactionScore),
+    strength: clamp01(n.interactionScore) * BASELINE_EDGE_SCALE,
     isDotted: false,
   }))
 }
