@@ -19,6 +19,16 @@ const CONNECTED_STRENGTH = 0.9
 // signal, so the edge jumps to full strength (vibrant) via the s12 visuals.
 const MET_UP_STRENGTH = 1
 
+// Free-tier cap on how many people the viewer can connect with before the
+// "Upgrade to Premium" prompt appears. Premium is intentionally always off in
+// the demo, so reaching the cap surfaces the upgrade modal rather than
+// unlocking more connections.
+export const CONNECTION_LIMIT = 3
+
+// Which free-tier gate triggered the upgrade prompt. Only the connection cap is
+// gated in this build (expansion depth and InMail are unrestricted).
+export type UpgradeReason = 'connection'
+
 export type BoardStatus = 'idle' | 'loading' | 'error'
 
 export interface BoardState {
@@ -48,6 +58,11 @@ export interface BoardState {
   people: PersonInput[]
   status: BoardStatus
   error: string | null
+  /**
+   * Which free-tier gate (if any) is currently prompting an upgrade. `null`
+   * when no prompt is open. Drives the "Upgrade to Premium" modal in WebBoard.
+   */
+  upgradePrompt: UpgradeReason | null
 }
 
 export type BoardAction =
@@ -60,6 +75,8 @@ export type BoardAction =
   | { type: 'connectNode'; id: string }
   | { type: 'pinNode'; id: string }
   | { type: 'logMeetup'; id: string }
+  | { type: 'showUpgrade'; reason: UpgradeReason }
+  | { type: 'dismissUpgrade' }
   | { type: 'clearSelection' }
   | { type: 'reset' }
 
@@ -80,6 +97,7 @@ export function createInitialBoardState(): BoardState {
     people: [],
     status: 'idle',
     error: null,
+    upgradePrompt: null,
   }
 }
 
@@ -220,6 +238,7 @@ export function boardReducer(
         metUpIds: [],
         status: 'idle',
         error: null,
+        upgradePrompt: null,
       }
     }
 
@@ -240,6 +259,7 @@ export function boardReducer(
         people: action.people,
         status: 'idle',
         error: null,
+        upgradePrompt: null,
       }
     }
 
@@ -302,6 +322,12 @@ export function boardReducer(
       // commitment action that the viewer can take without rearranging the
       // canvas. Idempotent — connecting again is a no-op.
       if (state.connectedIds.includes(action.id)) return state
+      // Free-tier connection cap: once the viewer has CONNECTION_LIMIT
+      // connections, attempting another surfaces the upgrade prompt instead of
+      // recording the connection (premium is always off in the demo).
+      if (state.connectedIds.length >= CONNECTION_LIMIT) {
+        return { ...state, upgradePrompt: 'connection' }
+      }
       const connectedIds = [...state.connectedIds, action.id]
       return {
         ...state,
@@ -342,6 +368,12 @@ export function boardReducer(
 
     case 'clearSelection':
       return { ...state, selectedId: null }
+
+    case 'showUpgrade':
+      return { ...state, upgradePrompt: action.reason }
+
+    case 'dismissUpgrade':
+      return { ...state, upgradePrompt: null }
 
     case 'reset':
       return createInitialBoardState()

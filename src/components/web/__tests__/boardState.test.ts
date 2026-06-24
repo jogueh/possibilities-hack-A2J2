@@ -161,6 +161,28 @@ describe('boardReducer', () => {
     expect(s.connectedIds).toEqual([])
   })
 
+  it('prompts an upgrade instead of connecting past the free-tier cap', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    // Reach the 3-connection free-tier limit.
+    s = reduce(s, { type: 'connectNode', id: 'c' })
+    s = reduce(s, { type: 'connectNode', id: 'c2' })
+    s = reduce(s, { type: 'connectNode', id: 'c3' })
+    expect(s.connectedIds).toEqual(['c', 'c2', 'c3'])
+    expect(s.upgradePrompt).toBeNull()
+    // The 4th connection is blocked and surfaces the upgrade prompt instead.
+    s = reduce(s, { type: 'connectNode', id: 'e' })
+    expect(s.connectedIds).toEqual(['c', 'c2', 'c3'])
+    expect(s.upgradePrompt).toBe('connection')
+    // Dismissing clears the prompt; a new goal also clears it.
+    s = reduce(s, { type: 'dismissUpgrade' })
+    expect(s.upgradePrompt).toBeNull()
+    s = reduce(s, { type: 'showUpgrade', reason: 'connection' })
+    s = reduce(s, { type: 'setGoalText', value: 'New goal' })
+    s = reduce(s, { type: 'submitGoal' })
+    expect(s.upgradePrompt).toBeNull()
+  })
+
   it('connecting a 2nd-degree does NOT solidify the 3rd-degree bridges below them (target-only)', () => {
     // Expand a -> reveal c (2nd). Connect to c (solidifies a__c). Click c to
     // reveal d (3rd). The c__d bridge MUST stay dotted: d is not yet
