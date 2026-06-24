@@ -49,7 +49,7 @@ export default function JobsDemoPage() {
   }, []);
 
   return (
-    <main style={{ padding: 40, fontFamily: "sans-serif", marginLeft: open ? 360 : 0 }}>
+    <main style={{ padding: 40, fontFamily: "sans-serif", marginLeft: open ? JOBS_PANEL_WIDTH : 0 }}>
       <h1>W4 Jobs Panel — manual test harness</h1>
       <p>Toggle the panel to see goal-matched jobs cross-referenced against the web.</p>
       <JobsPanelToggle open={open} onClick={() => setOpen((o) => !o)} />
