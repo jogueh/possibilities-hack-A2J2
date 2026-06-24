@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import type { JobMatch } from "@/types/job";
 import type { AlignmentTier } from "@/types/web";
 import { useWebStore } from "@/store/useWebStore";
-import { parseGoalRaw } from "@/mocks/goalParser";
+import { parseGoalFallback } from "@/lib/goalParser";
 import { fetchJobMatches } from "@/mocks/jobsApi";
 import { deriveAlignmentTier } from "@/lib/scoring";
 import { LI } from "@/lib/linkedinTokens";
@@ -65,7 +65,7 @@ export function JobsPanel({ open, onClose, onOpenConnection }: JobsPanelProps) {
   useEffect(() => {
     if (!open || !goal || !requestKey) return;
     let cancelled = false;
-    fetchJobMatches(parseGoalRaw(goal.raw), webUserIds)
+    fetchJobMatches(parseGoalFallback(goal.raw), webUserIds)
       .then((matches) => {
         if (!cancelled) setResult({ key: requestKey, status: "loaded", matches });
       })
