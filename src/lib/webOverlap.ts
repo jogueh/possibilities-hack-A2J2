@@ -54,9 +54,9 @@ export function findWebOverlap(
 }
 
 /**
- * Convenience: the set of company names (lowercased) that have at least one
- * web overlap across the provided job matches. Used by the canvas to flag
- * which web nodes get the pulsing "job overlap" ring.
+ * Convenience: the set of user IDs that have at least one web overlap across
+ * the provided job matches. Used by the canvas to flag which web nodes get the
+ * pulsing "job overlap" ring.
  */
 export function overlappingUserIds(
   jobs: Job[],
