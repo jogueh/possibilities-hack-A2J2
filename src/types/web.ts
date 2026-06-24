@@ -9,8 +9,8 @@ export type DegreeLevel = 1 | 2
 /**
  * Outreach-activity status, used to colour a node's "activity ring":
  * active = blue, moderate = amber, inactive = red. Mirrors the values of
- * scoring.ts `ActivityStatus` (kept inline here to keep this cross-workflow
- * type contract free of runtime imports).
+ * `@/lib/scoring`'s `ActivityStatus` (kept inline so this cross-workflow
+ * type contract does not depend on any workflow-owned runtime modules).
  */
 export type ActivityStatus = 'active' | 'moderate' | 'inactive'
 
