@@ -133,62 +133,15 @@ describe('boardReducer', () => {
     expect(bridge.strength).toBeGreaterThanOrEqual(0.9) // strengthened
   })
 
-  it('promotes a connected 2nd-degree person to a permanent 1st-degree connection', () => {
+  it('keeps a connection solid after the connector is re-expanded', () => {
     let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
     s = reduce(s, { type: 'submitGoal' })
     s = reduce(s, { type: 'selectNode', id: 'a' })
     s = reduce(s, { type: 'connectNode', id: 'c' })
-    // Visiting another connector rebuilds the web; the connection must survive.
+    // Visit b, then return to a (rebuilds a's expansion from scratch).
     s = reduce(s, { type: 'selectNode', id: 'b' })
-    const c = s.snapshot.nodes.find((n) => n.id === 'c')
-    expect(c).toBeTruthy()
-    // c is now a direct (1st-degree) connection with a solid self-edge, not a
-    // dotted warm-path bridge through a.
-    expect(c?.degree).toBe(1)
-    expect(s.snapshot.edges.find((e) => e.id === 'self_1__c')?.isDotted).toBe(false)
-    expect(s.snapshot.edges.some((e) => e.id === 'a__c')).toBe(false)
-  })
-
-  it('converts a connected node to a 1st-degree connection on clearSelection', () => {
-    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
-    s = reduce(s, { type: 'submitGoal' })
     s = reduce(s, { type: 'selectNode', id: 'a' })
-    s = reduce(s, { type: 'connectNode', id: 'c' })
-    // While still selected, c stays the 2nd-degree node (now with a solid bridge).
-    expect(s.snapshot.nodes.find((n) => n.id === 'c')?.degree).toBe(2)
-    // Clicking off promotes it to a permanent 1st-degree connection.
-    s = reduce(s, { type: 'clearSelection' })
-    expect(s.selectedId).toBeNull()
-    const c = s.snapshot.nodes.find((n) => n.id === 'c')
-    expect(c?.degree).toBe(1)
-    expect(s.snapshot.edges.find((e) => e.id === 'self_1__c')?.isDotted).toBe(false)
-  })
-
-  it('keeps a promoted node navigable: its former 3rd-degree becomes a 2nd-degree suggestion', () => {
-    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
-    s = reduce(s, { type: 'submitGoal' })
-    s = reduce(s, { type: 'selectNode', id: 'a' })
-    s = reduce(s, { type: 'connectNode', id: 'c' })
-    s = reduce(s, { type: 'clearSelection' }) // c promoted to 1st-degree
-    // d used to sit at depth 3 behind c. Now that c is a direct connection, d is
-    // a 2nd-degree suggestion revealed by selecting c.
-    s = reduce(s, { type: 'selectNode', id: 'c' })
-    expect(s.snapshot.nodes.find((n) => n.id === 'd')?.degree).toBe(2)
-  })
-
-  it('a new goal clears the promotion', () => {
-    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
-    s = reduce(s, { type: 'submitGoal' })
-    s = reduce(s, { type: 'selectNode', id: 'a' })
-    s = reduce(s, { type: 'connectNode', id: 'c' })
-    s = reduce(s, { type: 'clearSelection' })
-    expect(s.snapshot.nodes.find((n) => n.id === 'c')?.degree).toBe(1)
-    // Mapping a new goal resets connections; c is a warm-path 2nd-degree node again.
-    s = reduce(s, { type: 'setGoalText', value: 'New goal' })
-    s = reduce(s, { type: 'submitGoal' })
-    expect(s.connectedIds).toEqual([])
-    s = reduce(s, { type: 'selectNode', id: 'a' })
-    expect(s.snapshot.nodes.find((n) => n.id === 'c')?.degree).toBe(2)
+    expect(s.snapshot.edges.find((e) => e.id === 'a__c')?.isDotted).toBe(false)
   })
 
   it('connectNode is idempotent and resets on a new goal', () => {
