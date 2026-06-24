@@ -1,13 +1,18 @@
 import type { Course, Job, User, UserWithJobs } from '@/types/data'
+import userData from '@/data/user_data.json'
 
-// Server-side fetch + resolution layer for the three static datasets.
-// The datasets are immutable hackathon data, so each is fetched once with
-// `cache: 'force-cache'` (no revalidation) and additionally memoized in a
-// module-level cache to avoid re-parsing the JSON on every request.
+// Server-side fetch + resolution layer for the static datasets.
+//
+// Members (the "user table") are the source of truth for connections, so they
+// are loaded from the committed local `src/data/user_data.json` rather than
+// fetched remotely — the remote dataset has no `connections` field. Jobs and
+// courses are still immutable hackathon data fetched once with
+// `cache: 'force-cache'` (no revalidation) and memoized in a module-level cache.
 
-const USERS_URL = 'https://pit.najera.cc/user_data.json'
 const JOBS_URL = 'https://pit.najera.cc/jobs_data.json'
 const COURSES_URL = 'https://pit.najera.cc/course_data.json'
+
+const LOCAL_USERS = userData as User[]
 
 let usersCache: User[] | null = null
 let jobsCache: Job[] | null = null
@@ -15,7 +20,6 @@ let coursesCache: Course[] | null = null
 let jobsByIdCache: Map<string, Job> | null = null
 let usersByIdCache: Map<string, User> | null = null
 
-let usersPromise: Promise<User[]> | null = null
 let jobsPromise: Promise<Job[]> | null = null
 let coursesPromise: Promise<Course[]> | null = null
 
@@ -28,15 +32,11 @@ async function fetchJson<T>(url: string): Promise<T> {
 }
 
 export async function fetchUsers(): Promise<User[]> {
-  if (usersCache) return usersCache
-  if (!usersPromise) {
-    usersPromise = fetchJson<User[]>(USERS_URL).then((data) => {
-      usersCache = data
-      usersByIdCache = new Map(data.map((u) => [u.id, u]))
-      return data
-    })
+  if (!usersCache) {
+    usersCache = LOCAL_USERS
+    usersByIdCache = new Map(LOCAL_USERS.map((u) => [u.id, u]))
   }
-  return usersPromise
+  return usersCache
 }
 
 export async function fetchJobs(): Promise<Job[]> {
@@ -96,6 +96,7 @@ export async function resolveUserWithJobs(
     posts_activity: user.posts_activity,
     skills: user.skills,
     courses: user.courses,
+    connections: user.connections,
     job_history: jobs,
   }
 }
@@ -111,7 +112,15 @@ export function __resetDataCachesForTests(): void {
   coursesCache = null
   jobsByIdCache = null
   usersByIdCache = null
-  usersPromise = null
   jobsPromise = null
   coursesPromise = null
+}
+
+/**
+ * Test-only: inject a member table so tests don't depend on the committed
+ * local dataset. Populates both the array cache and the id index.
+ */
+export function __setUsersForTests(testUsers: User[]): void {
+  usersCache = testUsers
+  usersByIdCache = new Map(testUsers.map((u) => [u.id, u]))
 }

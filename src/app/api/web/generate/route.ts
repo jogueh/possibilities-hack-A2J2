@@ -51,6 +51,7 @@ export async function POST(request: Request): Promise<Response> {
         posts_activity: u.posts_activity,
         skills: u.skills,
         courses: u.courses,
+        connections: u.connections,
         job_history: jobs,
       }
     }),
