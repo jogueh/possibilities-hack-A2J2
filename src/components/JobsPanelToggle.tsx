@@ -19,6 +19,7 @@ export function JobsPanelToggle({ open, onClick, count = 0 }: JobsPanelTogglePro
       aria-pressed={open}
       aria-label={`${open ? "Close" : "Open"} jobs panel${count > 0 ? `, ${count} matched job${count === 1 ? "" : "s"}` : ""}`}
       title="Jobs for your goal"
+      style={{
         position: "relative",
         display: "inline-flex",
         alignItems: "center",
