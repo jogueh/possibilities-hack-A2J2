@@ -5,7 +5,7 @@ import { buildSnapshot, expandNode, type PersonInput } from '@/lib/web/snapshot'
 import { alignmentColor } from '@/lib/alignmentColors'
 import type { GoalQuery } from '@/types/web'
 
-const options = { width: 720, height: 520, ring1Radius: 100, ring2Radius: 200 }
+const options = { width: 720, height: 520, ring1Radius: 120, ring2Radius: 240 }
 const goal: GoalQuery = { raw: 'Move into PM', userId: 'self_1' }
 const people: PersonInput[] = [
   { id: 'a', name: 'Ada Lovelace', degree: 1, interactionScore: 0.9 },

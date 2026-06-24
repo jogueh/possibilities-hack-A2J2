@@ -110,15 +110,15 @@ describe('wrapLabel', () => {
 })
 
 describe('layoutNodes', () => {
-  const opts = { width: 800, height: 600, ring1Radius: 100, ring2Radius: 200 }
+  const opts = { width: 800, height: 600, ring1Radius: 120, ring2Radius: 240 }
 
   it('places 1st-degree nodes on the inner ring and 2nd on the outer ring', () => {
     const out = layoutNodes([node('a', 1), node('b', 2)], opts)
     const a = out.find((n) => n.id === 'a')!
     const b = out.find((n) => n.id === 'b')!
     const dist = (n: WebNode) => Math.hypot(n.position.x - 400, n.position.y - 300)
-    expect(Math.round(dist(a))).toBe(100)
-    expect(Math.round(dist(b))).toBe(200)
+    expect(Math.round(dist(a))).toBe(120)
+    expect(Math.round(dist(b))).toBe(240)
   })
 
   it('puts the most relevant node at the top of its ring', () => {
@@ -129,7 +129,7 @@ describe('layoutNodes', () => {
     const high = out.find((n) => n.id === 'high')!
     // Top of the circle is center.y - radius.
     expect(high.position.x).toBeCloseTo(400, 1)
-    expect(high.position.y).toBeCloseTo(200, 1)
+    expect(high.position.y).toBeCloseTo(180, 1)
   })
 
   it('is deterministic for the same input', () => {
@@ -139,7 +139,7 @@ describe('layoutNodes', () => {
 })
 
 describe('placeNearParent', () => {
-  const opts = { width: 800, height: 600, ring1Radius: 100, ring2Radius: 200 }
+  const opts = { width: 800, height: 600, ring1Radius: 120, ring2Radius: 240 }
   const center = { x: 400, y: 300 }
 
   it('places a child node near its parent, not on a global ring', () => {
@@ -236,6 +236,27 @@ describe('wrapWords', () => {
 
   it('keeps everything on one line when wordsPerLine <= 0', () => {
     expect(wrapWords('a b c', 0)).toEqual(['a b c'])
+  })
+
+  it('caps the wrap at maxLines and ellipsizes the last kept line', () => {
+    // 4 lines wrapped at 2 words/line would be ["Sales Representative",
+    // "at Global", "Solutions LLC", "Northeast Region"]; with maxLines=3
+    // the 4th line is dropped and the 3rd gets a trailing ellipsis.
+    expect(
+      wrapWords('Sales Representative at Global Solutions LLC Northeast Region', 2, 3),
+    ).toEqual(['Sales Representative', 'at Global', 'Solutions LLC…'])
+  })
+
+  it('returns input unchanged when the wrap already fits within maxLines', () => {
+    expect(wrapWords('Product Manager at Tech', 2, 3)).toEqual([
+      'Product Manager',
+      'at Tech',
+    ])
+  })
+
+  it('ignores maxLines when it is zero or negative', () => {
+    expect(wrapWords('a b c d e f', 2, 0)).toEqual(['a b', 'c d', 'e f'])
+    expect(wrapWords('a b c d e f', 2, -1)).toEqual(['a b', 'c d', 'e f'])
   })
 })
 
