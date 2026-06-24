@@ -19,6 +19,13 @@ const requestSchema = z.object({
       }),
     )
     .default([]),
+  // New optional context fields — when supplied the LLM can produce more
+  // grounded, specific tip variants (target's name lets it address them
+  // directly; location/posts give the activity-anchored variant something
+  // concrete to reference).
+  targetName: z.string().min(1).optional(),
+  targetLocation: z.string().min(1).optional(),
+  targetPosts: z.array(z.string().min(1)).max(5).optional(),
 })
 
 export async function POST(request: Request): Promise<Response> {

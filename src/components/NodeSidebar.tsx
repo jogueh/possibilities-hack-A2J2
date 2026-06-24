@@ -37,12 +37,12 @@ interface NodeSidebarProps {
   metUpLogged?: boolean;
 }
 
-// Cache the AI tip per userId so re-opening the same node never re-calls the LLM.
-const tipCache = new Map<string, string>();
+// Cache the AI tips per userId so re-opening the same node never re-calls the LLM.
+const tipsCache = new Map<string, string[]>();
 
 // Test/dev helper (NOT part of the planned W1 API).
 export function __resetNodeSidebarTipCache() {
-  tipCache.clear();
+  tipsCache.clear();
 }
 function viewerSummary(viewer: Pick<UserWithJobs, "job_history" | "skills"> | null): string {
   if (!viewer) return "";
@@ -76,7 +76,7 @@ export function NodeSidebar({
   // setState synchronously inside an effect (React 19 cascading-render rule).
   const [loaded, setLoaded] = useState<{ userId: string; user: UserWithJobs } | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
-  const [tipState, setTipState] = useState<{ userId: string; tip: string } | null>(null);
+  const [tipsState, setTipsState] = useState<{ userId: string; tips: string[] } | null>(null);
 
   const panelRef = useRef<HTMLDivElement>(null);
   const userId = node?.userId ?? null;
@@ -119,11 +119,11 @@ export function NodeSidebar({
   const commonalities: SharedContext[] =
     user && viewerProfile ? getSharedContext(viewerProfile, user) : [];
 
-  // Fetch the AI talking point once per userId (cached). Cached value is read at render
+  // Fetch the AI talking points once per userId (cached). Cached value is read at render
   // time; the effect only performs the async fetch on a cache miss.
   useEffect(() => {
     if (!user || !userId || !parsedGoal) return;
-    if (tipCache.has(userId)) return;
+    if (tipsCache.has(userId)) return;
     let cancelled = false;
     fetch("/api/node/talking-points", {
       method: "POST",
@@ -133,18 +133,29 @@ export function NodeSidebar({
         viewerSummary: viewerSummary(viewerProfile),
         targetSummary: targetSummary(relevantJobs),
         sharedContext: commonalities,
+        // Optional richer context — lets each tip variant anchor on a
+        // different concrete detail (name to address them, location for
+        // the "we're both in X" angle, recent posts as ice-breakers).
+        targetName: user.name,
+        targetLocation: user.current_location,
+        targetPosts: (user.posts_activity ?? []).slice(0, 3),
       }),
     })
       .then((r) => r.json())
-      .then((d: { tip?: string }) => {
-        const t = d.tip ?? "Mention your shared background.";
-        tipCache.set(userId, t);
-        if (!cancelled) setTipState({ userId, tip: t });
+      .then((d: { tip?: string; tips?: string[] }) => {
+        const tips =
+          (Array.isArray(d.tips) && d.tips.length > 0
+            ? d.tips
+            : d.tip
+              ? [d.tip]
+              : ["Mention your shared background."]);
+        tipsCache.set(userId, tips);
+        if (!cancelled) setTipsState({ userId, tips });
       })
       .catch(() => {
-        const t = "Mention your shared background.";
-        tipCache.set(userId, t);
-        if (!cancelled) setTipState({ userId, tip: t });
+        const tips = ["Mention your shared background."];
+        tipsCache.set(userId, tips);
+        if (!cancelled) setTipsState({ userId, tips });
       });
     return () => {
       cancelled = true;
@@ -152,12 +163,13 @@ export function NodeSidebar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, userId, parsedGoal]);
 
-  const tip =
-    userId && tipCache.has(userId)
-      ? tipCache.get(userId)!
-      : tipState?.userId === userId
-        ? tipState.tip
+  const tips =
+    userId && tipsCache.has(userId)
+      ? tipsCache.get(userId)!
+      : tipsState?.userId === userId
+        ? tipsState.tips
         : null;
+  const tip = tips?.[0] ?? null;
 
   if (!node) return null;
 
@@ -288,20 +300,30 @@ export function NodeSidebar({
             </Section>
           )}
 
-          {/* AI talking point */}
-          {tip && (
-            <Section title="">
+          {/* AI talking points — up to 3 variants, each anchored on a
+              different angle (shared background / recent activity /
+              advice-seeking). Single-tip backends still render fine. */}
+          {tips && tips.length > 0 && (
+            <Section title="Conversation starters">
               <div
                 data-testid="talking-point"
-                style={{
-                  background: "#EAF3FB",
-                  border: `1px solid ${LI.blue}`,
-                  borderRadius: 8,
-                  padding: 12,
-                  fontSize: 14,
-                }}
+                style={{ display: "flex", flexDirection: "column", gap: 8 }}
               >
-                💬 Try: &ldquo;{tip}&rdquo;
+                {tips.slice(0, 3).map((t, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      background: i === 0 ? "#EAF3FB" : LI.bg,
+                      border: `1px solid ${i === 0 ? LI.blue : LI.border}`,
+                      borderRadius: 8,
+                      padding: 12,
+                      fontSize: 14,
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    💬 &ldquo;{t}&rdquo;
+                  </div>
+                ))}
               </div>
             </Section>
           )}

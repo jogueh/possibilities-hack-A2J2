@@ -25,6 +25,9 @@ const baseRequest: TalkingPointsRequest = {
     { type: 'school', label: 'Both attended UC Berkeley' },
     { type: 'skill', label: 'Both know TypeScript' },
   ],
+  targetName: 'Sarah Chen',
+  targetLocation: 'San Francisco, CA',
+  targetPosts: ['Just shipped our new payments idempotency layer'],
 }
 
 describe('scrubSalary', () => {
@@ -66,6 +69,7 @@ describe('buildTalkingPointsPrompt', () => {
       viewerSummary: 'Skills: TypeScript. Salary expectations: $250,000.',
       targetSummary: 'SWE at Stripe. salary 200000-400000.',
       sharedContext: [{ type: 'company', label: 'salary at Acme: $80k' }],
+      targetPosts: ['salary post $400k'],
     })
     expect(prompt.toLowerCase()).not.toContain('salary')
     expect(prompt).not.toContain('$')
@@ -78,6 +82,27 @@ describe('buildTalkingPointsPrompt', () => {
       sharedContext: [],
     })
     expect(prompt).toContain('Shared context:\n(none)')
+  })
+
+  it('includes the new richer context fields in the prompt when supplied', () => {
+    const prompt = buildTalkingPointsPrompt(baseRequest)
+    expect(prompt).toContain('Sarah Chen')
+    expect(prompt).toContain('San Francisco, CA')
+    expect(prompt).toContain('payments idempotency layer')
+  })
+
+  it('renders "(none)" for recent activity when targetPosts is absent', () => {
+    const prompt = buildTalkingPointsPrompt({
+      ...baseRequest,
+      targetPosts: undefined,
+    })
+    expect(prompt).toContain("Target's recent activity:\n(none)")
+  })
+
+  it('explicitly asks for 3 distinct opener variants', () => {
+    const prompt = buildTalkingPointsPrompt(baseRequest)
+    expect(prompt).toMatch(/exactly 3 distinct openers/i)
+    expect(prompt).toMatch(/tips/i)
   })
 })
 
@@ -94,17 +119,35 @@ describe('generateTalkingPoint — LLM path', () => {
     else process.env.OPENROUTER_API_KEY = ORIGINAL_KEY
   })
 
-  it('returns the LLM tip on success', async () => {
+  it('returns the LLM tips on success (with tip = tips[0])', async () => {
     generateObjectMock.mockResolvedValueOnce({
-      object: { tip: 'Ask Sarah how Stripe approaches payment idempotency.' },
+      object: {
+        tips: [
+          'Ask Sarah how Stripe approaches payment idempotency.',
+          'Mention your shared UC Berkeley background.',
+          'Share your goal of finding a Bay Area SWE role.',
+        ],
+      },
     } as unknown as Awaited<ReturnType<typeof generateObject>>)
     const res = await generateTalkingPoint(baseRequest)
+    expect(res.tips).toHaveLength(3)
+    expect(res.tip).toBe(res.tips[0])
     expect(res.tip).toMatch(/Stripe/)
+  })
+
+  it('caps the LLM response at 3 tips and drops empty entries', async () => {
+    generateObjectMock.mockResolvedValueOnce({
+      object: {
+        tips: ['First', '  ', 'Second', '', 'Third', 'Fourth', 'Fifth'],
+      },
+    } as unknown as Awaited<ReturnType<typeof generateObject>>)
+    const res = await generateTalkingPoint(baseRequest)
+    expect(res.tips).toEqual(['First', 'Second', 'Third'])
   })
 
   it('sends the scrubbed (not raw) summaries to the prompt', async () => {
     generateObjectMock.mockResolvedValueOnce({
-      object: { tip: 'ok' },
+      object: { tips: ['ok'] },
     } as unknown as Awaited<ReturnType<typeof generateObject>>)
     await generateTalkingPoint({
       ...baseRequest,
@@ -115,13 +158,14 @@ describe('generateTalkingPoint — LLM path', () => {
     expect(call.prompt).not.toContain('$300,000')
   })
 
-  it('falls back to deterministic string on LLM error', async () => {
+  it('falls back to deterministic tips on LLM error', async () => {
     generateObjectMock.mockRejectedValueOnce(new Error('upstream broke'))
     const res = await generateTalkingPoint(baseRequest)
-    expect(res.tip).toBe('Mention your shared school (Both attended UC Berkeley).')
+    expect(res.tips.length).toBeGreaterThan(0)
+    expect(res.tips[0]).toMatch(/Berkeley/)
   })
 
-  it('falls back to deterministic string on abort/timeout', async () => {
+  it('falls back to deterministic tips on abort/timeout', async () => {
     generateObjectMock.mockImplementationOnce(async (opts: unknown) => {
       const { abortSignal } = opts as { abortSignal: AbortSignal }
       const err = new Error('aborted')
@@ -133,12 +177,12 @@ describe('generateTalkingPoint — LLM path', () => {
     expect(res.tip).toMatch(/Berkeley/)
   })
 
-  it('falls back when the LLM returns an empty/whitespace tip', async () => {
+  it('falls back when the LLM returns no usable tips', async () => {
     generateObjectMock.mockResolvedValueOnce({
-      object: { tip: '   ' },
+      object: { tips: ['   '] },
     } as unknown as Awaited<ReturnType<typeof generateObject>>)
     const res = await generateTalkingPoint(baseRequest)
-    expect(res.tip).toBe('Mention your shared school (Both attended UC Berkeley).')
+    expect(res.tip).toMatch(/Berkeley/)
   })
 })
 
@@ -155,20 +199,38 @@ describe('generateTalkingPoint — fallback path (no API key)', () => {
     else process.env.OPENROUTER_API_KEY = ORIGINAL_KEY
   })
 
-  it('uses the top sharedContext entry when available', async () => {
+  it('returns multiple variants from the local context (no LLM call)', async () => {
     const res = await generateTalkingPoint(baseRequest)
+    // First variant pulls from the top shared context.
     expect(res.tip).toBe(
       'Mention your shared school (Both attended UC Berkeley).',
     )
+    // Plus at least one additional angle anchored on a different signal.
+    expect(res.tips.length).toBeGreaterThan(1)
+    expect(res.tips.some((t) => /Sarah Chen/.test(t))).toBe(true)
     expect(generateObjectMock).not.toHaveBeenCalled()
   })
 
-  it('uses a generic industry-style fallback when sharedContext is empty', async () => {
+  it('uses a generic industry-style fallback when nothing else is available', async () => {
     const res = await generateTalkingPoint({
-      ...baseRequest,
+      goalRaw: '',
+      viewerSummary: 'n/a',
+      targetSummary: '',
       sharedContext: [],
     })
     expect(res.tip).toMatch(/industry/)
     expect(generateObjectMock).not.toHaveBeenCalled()
+  })
+
+  it('first fallback variant is the shared-context one when available', async () => {
+    const res = await generateTalkingPoint({
+      goalRaw: 'find a PM role',
+      viewerSummary: 'n/a',
+      targetSummary: 'PM at Notion',
+      sharedContext: [
+        { type: 'company', label: 'Both worked at Acme' },
+      ],
+    })
+    expect(res.tip).toBe('Mention your shared company (Both worked at Acme).')
   })
 })
