@@ -49,7 +49,9 @@ export function JobsPanel({ open, onClose, onOpenConnection }: JobsPanelProps) {
   const nodes = useWebStore((s) => s.nodes);
 
   const webUserIds = nodes.map((n) => n.userId);
-  const requestKey = goal ? `${goal.raw}::${[...webUserIds].sort().join(",")}` : null;
+  const requestKey = goal
+    ? `${goal.raw}::${[...webUserIds].sort().join(",")}`
+    : null;
 
   // Keyed result written only from the async callback (React 19: never setState
   // synchronously in an effect). `current === null` (for the active key) means a

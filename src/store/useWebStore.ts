@@ -6,6 +6,7 @@ import type {
   WebState,
 } from '@/types/web'
 import type { UserWithJobs } from '@/types/data'
+import type { ParsedGoal } from '@/types/goal'
 
 // Global state for the connection web — the single source of truth other
 // workflows read from and dispatch into. This module is the real W1 store that
@@ -27,14 +28,17 @@ export interface WebStoreState {
   // ── Snapshot slice (mirrors `WebSnapshot`; read by W3/W4) ──────────────────
   state: WebState
   goal: GoalQuery | null
+  parsedGoal: ParsedGoal | null
   nodes: WebNode[]
   edges: WebEdge[]
   /** Viewer's own resolved profile — set once on app load, read by W3. */
   viewerProfile: UserWithJobs | null
 
   // ── Actions ────────────────────────────────────────────────────────────────
-  /** Stores the parsed goal (produced by Workflow 2). */
+  /** Stores the raw goal query and clears any cached parse from a prior goal. */
   setGoal: (goal: GoalQuery) => void
+  /** Stores the parsed goal (produced by Workflow 2). */
+  setParsedGoal: (parsedGoal: ParsedGoal | null) => void
   /** Seeds the web with 1st-degree nodes/edges; moves to the `seeded` state. */
   seedWeb: (nodes: WebNode[], edges: WebEdge[]) => void
   /**
@@ -64,6 +68,7 @@ export interface WebStoreState {
 const emptySnapshot = () => ({
   state: 'empty' as WebState,
   goal: null,
+  parsedGoal: null,
   nodes: [] as WebNode[],
   edges: [] as WebEdge[],
 })
@@ -72,7 +77,9 @@ export const useWebStore = create<WebStoreState>()((set) => ({
   ...emptySnapshot(),
   viewerProfile: null,
 
-  setGoal: (goal) => set({ goal }),
+  setGoal: (goal) => set({ goal, parsedGoal: null }),
+
+  setParsedGoal: (parsedGoal) => set({ parsedGoal }),
 
   seedWeb: (nodes, edges) => set({ nodes, edges, state: 'seeded' }),
 

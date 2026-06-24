@@ -43,6 +43,10 @@ const node: WebNode = {
 function seed() {
   __setMockWebState({
     goal: { raw: "Become a software engineer", userId: "user_4579" },
+    parsedGoal: {
+      intent: "Become a software engineer",
+      targetRole: "Software Engineer",
+    },
     nodes: [node],
     edges: [],
     viewerProfile: null,
@@ -167,7 +171,7 @@ describe("JobsPanel", () => {
   });
 
   it("prompts for a goal when none is set", async () => {
-    __setMockWebState({ goal: null, nodes: [], edges: [], viewerProfile: null });
+    __setMockWebState({ goal: null, parsedGoal: null, nodes: [], edges: [], viewerProfile: null });
     render(<JobsPanel open onClose={() => {}} />);
     await waitFor(() =>
       expect(screen.getByText(/set a career goal/i)).toBeTruthy(),

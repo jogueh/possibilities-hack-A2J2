@@ -3,6 +3,7 @@ import { renderHook, act } from '@testing-library/react'
 import { useWebStore } from '@/store/useWebStore'
 import type { WebEdge, WebNode } from '@/types/web'
 import type { UserWithJobs } from '@/types/data'
+import type { ParsedGoal } from '@/types/goal'
 
 const node = (id: string, over: Partial<WebNode> = {}): WebNode => ({
   id,
@@ -30,6 +31,7 @@ const resetStore = () =>
   useWebStore.setState({
     state: 'empty',
     goal: null,
+    parsedGoal: null,
     nodes: [],
     edges: [],
     viewerProfile: null,
@@ -42,6 +44,7 @@ describe('useWebStore', () => {
     const s = useWebStore.getState()
     expect(s.state).toBe('empty')
     expect(s.goal).toBeNull()
+    expect(s.parsedGoal).toBeNull()
     expect(s.nodes).toEqual([])
     expect(s.edges).toEqual([])
     expect(s.viewerProfile).toBeNull()
@@ -59,9 +62,28 @@ describe('useWebStore', () => {
     expect(useWebStore.getState().state).toBe('expanded')
   })
 
-  it('setGoal stores the parsed goal', () => {
+  it('setGoal stores the raw goal and clears any cached parsed goal', () => {
+    act(() =>
+      useWebStore
+        .getState()
+        .setParsedGoal({ intent: 'old goal', targetRole: 'Product Manager' }),
+    )
     act(() => useWebStore.getState().setGoal({ raw: 'Break into PM', userId: 'self' }))
     expect(useWebStore.getState().goal).toEqual({ raw: 'Break into PM', userId: 'self' })
+    expect(useWebStore.getState().parsedGoal).toBeNull()
+  })
+
+  it('setParsedGoal stores and clears the server-parsed goal', () => {
+    const parsedGoal: ParsedGoal = {
+      intent: 'Break into software engineering',
+      targetRole: 'Software Engineer',
+    }
+
+    act(() => useWebStore.getState().setParsedGoal(parsedGoal))
+    expect(useWebStore.getState().parsedGoal).toBe(parsedGoal)
+
+    act(() => useWebStore.getState().setParsedGoal(null))
+    expect(useWebStore.getState().parsedGoal).toBeNull()
   })
 
   it('resetWeb clears the snapshot but keeps the viewer profile', () => {
@@ -69,6 +91,7 @@ describe('useWebStore', () => {
     act(() => {
       useWebStore.getState().setViewerProfile(viewer)
       useWebStore.getState().setGoal({ raw: 'x', userId: 'self' })
+      useWebStore.getState().setParsedGoal({ intent: 'x' })
       useWebStore.getState().seedWeb([node('a')], [edge('self__a')])
     })
 
@@ -77,6 +100,7 @@ describe('useWebStore', () => {
     const s = useWebStore.getState()
     expect(s.state).toBe('empty')
     expect(s.goal).toBeNull()
+    expect(s.parsedGoal).toBeNull()
     expect(s.nodes).toEqual([])
     expect(s.edges).toEqual([])
     expect(s.viewerProfile).toBe(viewer)

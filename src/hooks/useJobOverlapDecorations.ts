@@ -10,8 +10,6 @@
 // back to their `WebNode.id`. All decision logic lives in the pure, unit-tested
 // `overlappingNodeIds` helper (@/lib/webOverlap); this hook is just the glue.
 //
-// DATA SOURCE: the W4 jobs-match library at `@/lib/jobMatchesClient` (a
-// client-side wrapper around `buildJobMatches` that resolves users via the
 // DATA SOURCE: `@/lib/jobMatchesClient` calls the real `POST /api/jobs/matches`
 // route; the server parses the goal (LLM-aware via OpenRouter) and runs
 // `buildJobMatches` over the shared `fetchJobs` cache from `@/lib/data`. This

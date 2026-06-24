@@ -7,7 +7,7 @@ import type { UserWithJobs } from '@/types/data'
 
 // POST /api/web/generate
 // Request:  { goal: string, userId?: string }
-// Response: { nodes: WebNode[], edges: WebEdge[] }
+// Response: { nodes: WebNode[], edges: WebEdge[], parsedGoal: ParsedGoal }
 // Consumed by Workflow 1 to seed the canvas.
 
 const DEFAULT_VIEWER_ID = 'user_4579'
@@ -63,5 +63,5 @@ export async function POST(request: Request): Promise<Response> {
     candidates,
   })
 
-  return NextResponse.json({ nodes, edges })
+  return NextResponse.json({ nodes, edges, parsedGoal })
 }

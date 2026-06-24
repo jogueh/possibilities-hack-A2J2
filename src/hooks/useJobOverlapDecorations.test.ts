@@ -7,9 +7,6 @@ const fetchJobMatchesMock = vi.fn();
 vi.mock("@/lib/jobMatchesClient", () => ({
   fetchJobMatches: (...args: unknown[]) => fetchJobMatchesMock(...args),
 }));
-vi.mock("@/lib/goalParser", () => ({
-  parseGoalFallback: (raw: string) => ({ intent: raw }),
-}));
 
 import { useJobOverlapDecorations } from "./useJobOverlapDecorations";
 import { useWebStore } from "@/store/useWebStore";
@@ -50,6 +47,10 @@ const nodes = [node("n1", "user_a"), node("n2", "user_b")];
 function seedStore() {
   act(() => {
     useWebStore.getState().setGoal({ raw: "find engineers", userId: "viewer" });
+    useWebStore.getState().setParsedGoal({
+      intent: "find engineers",
+      targetRole: "Software Engineer",
+    });
     useWebStore.getState().seedWeb(nodes, []);
   });
 }
