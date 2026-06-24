@@ -9,7 +9,7 @@ import {
 import { deriveActivityStatus, type ActivityStatus } from "./scoring";
 import type { User } from "@/types/data";
 
-const ALL_STATUSES: ActivityStatus[] = ["active", "moderate", "inactive"];
+const ALL_STATUSES = Object.keys(ACTIVITY_RING_COLORS) as ActivityStatus[];
 
 function userWithPosts(count: number): User {
   return {
