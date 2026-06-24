@@ -23,6 +23,10 @@ interface NodeSidebarProps {
   connected?: boolean;
   /** Promotes a 2nd-degree node to a connection on the web; receives its graph id. */
   onConnect?: (nodeId: string) => void;
+  /** True when the viewer has hit the free-tier connection cap. */
+  atConnectionLimit?: boolean;
+  /** Surfaces the "Upgrade to Premium" prompt (free-tier connection cap reached). */
+  onUpgrade?: () => void;
   /** True when the viewer has pinned this node to the canvas (W1 board state). */
   pinned?: boolean;
   /** Pins the open node to the canvas across snapshot rebuilds; receives its graph id. */
@@ -57,6 +61,8 @@ export function NodeSidebar({
   onClose,
   connected,
   onConnect,
+  atConnectionLimit,
+  onUpgrade,
   pinned,
   onPin,
   onLogMeetup,
@@ -308,6 +314,8 @@ export function NodeSidebar({
             degree={node.degree}
             connected={connected}
             onConnect={() => onConnect?.(node.id)}
+            atConnectionLimit={atConnectionLimit}
+            onUpgrade={onUpgrade}
             pinned={pinned}
             onPin={() => onPin?.(node.id)}
             nodeId={node.id}

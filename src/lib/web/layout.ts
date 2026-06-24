@@ -22,7 +22,7 @@ export interface Relationship {
 /** Alignment-tier → node fill colour (LinkedIn-inspired palette). */
 export const TIER_COLORS: Record<AlignmentTier, string> = {
   strong: '#0a66c2',
-  moderate: '#3b8f4f',
+  moderate: '#F59E0B',
   weak: '#8c8c8c',
 }
 

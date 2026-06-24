@@ -16,6 +16,11 @@ interface ActionsBarProps {
   connected?: boolean;
   /** Called when a connection request is confirmed; promotes the person on the web. */
   onConnect?: () => void;
+  /** True when the viewer has hit the free-tier connection cap. The Connect
+   *  button then opens the upgrade prompt instead of the confirmation dialog. */
+  atConnectionLimit?: boolean;
+  /** Surfaces the "Upgrade to Premium" prompt (free-tier connection cap reached). */
+  onUpgrade?: () => void;
   /** True once the viewer has pinned this person to the canvas via "Add to web". */
   pinned?: boolean;
   /**
@@ -40,6 +45,8 @@ export function ActionsBar({
   degree,
   connected,
   onConnect,
+  atConnectionLimit,
+  onUpgrade,
   pinned,
   onPin,
   nodeId,
@@ -96,6 +103,16 @@ export function ActionsBar({
     cursor: "pointer",
   };
 
+  // Connect is gated by the free-tier connection cap: past the limit the button
+  // prompts an upgrade instead of opening the confirmation dialog.
+  const handleConnectClick = () => {
+    if (atConnectionLimit) {
+      onUpgrade?.();
+      return;
+    }
+    setConnectOpen(true);
+  };
+
   return (
     <section style={{ marginTop: 24, paddingTop: 16, borderTop: `1px solid ${LI.border}` }}>
       <div style={{ display: "flex", gap: 8 }}>
@@ -112,7 +129,7 @@ export function ActionsBar({
           ) : (
             <button
               type="button"
-              onClick={() => setConnectOpen(true)}
+              onClick={handleConnectClick}
               style={{ ...btn, background: LI.blue, color: "#fff", border: "none" }}
             >
               Connect

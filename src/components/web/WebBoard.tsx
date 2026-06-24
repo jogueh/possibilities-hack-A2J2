@@ -6,15 +6,18 @@ import {
   Button,
   Card,
   Input,
+  Modal,
   Space,
   Typography,
 } from 'antd'
-import { AimOutlined, ReloadOutlined, UpOutlined, DownOutlined } from '@ant-design/icons'
+import { AimOutlined, ReloadOutlined, UpOutlined, DownOutlined, CrownOutlined } from '@ant-design/icons'
 import WebCanvas from './WebCanvas'
 import {
   boardReducer,
   createInitialBoardState,
+  CONNECTION_LIMIT,
   type BoardConfig,
+  type UpgradeReason,
 } from './boardState'
 import { SELF_USER_ID, webPeople } from '@/data/web_people'
 import { NodeSidebar } from '@/components/NodeSidebar'
@@ -30,9 +33,15 @@ const CANVAS_HEIGHT = 620
 // Static goal suggestions — clicking one pre-fills the goal box (no API call).
 const SUGGESTIONS = [
   'Grow my software engineering network in San Francisco.',
-  'Find short, actionable connection and outreach tips.',
-  'Meet people who can introduce me to my target community.',
+  'Find people in product management',
+  'I want to find a referral for FutureWorks',
 ]
+
+// Copy for the "Upgrade to Premium" prompt, keyed by which free-tier gate the
+// viewer hit. Premium is always off in the demo, so this never unlocks.
+const UPGRADE_COPY: Record<UpgradeReason, string> = {
+  connection: `You've reached the ${CONNECTION_LIMIT}-connection limit on the free plan. Upgrade to Premium to keep growing your web.`,
+}
 
 /**
  * Converts the `/api/web/generate` response (WebNode[] + WebEdge[], with
@@ -88,12 +97,13 @@ export default function WebBoard() {
     createInitialBoardState,
   )
 
-  const { snapshot, selectedId, goalText, status, error } = state
+  const { snapshot, selectedId, goalText, status, error, upgradePrompt } = state
   const selected = snapshot.nodes.find((n) => n.id === selectedId) ?? null
   const isEmpty = snapshot.state === 'empty'
   const selectedConnected = selected ? state.connectedIds.includes(selected.id) : false
   const selectedPinned = selected ? state.pinnedIds.includes(selected.id) : false
   const selectedMetUpLogged = selected ? state.metUpIds.includes(selected.id) : false
+  const atConnectionLimit = state.connectedIds.length >= CONNECTION_LIMIT
   const loading = status === 'loading'
 
   // Collapsible side cards (chevron toggles) — purely presentational.
@@ -294,6 +304,8 @@ export default function WebBoard() {
               connected={selectedConnected}
               metUpLogged={selectedMetUpLogged}
               onConnect={(id) => dispatch({ type: 'connectNode', id })}
+              atConnectionLimit={atConnectionLimit}
+              onUpgrade={() => dispatch({ type: 'showUpgrade', reason: 'connection' })}
               pinned={selectedPinned}
               onPin={(id) => dispatch({ type: 'pinNode', id })}
               onLogMeetup={(id) => dispatch({ type: 'logMeetup', id })}
@@ -302,6 +314,24 @@ export default function WebBoard() {
           </div>
         </Space>
       </Card>
+
+      <Modal
+        open={upgradePrompt !== null}
+        onCancel={() => dispatch({ type: 'dismissUpgrade' })}
+        title={
+          <span>
+            <CrownOutlined style={{ color: '#F59E0B', marginRight: 8 }} />
+            Upgrade to Premium
+          </span>
+        }
+        okText="Upgrade to Premium"
+        cancelText="Maybe later"
+        onOk={() => dispatch({ type: 'dismissUpgrade' })}
+      >
+        <Typography.Paragraph style={{ marginBottom: 0 }}>
+          {upgradePrompt ? UPGRADE_COPY[upgradePrompt] : ''}
+        </Typography.Paragraph>
+      </Modal>
     </div>
   )
 }
