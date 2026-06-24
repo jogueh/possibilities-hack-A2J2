@@ -91,6 +91,7 @@ export default function WebBoard() {
   const selected = snapshot.nodes.find((n) => n.id === selectedId) ?? null
   const isEmpty = snapshot.state === 'empty'
   const selectedConnected = selected ? state.connectedIds.includes(selected.id) : false
+  const selectedMetUpLogged = selected ? state.metUpIds.includes(selected.id) : false
   const loading = status === 'loading'
 
   // Collapsible side cards (chevron toggles) — purely presentational.
@@ -286,6 +287,7 @@ export default function WebBoard() {
             <NodeSidebar
               node={selected}
               connected={selectedConnected}
+              metUpLogged={selectedMetUpLogged}
               onConnect={(id) => dispatch({ type: 'connectNode', id })}
               onLogMeetup={(id) => dispatch({ type: 'logMeetup', id })}
               onClose={() => dispatch({ type: 'clearSelection' })}

@@ -90,18 +90,23 @@ function applyConnections(
 }
 
 /**
- * Strengthens every solid edge touching a person the viewer has logged a meetup
- * with, bumping it to full strength. Idempotent (uses `Math.max`) so it can be
- * re-applied after a snapshot rebuild without over-accumulating.
+ * Strengthens only the solid self↔person edge for each person the viewer has
+ * logged a meetup with, bumping it to full strength. Idempotent (uses
+ * `Math.max`) so it can be re-applied after a snapshot rebuild without
+ * over-accumulating.
  */
 function applyMeetups(
   snapshot: WebSnapshot,
   metUpIds: string[],
 ): WebSnapshot {
   if (metUpIds.length === 0) return snapshot
+  const selfId = snapshot.goal?.userId
+  if (!selfId) return snapshot
   const metUp = new Set(metUpIds)
   const edges = snapshot.edges.map((e) =>
-    !e.isDotted && (metUp.has(e.target) || metUp.has(e.source))
+    !e.isDotted &&
+    ((metUp.has(e.target) && e.source === selfId) ||
+      (metUp.has(e.source) && e.target === selfId))
       ? { ...e, strength: Math.max(e.strength, MET_UP_STRENGTH) }
       : e,
   )

@@ -168,6 +168,20 @@ describe('boardReducer', () => {
     expect(s.snapshot.edges.find((e) => e.id === selfEdgeId)!.strength).toBe(1)
   })
 
+  it('logMeetup does not strengthen non-viewer edges touching the met-up person', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    s = reduce(s, { type: 'connectNode', id: 'c' })
+    const bridgeBefore = s.snapshot.edges.find((e) => e.id === 'a__c')!
+    expect(bridgeBefore.isDotted).toBe(false)
+    expect(bridgeBefore.strength).toBeLessThan(1)
+
+    s = reduce(s, { type: 'logMeetup', id: 'a' })
+    expect(s.snapshot.edges.find((e) => e.id === 'self_1__a')!.strength).toBe(1)
+    expect(s.snapshot.edges.find((e) => e.id === 'a__c')!.strength).toBe(bridgeBefore.strength)
+  })
+
   it('keeps a meetup-strengthened edge after the web is re-expanded', () => {
     let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
     s = reduce(s, { type: 'submitGoal' })

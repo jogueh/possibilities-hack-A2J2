@@ -101,6 +101,28 @@ describe("ActionsBar", () => {
     expect(screen.getByRole("button", { name: /Met up logged/ })).toBeDisabled();
   });
 
+  it("uses board-controlled logged state for the meetup button", () => {
+    const first = render(
+      <ActionsBar targetName="Alice" degree={1} nodeId="a" onLogMeetup={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /I met up with this person/ }));
+    first.unmount();
+
+    const onLogMeetup = vi.fn();
+    const { rerender } = render(
+      <ActionsBar targetName="Alice" degree={1} nodeId="a" metUpLogged={false} onLogMeetup={onLogMeetup} />,
+    );
+    const enabled = screen.getByRole("button", { name: /I met up with this person/ });
+    expect(enabled).toBeEnabled();
+    fireEvent.click(enabled);
+    expect(onLogMeetup).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <ActionsBar targetName="Alice" degree={1} nodeId="a" metUpLogged onLogMeetup={onLogMeetup} />,
+    );
+    expect(screen.getByRole("button", { name: /Met up logged/ })).toBeDisabled();
+  });
+
   it("does not offer the 'I met up' button for 2nd-degree people", () => {
     render(
       <ActionsBar targetName="Alice" degree={2} nodeId="c" onLogMeetup={vi.fn()} />,

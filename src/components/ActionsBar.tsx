@@ -18,11 +18,13 @@ interface ActionsBarProps {
   onConnect?: () => void;
   /** Graph id of the open node — passed to the "I met up" button as its key. */
   nodeId?: string;
+  /** True when board state says the meetup has already been logged for this node. */
+  metUpLogged?: boolean;
   /** Called when the viewer logs a real-world meetup (strengthens the edge). */
   onLogMeetup?: () => void;
 }
 
-export function ActionsBar({ targetName, tip, degree, connected, onConnect, nodeId, onLogMeetup }: ActionsBarProps) {
+export function ActionsBar({ targetName, tip, degree, connected, onConnect, nodeId, metUpLogged, onLogMeetup }: ActionsBarProps) {
   const [connectOpen, setConnectOpen] = useState(false);
   const [messageOpen, setMessageOpen] = useState(false);
   const [subject, setSubject] = useState("");
@@ -85,7 +87,7 @@ export function ActionsBar({ targetName, tip, degree, connected, onConnect, node
       {/* 1st-degree people are existing connections — logging a real-world meetup
           with them strengthens the edge on the web (W4 stretch s11). */}
       {degree === 1 && nodeId && onLogMeetup && (
-        <MetUpButton edgeId={nodeId} onLog={onLogMeetup} />
+        <MetUpButton edgeId={nodeId} logged={metUpLogged} onLog={onLogMeetup} />
       )}
 
       {connectOpen && (
