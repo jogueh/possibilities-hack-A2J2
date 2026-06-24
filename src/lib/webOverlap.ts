@@ -26,6 +26,7 @@ export function roleAtCompany(
   user: UserWithJobs,
   company: string,
 ): string | undefined {
+  if (!company.trim()) return undefined;
   const match = user.job_history.find((j) => sameCompany(j.company, company));
   return match?.position;
 }
