@@ -79,6 +79,34 @@ export function truncateLabel(text: string, max: number): string {
   return `${text.slice(0, max - 1).trimEnd()}…`
 }
 
+/**
+ * Word-wraps a label into lines no longer than `maxChars` characters each, so a
+ * node caption (e.g. a full role like "Product Manager at Tech Innovators Inc.")
+ * stays inside the node's width instead of being truncated — it flows onto the
+ * next line whenever the next word would overflow. A single word longer than
+ * `maxChars` is kept whole on its own line. Pure and deterministic.
+ */
+export function wrapLabel(text: string, maxChars: number): string[] {
+  const words = text.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return []
+  if (maxChars <= 0) return [words.join(' ')]
+
+  const lines: string[] = []
+  let line = ''
+  for (const word of words) {
+    if (!line) {
+      line = word
+    } else if ((line + ' ' + word).length <= maxChars) {
+      line += ' ' + word
+    } else {
+      lines.push(line)
+      line = word
+    }
+  }
+  if (line) lines.push(line)
+  return lines
+}
+
 const round2 = (n: number): number => Math.round(n * 100) / 100
 
 const clamp = (n: number, min: number, max: number): number =>

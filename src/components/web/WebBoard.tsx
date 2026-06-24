@@ -62,6 +62,7 @@ export default function WebBoard() {
   const { snapshot, selectedId, goalText } = state
   const selected = snapshot.nodes.find((n) => n.id === selectedId) ?? null
   const isEmpty = snapshot.state === 'empty'
+  const selectedConnected = selected ? state.connectedIds.includes(selected.id) : false
 
   // Collapsible side cards (chevron toggles) — purely presentational.
   const [showSuggestions, setShowSuggestions] = useState(true)
@@ -244,6 +245,8 @@ export default function WebBoard() {
 
             <NodeSidebar
               node={selected}
+              connected={selectedConnected}
+              onConnect={(id) => dispatch({ type: 'connectNode', id })}
               onClose={() => dispatch({ type: 'clearSelection' })}
             />
           </div>

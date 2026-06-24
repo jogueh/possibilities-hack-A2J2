@@ -9,16 +9,23 @@ import {
 // Pure state machine backing the WebBoard. Kept framework-free so the
 // empty -> seeded -> expanded transitions and selection are unit-testable.
 
+// Tie strength applied to a bridge edge once the viewer connects with the
+// 2nd-degree person it reaches, so the (now solid) line reads as a strong link.
+const CONNECTED_STRENGTH = 0.9
+
 export interface BoardState {
   snapshot: WebSnapshot
   selectedId: string | null
   goalText: string
+  /** Ids of people the viewer has connected with (dotted bridge -> solid link). */
+  connectedIds: string[]
 }
 
 export type BoardAction =
   | { type: 'setGoalText'; value: string }
   | { type: 'submitGoal' }
   | { type: 'selectNode'; id: string }
+  | { type: 'connectNode'; id: string }
   | { type: 'clearSelection' }
   | { type: 'reset' }
 
@@ -33,7 +40,27 @@ export function createInitialBoardState(): BoardState {
     snapshot: { state: 'empty', nodes: [], edges: [], goal: null },
     selectedId: null,
     goalText: '',
+    connectedIds: [],
   }
+}
+
+/**
+ * Solidifies every dotted bridge edge that touches a connected person: the line
+ * stops being dotted, turns into a strong link and is strengthened. Re-applied
+ * after a snapshot rebuild so a connection survives re-expanding its connector.
+ */
+function applyConnections(
+  snapshot: WebSnapshot,
+  connectedIds: string[],
+): WebSnapshot {
+  if (connectedIds.length === 0) return snapshot
+  const connected = new Set(connectedIds)
+  const edges = snapshot.edges.map((e) =>
+    e.isDotted && (connected.has(e.target) || connected.has(e.source))
+      ? { ...e, isDotted: false, strength: Math.max(e.strength, CONNECTED_STRENGTH) }
+      : e,
+  )
+  return { ...snapshot, edges }
 }
 
 export function boardReducer(
@@ -53,6 +80,7 @@ export function boardReducer(
         snapshot: buildSnapshot(goal, config.people, config.options),
         selectedId: null,
         goalText: state.goalText,
+        connectedIds: [],
       }
     }
 
@@ -79,7 +107,24 @@ export function boardReducer(
         config.people,
         config.options,
       )
-      return { ...state, snapshot, selectedId: action.id }
+      return {
+        ...state,
+        snapshot: applyConnections(snapshot, state.connectedIds),
+        selectedId: action.id,
+      }
+    }
+
+    case 'connectNode': {
+      // Connecting reaches a 2nd-degree person through their warm-path bridge:
+      // record the link and turn that dotted bridge into a solid, strengthened
+      // (blue) edge. Idempotent — connecting again is a no-op.
+      if (state.connectedIds.includes(action.id)) return state
+      const connectedIds = [...state.connectedIds, action.id]
+      return {
+        ...state,
+        connectedIds,
+        snapshot: applyConnections(state.snapshot, connectedIds),
+      }
     }
 
     case 'clearSelection':

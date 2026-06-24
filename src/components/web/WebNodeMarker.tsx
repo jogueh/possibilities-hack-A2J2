@@ -3,7 +3,7 @@
 import type { KeyboardEvent } from 'react'
 import { motion } from 'framer-motion'
 import type { WebNode } from '@/types/web'
-import { tierColor, tierRadius, truncateLabel, activityRingColor, activityRingLabel } from '@/lib/web/layout'
+import { tierColor, tierRadius, truncateLabel, wrapLabel, activityRingColor, activityRingLabel } from '@/lib/web/layout'
 
 /**
  * Per-node visual decorations injected by sibling workflows. Workflow 1 owns the
@@ -23,11 +23,11 @@ export interface WebNodeMarkerProps {
   decoration?: NodeDecoration
 }
 
-// Caption length caps keep each node's name + headline narrower than the gap
-// between adjacent nodes so labels never collide. The full text remains in the
-// marker's `aria-label` for screen readers.
+// The name caption stays on one line (capped width). The headline wraps across
+// lines so the full role is shown without overflowing the node's width.
 const NAME_MAX = 18
-const HEADLINE_MAX = 22
+const HEADLINE_WRAP = 16
+const HEADLINE_LINE_HEIGHT = 13
 
 // Presentational SVG marker for a single person node.
 export default function WebNodeMarker({
@@ -117,12 +117,20 @@ export default function WebNodeMarker({
         {truncateLabel(node.label, NAME_MAX)}
       </text>
 
-      {/* Headline */}
-      {node.headline && (
-        <text textAnchor="middle" y={r + 31} fontSize={10.5} fill="#6b7280">
-          {truncateLabel(node.headline, HEADLINE_MAX)}
-        </text>
-      )}
+      {/* Headline — width-constrained: wraps across lines so the full role
+          (e.g. "Product Manager at Tech Innovators Inc.") is always shown. */}
+      {node.headline &&
+        wrapLabel(node.headline, HEADLINE_WRAP).map((line, i) => (
+          <text
+            key={i}
+            textAnchor="middle"
+            y={r + 31 + i * HEADLINE_LINE_HEIGHT}
+            fontSize={10.5}
+            fill="#6b7280"
+          >
+            {line}
+          </text>
+        ))}
     </motion.g>
   )
 }

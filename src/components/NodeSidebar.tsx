@@ -19,6 +19,10 @@ import { ActionsBar } from "@/components/ActionsBar";
 interface NodeSidebarProps {
   node: WebNode | null;
   onClose: () => void;
+  /** True when the viewer has already connected with this node (W1 board state). */
+  connected?: boolean;
+  /** Promotes a 2nd-degree node to a connection on the web; receives its graph id. */
+  onConnect?: (nodeId: string) => void;
 }
 
 // Cache the AI tip per userId so re-opening the same node never re-calls the LLM.
@@ -40,7 +44,7 @@ function targetSummary(jobs: { position: string; company: string }[]): string {
   return jobs.map((j) => `${j.position} at ${j.company}`).join("; ");
 }
 
-export function NodeSidebar({ node, onClose }: NodeSidebarProps) {
+export function NodeSidebar({ node, onClose, connected, onConnect }: NodeSidebarProps) {
   const goal = useWebStore((s) => s.goal);
   const viewerProfile = useWebStore((s) => s.viewerProfile);
 
@@ -267,7 +271,13 @@ export function NodeSidebar({ node, onClose }: NodeSidebarProps) {
 
           {/* 2nd-degree preview (Step 5), then Actions bar (Step 6). */}
           <SecondDegreePreview parentNode={node} parentName={user.name} />
-          <ActionsBar targetName={user.name} tip={tip} />
+          <ActionsBar
+            targetName={user.name}
+            tip={tip}
+            degree={node.degree}
+            connected={connected}
+            onConnect={() => onConnect?.(node.id)}
+          />
         </div>
       )}
     </aside>

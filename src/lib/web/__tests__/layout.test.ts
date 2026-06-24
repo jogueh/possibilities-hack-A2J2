@@ -6,6 +6,7 @@ import {
   tierColor,
   tierRadius,
   truncateLabel,
+  wrapLabel,
   edgeStrokeWidth,
   edgeStrokeDasharray,
   TIER_COLORS,
@@ -76,6 +77,32 @@ describe('truncateLabel', () => {
   it('handles degenerate limits', () => {
     expect(truncateLabel('anything', 0)).toBe('')
     expect(truncateLabel('anything', 1)).toBe('…')
+  })
+})
+
+describe('wrapLabel', () => {
+  it('keeps a short label on a single line', () => {
+    expect(wrapLabel('Data Scientist', 16)).toEqual(['Data Scientist'])
+  })
+
+  it('wraps a long role onto multiple lines without dropping any words', () => {
+    const lines = wrapLabel('Product Manager at Tech Innovators Inc.', 16)
+    // Every line stays within the width budget...
+    lines.forEach((line) => expect(line.length).toBeLessThanOrEqual(16))
+    // ...and the full text is preserved (nothing truncated).
+    expect(lines.join(' ')).toBe('Product Manager at Tech Innovators Inc.')
+    expect(lines.length).toBeGreaterThan(1)
+  })
+
+  it('keeps a single over-long word whole on its own line', () => {
+    expect(wrapLabel('Supercalifragilistic role', 10)).toEqual([
+      'Supercalifragilistic',
+      'role',
+    ])
+  })
+
+  it('returns an empty list for blank text', () => {
+    expect(wrapLabel('   ', 16)).toEqual([])
   })
 })
 
