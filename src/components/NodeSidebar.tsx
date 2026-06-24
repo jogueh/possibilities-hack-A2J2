@@ -45,9 +45,22 @@ function tipKeyFor(userId: string, goalRaw: string): string {
   return `${userId}::${goalRaw}`;
 }
 
+// Tracks the goal the cache currently holds tips for. When the active goal
+// changes, the previous goal's tips are obsolete, so we evict them — this keeps
+// the module-level cache bounded to the current goal instead of growing without
+// bound across repeated re-prompts in a long-lived session.
+let cachedGoalRaw: string | null = null;
+function evictTipsIfGoalChanged(goalRaw: string) {
+  if (cachedGoalRaw !== goalRaw) {
+    tipCache.clear();
+    cachedGoalRaw = goalRaw;
+  }
+}
+
 // Test/dev helper (NOT part of the planned W1 API).
 export function __resetNodeSidebarTipCache() {
   tipCache.clear();
+  cachedGoalRaw = null;
 }
 function viewerSummary(viewer: Pick<UserWithJobs, "job_history" | "skills"> | null): string {
   if (!viewer) return "";
@@ -128,6 +141,8 @@ export function NodeSidebar({
   useEffect(() => {
     if (!user || !userId || !parsedGoal) return;
     const goalRaw = goal?.raw ?? "";
+    // Drop the previous goal's tips before (re)populating for the current goal.
+    evictTipsIfGoalChanged(goalRaw);
     const key = tipKeyFor(userId, goalRaw);
     if (tipCache.has(key)) return;
     let cancelled = false;
