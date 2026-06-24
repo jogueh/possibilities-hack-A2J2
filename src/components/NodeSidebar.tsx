@@ -8,6 +8,7 @@ import type { UserWithJobs } from "@/types/data";
 import { useWebStore } from "@/store/useWebStore";
 import { fetchUserWithJobs } from "@/lib/userApi";
 import { ALIGNMENT_LABELS, alignmentColor } from "@/lib/alignmentColors";
+import { activityRingColor } from "@/lib/web/layout";
 import { filterRelevantJobs } from "@/lib/relevance";
 import { getSharedContext } from "@/lib/sharedContext";
 import { LI, SIDEBAR_WIDTH } from "@/lib/linkedinTokens";
@@ -20,8 +21,12 @@ interface NodeSidebarProps {
   onClose: () => void;
   /** True when the viewer has already connected with this node (W1 board state). */
   connected?: boolean;
+  /** True when the viewer has hit the free-tier connection cap (premium gate). */
+  atConnectionLimit?: boolean;
   /** Promotes a 2nd-degree node to a connection on the web; receives its graph id. */
   onConnect?: (nodeId: string) => void;
+  /** Surfaces an "Upgrade to Premium" prompt (InMail / connection cap). */
+  onUpgrade?: (reason: "connection" | "inmail") => void;
 }
 
 // Cache the AI tip per userId so re-opening the same node never re-calls the LLM.
@@ -43,7 +48,7 @@ function targetSummary(jobs: { position: string; company: string }[]): string {
   return jobs.map((j) => `${j.position} at ${j.company}`).join("; ");
 }
 
-export function NodeSidebar({ node, onClose, connected, onConnect }: NodeSidebarProps) {
+export function NodeSidebar({ node, onClose, connected, atConnectionLimit, onConnect, onUpgrade }: NodeSidebarProps) {
   const goal = useWebStore((s) => s.goal);
   const parsedGoal = useWebStore((s) => s.parsedGoal);
   const viewerProfile = useWebStore((s) => s.viewerProfile);
@@ -137,6 +142,13 @@ export function NodeSidebar({ node, onClose, connected, onConnect }: NodeSidebar
 
   if (!node) return null;
 
+  // The avatar ring mirrors the node's ring on the canvas: the activity colour
+  // (blue/amber/red) when the node carries an activity status, otherwise the
+  // goal-alignment colour. Keeps the sidebar consistent with the web.
+  const ringColor = node.activityStatus
+    ? activityRingColor(node.activityStatus)
+    : alignmentColor(node.alignmentTier);
+
   return (
     <aside
       ref={panelRef}
@@ -189,7 +201,7 @@ export function NodeSidebar({ node, onClose, connected, onConnect }: NodeSidebar
                 height: 64,
                 borderRadius: "50%",
                 background: LI.bg,
-                border: `3px solid ${alignmentColor(node.alignmentTier)}`,
+                border: `3px solid ${ringColor}`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -272,10 +284,11 @@ export function NodeSidebar({ node, onClose, connected, onConnect }: NodeSidebar
           <SecondDegreePreview parentNode={node} parentName={user.name} />
           <ActionsBar
             targetName={user.name}
-            tip={tip}
             degree={node.degree}
             connected={connected}
+            atConnectionLimit={atConnectionLimit}
             onConnect={() => onConnect?.(node.id)}
+            onUpgrade={onUpgrade}
           />
         </div>
       )}

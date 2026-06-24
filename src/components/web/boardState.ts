@@ -13,6 +13,16 @@ import {
 // 2nd-degree person it reaches, so the (now solid) line reads as a strong link.
 const CONNECTED_STRENGTH = 0.9
 
+// Free-tier limits. The product is always non-premium in the demo, so hitting
+// either of these surfaces an "Upgrade to Premium" prompt with no way to unlock.
+/** Deepest degree the viewer can reach before a premium prompt blocks them. */
+export const FREE_MAX_DEGREE = 3
+/** Max number of new connections the viewer can add on the free tier. */
+export const CONNECTION_LIMIT = 3
+
+/** Why an upgrade prompt is showing: hit the depth limit, or the connection cap. */
+export type UpgradeReason = 'depth' | 'connection' | 'inmail'
+
 export type BoardStatus = 'idle' | 'loading' | 'error'
 
 export interface BoardState {
@@ -30,6 +40,8 @@ export interface BoardState {
   people: PersonInput[]
   status: BoardStatus
   error: string | null
+  /** Set when a premium gate is hit; drives the WebBoard's upgrade prompt. */
+  upgradePrompt: UpgradeReason | null
 }
 
 export type BoardAction =
@@ -40,6 +52,8 @@ export type BoardAction =
   | { type: 'mapError'; error: string }
   | { type: 'selectNode'; id: string }
   | { type: 'connectNode'; id: string }
+  | { type: 'showUpgrade'; reason: UpgradeReason }
+  | { type: 'dismissUpgrade' }
   | { type: 'clearSelection' }
   | { type: 'reset' }
 
@@ -58,6 +72,7 @@ export function createInitialBoardState(): BoardState {
     people: [],
     status: 'idle',
     error: null,
+    upgradePrompt: null,
   }
 }
 
@@ -109,6 +124,7 @@ export function boardReducer(
         connectedIds: [],
         status: 'idle',
         error: null,
+        upgradePrompt: null,
       }
     }
 
@@ -127,6 +143,7 @@ export function boardReducer(
         people: action.people,
         status: 'idle',
         error: null,
+        upgradePrompt: null,
       }
     }
 
@@ -135,9 +152,7 @@ export function boardReducer(
 
     case 'selectNode': {
       const clicked = state.snapshot.nodes.find((n) => n.id === action.id)
-      // Selecting a 2nd-degree node (or an unknown id) only changes the
-      // selection — it must not collapse or rebuild the web.
-      if (!clicked || clicked.degree !== 1 || !state.snapshot.goal) {
+      if (!clicked || !state.snapshot.goal) {
         return { ...state, selectedId: action.id }
       }
 
@@ -145,14 +160,40 @@ export function boardReducer(
       // people, clustered next to it. Rebuilding from the seeded snapshot first
       // collapses any other connector that was previously expanded, so the web
       // never shows a different person's warm path.
+      if (clicked.degree === 1) {
+        const people = effectivePeople(state, config)
+        const seeded = buildSnapshot(
+          state.snapshot.goal,
+          people,
+          config.options,
+        )
+        const snapshot = expandNode(seeded, action.id, people, config.options)
+        return {
+          ...state,
+          snapshot: applyConnections(snapshot, state.connectedIds),
+          selectedId: action.id,
+        }
+      }
+
+      // Deeper (2nd-degree+) nodes only keep going once the viewer has actually
+      // CONNECTED with them — you drill further along a warm path you've opened.
+      // Unconnected deeper nodes just update the selection (sidebar shows the
+      // Connect / InMail actions).
+      if (!state.connectedIds.includes(action.id)) {
+        return { ...state, selectedId: action.id }
+      }
+
+      // Premium depth gate: expanding reveals the NEXT degree. Block past the
+      // free tier's deepest reachable degree and prompt to upgrade instead.
+      if (clicked.degree + 1 > FREE_MAX_DEGREE) {
+        return { ...state, selectedId: action.id, upgradePrompt: 'depth' }
+      }
+
+      // Additively reveal this connected person's own connections (next degree),
+      // keeping everything already on the canvas in place.
       const people = effectivePeople(state, config)
-      const seeded = buildSnapshot(
-        state.snapshot.goal,
-        people,
-        config.options,
-      )
       const snapshot = expandNode(
-        seeded,
+        state.snapshot,
         action.id,
         people,
         config.options,
@@ -169,6 +210,10 @@ export function boardReducer(
       // record the link and turn that dotted bridge into a solid, strengthened
       // (blue) edge. Idempotent — connecting again is a no-op.
       if (state.connectedIds.includes(action.id)) return state
+      // Free-tier connection cap: prompt to upgrade instead of adding more.
+      if (state.connectedIds.length >= CONNECTION_LIMIT) {
+        return { ...state, upgradePrompt: 'connection' }
+      }
       const connectedIds = [...state.connectedIds, action.id]
       return {
         ...state,
@@ -176,6 +221,12 @@ export function boardReducer(
         snapshot: applyConnections(state.snapshot, connectedIds),
       }
     }
+
+    case 'showUpgrade':
+      return { ...state, upgradePrompt: action.reason }
+
+    case 'dismissUpgrade':
+      return { ...state, upgradePrompt: null }
 
     case 'clearSelection':
       return { ...state, selectedId: null }

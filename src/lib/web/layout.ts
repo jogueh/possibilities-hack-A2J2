@@ -201,8 +201,8 @@ export function placeNearParent(
 
 /**
  * Builds styled WebEdges from raw relationships. An edge is dotted when either
- * endpoint is a 2nd-degree node (i.e. it crosses into the warm-path frontier).
- * Unknown endpoints are skipped.
+ * endpoint is a 2nd-degree node or deeper (i.e. it crosses into the warm-path
+ * frontier). Unknown endpoints are skipped.
  */
 export function deriveEdges(
   relationships: Relationship[],
@@ -213,7 +213,7 @@ export function deriveEdges(
     const source = byId.get(rel.source)
     const target = byId.get(rel.target)
     if (!source || !target) return []
-    const isDotted = source.degree === 2 || target.degree === 2
+    const isDotted = Math.max(source.degree, target.degree) >= 2
     return [
       {
         id: `${rel.source}__${rel.target}`,

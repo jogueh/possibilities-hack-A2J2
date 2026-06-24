@@ -11,6 +11,9 @@ const people: PersonInput[] = [
   { id: 'b', name: 'Bob Smith', degree: 1 },
   { id: 'c', name: 'Carol Danvers', degree: 2, via: 'a' },
   { id: 'e', name: 'Eve Polastri', degree: 2, via: 'b' },
+  { id: 'f', name: 'Frank Castle', degree: 2, via: 'a' },
+  { id: 'g', name: 'Gwen Stacy', degree: 2, via: 'a' },
+  { id: 'z', name: 'Zoe Washburne', degree: 3, via: 'c' },
 ]
 
 const config: BoardConfig = {
@@ -118,5 +121,60 @@ describe('boardReducer', () => {
     s = reduce(s, { type: 'setGoalText', value: 'New goal' })
     s = reduce(s, { type: 'submitGoal' })
     expect(s.connectedIds).toEqual([])
+  })
+
+  it('expands a connected 2nd-degree node to reveal its 3rd-degree connections', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'selectNode', id: 'a' }) // reveals c (2nd)
+    s = reduce(s, { type: 'connectNode', id: 'c' }) // connect c
+    s = reduce(s, { type: 'selectNode', id: 'c' }) // keep going: reveal z (3rd)
+    expect(s.snapshot.nodes.some((n) => n.id === 'z')).toBe(true)
+    expect(s.selectedId).toBe('c')
+    expect(s.upgradePrompt).toBeNull()
+    // Additive: the connector and its 2nd-degree node stay on the canvas.
+    expect(s.snapshot.nodes.some((n) => n.id === 'a')).toBe(true)
+    expect(s.snapshot.nodes.some((n) => n.id === 'c')).toBe(true)
+  })
+
+  it('does not expand a 2nd-degree node until the viewer connects with it', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    s = reduce(s, { type: 'selectNode', id: 'c' }) // not connected -> no expansion
+    expect(s.snapshot.nodes.some((n) => n.id === 'z')).toBe(false)
+    expect(s.selectedId).toBe('c')
+    expect(s.upgradePrompt).toBeNull()
+  })
+
+  it('prompts to upgrade when expanding past the 3rd degree', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    s = reduce(s, { type: 'connectNode', id: 'c' })
+    s = reduce(s, { type: 'selectNode', id: 'c' }) // reveal z (3rd)
+    s = reduce(s, { type: 'connectNode', id: 'z' })
+    s = reduce(s, { type: 'selectNode', id: 'z' }) // 3rd -> would reveal 4th: blocked
+    expect(s.upgradePrompt).toBe('depth')
+    expect(s.selectedId).toBe('z')
+  })
+
+  it('caps connections at the free-tier limit and prompts to upgrade', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'connectNode', id: 'c' })
+    s = reduce(s, { type: 'connectNode', id: 'f' })
+    s = reduce(s, { type: 'connectNode', id: 'g' })
+    // 4th connection is blocked on the free tier.
+    s = reduce(s, { type: 'connectNode', id: 'e' })
+    expect(s.connectedIds).toEqual(['c', 'f', 'g'])
+    expect(s.upgradePrompt).toBe('connection')
+  })
+
+  it('dismisses the upgrade prompt', () => {
+    let s = reduce(createInitialBoardState(), { type: 'showUpgrade', reason: 'inmail' })
+    expect(s.upgradePrompt).toBe('inmail')
+    s = reduce(s, { type: 'dismissUpgrade' })
+    expect(s.upgradePrompt).toBeNull()
   })
 })

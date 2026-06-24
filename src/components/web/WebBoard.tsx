@@ -5,19 +5,21 @@ import {
   Alert,
   Button,
   Card,
-  Empty,
   Input,
+  Modal,
   Progress,
   Select,
   Space,
   Typography,
 } from 'antd'
-import { AimOutlined, ReloadOutlined, UpOutlined, DownOutlined } from '@ant-design/icons'
+import { AimOutlined, ReloadOutlined, UpOutlined, DownOutlined, CrownOutlined } from '@ant-design/icons'
 import WebCanvas from './WebCanvas'
 import {
   boardReducer,
   createInitialBoardState,
+  CONNECTION_LIMIT,
   type BoardConfig,
+  type UpgradeReason,
 } from './boardState'
 import { SELF_USER_ID, webPeople } from '@/data/web_people'
 import { NodeSidebar } from '@/components/NodeSidebar'
@@ -42,6 +44,14 @@ const SUGGESTIONS = [
 const LOCATION_OPTIONS = ['San Francisco', 'New York', 'Remote']
 const INDUSTRY_OPTIONS = ['Software', 'Product', 'Design', 'Recruiting']
 const EVENT_OPTIONS = ['All events', 'Recently active', 'New connections']
+
+// Copy for the "Upgrade to Premium" prompt, keyed by which free-tier gate the
+// viewer hit. Premium is always off in the demo, so these never unlock.
+const UPGRADE_COPY: Record<UpgradeReason, string> = {
+  connection: `You've reached the ${CONNECTION_LIMIT}-connection limit on the free plan. Upgrade to Premium to keep growing your web.`,
+  depth: 'Reaching further than 3rd-degree connections is a Premium feature. Upgrade to explore deeper into your network.',
+  inmail: 'InMail lets you message people outside your network. Upgrade to Premium to send InMail.',
+}
 
 const round = (n: number) => Math.round(n)
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0)
@@ -70,10 +80,12 @@ function apiResponseToPeople(
       relevanceScore: n.relevanceScore / 100,
       interactionScore: n.interactionScore,
     }
-    if (n.degree === 2) {
-      const via = viaByTarget.get(n.id)
-      if (via) person.via = via
-    }
+    // Warm-path nodes (2nd-degree and deeper) reach the viewer through a dotted
+    // bridge; carry that connector so the canvas can cluster + expand them.
+    const via = viaByTarget.get(n.id)
+    if (via) person.via = via
+    if (n.activityStatus) person.activityStatus = n.activityStatus
+    if (n.headline) person.headline = n.headline
     return person
   })
 }
@@ -95,10 +107,14 @@ export default function WebBoard() {
     createInitialBoardState,
   )
 
-  const { snapshot, selectedId, goalText, status, error } = state
+  const { snapshot, selectedId, goalText, status, error, upgradePrompt } = state
   const selected = snapshot.nodes.find((n) => n.id === selectedId) ?? null
   const isEmpty = snapshot.state === 'empty'
   const selectedConnected = selected ? state.connectedIds.includes(selected.id) : false
+  // Free-tier cap: once the viewer has used all their connections, prompt to
+  // upgrade rather than letting them add more (premium is always off in the demo).
+  const atConnectionLimit =
+    !selectedConnected && state.connectedIds.length >= CONNECTION_LIMIT
   const loading = status === 'loading'
 
   // Collapsible side cards (chevron toggles) — purely presentational.
@@ -292,7 +308,7 @@ export default function WebBoard() {
         <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
           <div>
             <Typography.Title level={4} style={{ marginTop: 0, marginBottom: 4 }}>
-              Your Network Web
+              Your Web
             </Typography.Title>
             <Typography.Text type="secondary">
               Interactively re-rank your relationships.
@@ -312,9 +328,12 @@ export default function WebBoard() {
               }}
             >
               {isEmpty ? (
-                <div style={{ padding: 48 }}>
-                  <Empty description="No goal yet — tell us where you want to go and we'll map who can help." />
-                </div>
+                <WebCanvas
+                  snapshot={snapshot}
+                  width={CANVAS_WIDTH}
+                  height={CANVAS_HEIGHT}
+                  alwaysShowSelf
+                />
               ) : (
                 <WebCanvas
                   snapshot={snapshot}
@@ -329,7 +348,9 @@ export default function WebBoard() {
             <NodeSidebar
               node={selected}
               connected={selectedConnected}
+              atConnectionLimit={atConnectionLimit}
               onConnect={(id) => dispatch({ type: 'connectNode', id })}
+              onUpgrade={(reason) => dispatch({ type: 'showUpgrade', reason })}
               onClose={() => dispatch({ type: 'clearSelection' })}
             />
           </div>
@@ -363,6 +384,24 @@ export default function WebBoard() {
           </div>
         </Space>
       </Card>
+
+      <Modal
+        open={upgradePrompt !== null}
+        onCancel={() => dispatch({ type: 'dismissUpgrade' })}
+        title={
+          <span>
+            <CrownOutlined style={{ color: '#F59E0B', marginRight: 8 }} />
+            Upgrade to Premium
+          </span>
+        }
+        okText="Upgrade to Premium"
+        cancelText="Maybe later"
+        onOk={() => dispatch({ type: 'dismissUpgrade' })}
+      >
+        <Typography.Paragraph style={{ marginBottom: 0 }}>
+          {upgradePrompt ? UPGRADE_COPY[upgradePrompt] : ''}
+        </Typography.Paragraph>
+      </Modal>
     </div>
   )
 }

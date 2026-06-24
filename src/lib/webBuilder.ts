@@ -1,8 +1,9 @@
-import type { WebEdge, WebNode } from '@/types/web'
+import type { DegreeLevel, WebEdge, WebNode } from '@/types/web'
 import type { ParsedGoal } from '@/types/goal'
 import type { UserWithJobs } from '@/types/data'
 import {
   deriveAlignmentTier,
+  deriveActivityStatus,
   scoreUserAgainstGoal as defaultScorer,
 } from '@/lib/scoring'
 import { suggestConnections } from '@/lib/connections'
@@ -21,6 +22,12 @@ export interface BuildWebInput {
   candidates: UserWithJobs[]
   /** Optional scorer override for tests. Defaults to the real `scoreUserAgainstGoal`. */
   scorer?: (user: UserWithJobs, goal: ParsedGoal) => number
+  /**
+   * Deepest degree to emit. Defaults to 2 (1st + 2nd degree) so existing
+   * callers/tests are unchanged; the live route passes 3 so the viewer can
+   * "keep going" past the 2nd-degree frontier once they connect.
+   */
+  maxDegree?: 2 | 3
 }
 
 export interface BuildWebOutput {
@@ -46,7 +53,7 @@ function initialsFromName(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
-function toNode(user: UserWithJobs, degree: 1 | 2, score: number): WebNode {
+function toNode(user: UserWithJobs, degree: DegreeLevel, score: number): WebNode {
   return {
     id: user.id,
     userId: user.id,
@@ -54,6 +61,9 @@ function toNode(user: UserWithJobs, degree: 1 | 2, score: number): WebNode {
     degree,
     avatarInitials: initialsFromName(user.name),
     alignmentTier: deriveAlignmentTier(score),
+    // The activity ring (blue/amber/red) is derived from the member's real
+    // post activity so the live web matches the demo palette.
+    activityStatus: deriveActivityStatus(user),
     // interactionScore starts at 0 per src/types/web.ts contract; W4 stretch
     // updates it client-side via the Zustand store.
     interactionScore: 0,
@@ -108,6 +118,7 @@ export function buildWeb({
   parsedGoal,
   candidates,
   scorer = defaultScorer,
+  maxDegree = 2,
 }: BuildWebInput): BuildWebOutput {
   // O(1) candidate lookup by userId.
   const byId = new Map<string, UserWithJobs>()
@@ -163,6 +174,7 @@ export function buildWeb({
   const inWeb = new Set<string>([viewerUserId, ...firstDegree.map((s) => s.user.id)])
 
   // 2nd-degree: friends-of-friends per 1st-degree node, ranked by goal score.
+  const secondDegree: ScoredUser[] = []
   for (const parent of firstDegree) {
     const candidateScored: ScoredUser[] = []
     for (const id of connectionsOf(parent.user.id)) {
@@ -177,8 +189,34 @@ export function buildWeb({
     const picked = candidateScored.slice(0, SECOND_DEGREE_PER_NODE_MAX)
     for (const m of picked) {
       inWeb.add(m.user.id)
+      secondDegree.push(m)
       nodes.push(toNode(m.user, 2, m.score))
       edges.push(edge(parent.user.id, m.user.id, true))
+    }
+  }
+
+  // 3rd-degree: one hop further out from each 2nd-degree node, so the viewer can
+  // "keep going" past the warm-path frontier once they connect. Same ranking +
+  // threshold as the 2nd-degree pass; dotted edges from the 2nd-degree parent.
+  // Only emitted when the caller opts into a deeper web (`maxDegree >= 3`).
+  if (maxDegree >= 3) {
+    for (const parent of secondDegree) {
+      const candidateScored: ScoredUser[] = []
+      for (const id of connectionsOf(parent.user.id)) {
+        if (inWeb.has(id)) continue
+        const user = byId.get(id)
+        if (!user) continue
+        const score = scorer(user, parsedGoal)
+        if (score < SECOND_DEGREE_MIN_SCORE) continue
+        candidateScored.push({ user, score })
+      }
+      candidateScored.sort((a, b) => b.score - a.score)
+      const picked = candidateScored.slice(0, SECOND_DEGREE_PER_NODE_MAX)
+      for (const m of picked) {
+        inWeb.add(m.user.id)
+        nodes.push(toNode(m.user, 3, m.score))
+        edges.push(edge(parent.user.id, m.user.id, true))
+      }
     }
   }
 

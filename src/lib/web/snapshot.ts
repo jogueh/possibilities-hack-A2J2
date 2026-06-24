@@ -115,12 +115,14 @@ export function buildSnapshot(
 }
 
 /**
- * Expands a 1st-degree node, revealing the 2nd-degree people that reach the user
- * through it. Returns an `expanded` snapshot with dotted bridge edges. The new
- * 2nd-degree nodes are clustered next to their connector (not on a global outer
- * ring) so the warm path reads clearly. Existing nodes keep their positions, so
- * expanding one node never reshuffles the rest of the web. Calling it for an
- * unknown / already-expanded node is a no-op (idempotent).
+ * Expands a node, revealing the next-degree people that reach the user through
+ * it. Works for any parent degree (1st reveals 2nd, a connected 2nd reveals 3rd,
+ * …) so the viewer can keep drilling along a warm path. Returns an `expanded`
+ * snapshot with dotted bridge edges. The new nodes are clustered next to their
+ * connector (not on a global outer ring) so the warm path reads clearly.
+ * Existing nodes keep their positions, so expanding one node never reshuffles
+ * the rest of the web. Calling it for an unknown / already-expanded node is a
+ * no-op (idempotent).
  */
 export function expandNode(
   snapshot: WebSnapshot,
@@ -130,12 +132,12 @@ export function expandNode(
 ): WebSnapshot {
   if (!snapshot.goal) return snapshot
 
-  const parent = snapshot.nodes.find((n) => n.id === nodeId && n.degree === 1)
+  const parent = snapshot.nodes.find((n) => n.id === nodeId)
   if (!parent) return snapshot
 
   const existingIds = new Set(snapshot.nodes.map((n) => n.id))
   const newPeople = people.filter(
-    (p) => p.degree === 2 && p.via === nodeId && !existingIds.has(p.id),
+    (p) => p.via === nodeId && !existingIds.has(p.id),
   )
   if (newPeople.length === 0) {
     return snapshot

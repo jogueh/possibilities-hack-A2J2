@@ -4,7 +4,7 @@
 
 export type AlignmentTier = 'strong' | 'moderate' | 'weak'
 export type WebState = 'empty' | 'seeded' | 'expanded'
-export type DegreeLevel = 1 | 2
+export type DegreeLevel = 1 | 2 | 3
 
 /**
  * Outreach-activity status, used to colour a node's "activity ring":

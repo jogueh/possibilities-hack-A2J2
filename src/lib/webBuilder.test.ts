@@ -496,3 +496,46 @@ describe('buildWeb — WebNode shape', () => {
     expect(one).toEqual(two)
   })
 })
+
+describe('buildWeb — 3rd-degree selection (maxDegree: 3)', () => {
+  // viewer -> friend (1st) -> fof (2nd) -> fofof (3rd)
+  const buildChain = (maxDegree?: 2 | 3) => {
+    const viewer = makeUser('viewer', { connections: ['friend'] })
+    const friend = makeUser('friend', { connections: ['fof'] })
+    const fof = makeUser('fof', { connections: ['fofof'] })
+    const fofof = makeUser('fofof', { connections: [] })
+    return buildWeb({
+      viewerUserId: 'viewer',
+      parsedGoal: goal,
+      candidates: [viewer, friend, fof, fofof],
+      scorer: scorerByMap({ friend: 90, fof: 85, fofof: 80 }),
+      maxDegree,
+    })
+  }
+
+  it('does not emit 3rd-degree nodes by default (maxDegree defaults to 2)', () => {
+    const { nodes } = buildChain()
+    expect(nodes.some((n) => n.degree === 3)).toBe(false)
+    expect(nodes.find((n) => n.id === 'fofof')).toBeUndefined()
+  })
+
+  it('emits 3rd-degree nodes from the 2nd-degree connections with a dotted bridge', () => {
+    const { nodes, edges } = buildChain(3)
+    const third = nodes.find((n) => n.id === 'fofof')
+    expect(third?.degree).toBe(3)
+    const bridge = edges.find((e) => e.id === 'fof__fofof')
+    expect(bridge?.isDotted).toBe(true)
+  })
+
+  it('carries the activity ring status onto built nodes', () => {
+    const viewer = makeUser('viewer', { connections: ['active1'] })
+    const active1 = makeUser('active1', { posts_activity: ['x', 'y', 'z'] }) // 3 posts -> active
+    const { nodes } = buildWeb({
+      viewerUserId: 'viewer',
+      parsedGoal: goal,
+      candidates: [viewer, active1],
+      scorer: scorerByMap({ active1: 90 }),
+    })
+    expect(nodes.find((n) => n.id === 'active1')?.activityStatus).toBe('active')
+  })
+})

@@ -94,10 +94,13 @@ afterEach(() => {
 })
 
 describe('WebBoard', () => {
-  it('shows the empty prompt before a goal is set', () => {
-    const { container, getByText } = render(<WebBoard />)
-    expect(getByText(/No goal yet/i)).toBeInTheDocument()
-    expect(container.querySelector('[data-testid="web-canvas"]')).toBeNull()
+  it('shows only the self node at the centre before a goal is set', () => {
+    const { container } = render(<WebBoard />)
+    // The empty view now renders the canvas with just the central "You" node —
+    // the viewer at the centre of their (yet-to-grow) web — and no person nodes.
+    expect(container.querySelector('[data-testid="web-canvas"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="web-self"]')).not.toBeNull()
+    expect(container.querySelectorAll('[data-testid^="web-node-"]').length).toBe(0)
   })
 
   it('maps the web from the /api/web/generate response when a goal is submitted', async () => {

@@ -17,7 +17,7 @@ describe('web types contract', () => {
     expectTypeOf<AlignmentTier>().toEqualTypeOf<'strong' | 'moderate' | 'weak'>()
     expectTypeOf<ActivityStatus>().toEqualTypeOf<'active' | 'moderate' | 'inactive'>()
     expectTypeOf<WebState>().toEqualTypeOf<'empty' | 'seeded' | 'expanded'>()
-    expectTypeOf<DegreeLevel>().toEqualTypeOf<1 | 2>()
+    expectTypeOf<DegreeLevel>().toEqualTypeOf<1 | 2 | 3>()
   })
 
   it('describes a WebNode', () => {

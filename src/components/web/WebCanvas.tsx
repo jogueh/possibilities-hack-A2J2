@@ -20,6 +20,12 @@ export interface WebCanvasProps {
   selectedId?: string | null
   onNodeSelect?: (id: string) => void
   /**
+   * Renders the central "You" node even before a goal is mapped (empty state),
+   * so the blank view shows the viewer at the centre of their (yet-to-grow) web
+   * instead of an empty placeholder.
+   */
+  alwaysShowSelf?: boolean
+  /**
    * Per-node decorations keyed by `WebNode.id`, injected by sibling workflows
    * (e.g. Workflow 4 sets `{ hasJobOverlap: true }` for connections that match
    * relevant jobs). Workflow 1 only routes them to the markers; the flag data
@@ -51,6 +57,7 @@ export default function WebCanvas({
   height = 520,
   selectedId = null,
   onNodeSelect,
+  alwaysShowSelf = false,
   nodeDecorations,
 }: WebCanvasProps) {
   const center = { x: width / 2, y: height / 2 }
@@ -186,7 +193,7 @@ export default function WebCanvas({
             })}
           </g>
 
-          {snapshot.goal && (
+          {(snapshot.goal || alwaysShowSelf) && (
             <motion.g
               data-testid="web-self"
               initial={{ opacity: 0, x: center.x, y: center.y, scale: 0.7 }}

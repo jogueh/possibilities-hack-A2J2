@@ -99,10 +99,10 @@ export default function WebNodeMarker({
         {node.avatarInitials}
       </text>
 
-      {/* 2nd-degree badge */}
-      {node.degree === 2 && (
+      {/* Warm-path degree badge (2nd / 3rd) */}
+      {node.degree >= 2 && (
         <text x={r + 4} y={-r + 2} fontSize={10} fontWeight={600} fill="#8a94a6">
-          2nd
+          {node.degree === 2 ? '2nd' : '3rd'}
         </text>
       )}
 

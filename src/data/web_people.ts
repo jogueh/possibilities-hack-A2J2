@@ -1,10 +1,10 @@
 import type { PersonInput } from '@/lib/web/snapshot'
 
-// Curated mock graph for Workflow 1's demo, themed to match the Network Web
-// mockup. Workflow 3 (scoring) will later supply real relevance/interaction
-// scores; Workflow 2 supplies the goal and resolved headlines.
-// 1st-degree people are direct connections; 2nd-degree people reach the user
-// via a named 1st-degree connector (`via`).
+// Curated mock graph for Workflow 1's demo, themed to match the Web mockup.
+// Workflow 3 (scoring) will later supply real relevance/interaction scores;
+// Workflow 2 supplies the goal and resolved headlines.
+// 1st-degree people are direct connections; 2nd-degree (and a 3rd-degree
+// example) reach the user via a named connector (`via`).
 //
 // `userId` is a real member id in `src/data/user_data.json`; the node sidebar
 // fetches the full profile by that id. Each `name`/`headline` here is the value
@@ -34,4 +34,8 @@ export const webPeople: PersonInput[] = [
   { id: 'p_david_l', userId: 'user_1364', name: 'Jynxzi', headline: 'DevOps Engineer at AI Dynamics', degree: 2, via: 'p_john', interactionScore: 0.5, relevanceScore: 0.72, activityStatus: 'moderate' },
   { id: 'p_david_k', userId: 'user_1386', name: 'Wei Olsen', headline: 'Software Engineer at Tech Innovators Inc.', degree: 2, via: 'p_john', interactionScore: 0.4, relevanceScore: 0.58, activityStatus: 'inactive' },
   { id: 'p_grace', userId: 'user_1465', name: 'Nadia Nguyen', headline: 'HR Coordinator at Innovatech', degree: 2, via: 'p_alice', interactionScore: 0.5, relevanceScore: 0.63, activityStatus: 'active' },
+
+  // 3rd-degree example (reached once the viewer connects with the 2nd-degree
+  // connector `p_grace`), so the demo can "keep going" past the 2nd level.
+  { id: 'p_mateo', userId: 'user_1008', name: 'Mateo Dubois', headline: 'Data Scientist at Innovatech', degree: 3, via: 'p_grace', interactionScore: 0.5, relevanceScore: 0.6, activityStatus: 'active' },
 ]
