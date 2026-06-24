@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useReducer } from 'react'
+import { useMemo, useReducer, useState } from 'react'
 import {
   Button,
   Card,
@@ -12,7 +12,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { AimOutlined, ReloadOutlined } from '@ant-design/icons'
+import { AimOutlined, ReloadOutlined, UpOutlined, DownOutlined } from '@ant-design/icons'
 import type { AlignmentTier } from '@/types/web'
 import WebCanvas from './WebCanvas'
 import {
@@ -71,6 +71,10 @@ export default function WebBoard() {
   const selected = snapshot.nodes.find((n) => n.id === selectedId) ?? null
   const isEmpty = snapshot.state === 'empty'
 
+  // Collapsible side cards (chevron toggles) — purely presentational.
+  const [showSuggestions, setShowSuggestions] = useState(true)
+  const [showMetrics, setShowMetrics] = useState(true)
+
   // Presentational "metrics" derived from the seeded web. Real scoring is
   // owned by Workflow 2; these are deterministic placeholders for the demo.
   const degree1 = snapshot.nodes.filter((n) => n.degree === 1)
@@ -122,39 +126,67 @@ export default function WebBoard() {
           </Space>
         </Card>
 
-        <Card title="Suggestions" size="small">
-          <Space orientation="vertical" size={8} style={{ width: '100%' }}>
-            {SUGGESTIONS.map((text) => (
-              <Button
-                key={text}
-                type="link"
-                onClick={() => dispatch({ type: 'setGoalText', value: text })}
-                style={{
-                  display: 'block',
-                  height: 'auto',
-                  padding: 0,
-                  textAlign: 'left',
-                  whiteSpace: 'normal',
-                  lineHeight: 1.4,
-                }}
-              >
-                • {text}
-              </Button>
-            ))}
-          </Space>
+        <Card
+          title="Suggestions"
+          size="small"
+          extra={
+            <Button
+              type="text"
+              size="small"
+              aria-label={showSuggestions ? 'Collapse suggestions' : 'Expand suggestions'}
+              icon={showSuggestions ? <UpOutlined /> : <DownOutlined />}
+              onClick={() => setShowSuggestions((v) => !v)}
+            />
+          }
+        >
+          {showSuggestions && (
+            <Space orientation="vertical" size={8} style={{ width: '100%' }}>
+              {SUGGESTIONS.map((text) => (
+                <Button
+                  key={text}
+                  type="link"
+                  onClick={() => dispatch({ type: 'setGoalText', value: text })}
+                  style={{
+                    display: 'block',
+                    height: 'auto',
+                    padding: 0,
+                    textAlign: 'left',
+                    whiteSpace: 'normal',
+                    lineHeight: 1.4,
+                  }}
+                >
+                  • {text}
+                </Button>
+              ))}
+            </Space>
+          )}
         </Card>
 
-        <Card title="Metrics" size="small">
-          <Space orientation="vertical" size={12} style={{ width: '100%' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <Progress type="circle" percent={goalProgress} size={72} strokeColor="#0a66c2" />
-              <Typography.Text strong>Goal Progress</Typography.Text>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Typography.Text type="secondary">Connection Achievability</Typography.Text>
-              <Typography.Text strong>{achievability}%</Typography.Text>
-            </div>
-          </Space>
+        <Card
+          title="Metrics"
+          size="small"
+          extra={
+            <Button
+              type="text"
+              size="small"
+              aria-label={showMetrics ? 'Collapse metrics' : 'Expand metrics'}
+              icon={showMetrics ? <UpOutlined /> : <DownOutlined />}
+              onClick={() => setShowMetrics((v) => !v)}
+            />
+          }
+        >
+          {showMetrics && (
+            <Space orientation="vertical" size={12} style={{ width: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <Progress type="circle" percent={goalProgress} size={72} strokeColor="#0a66c2" />
+                <Typography.Text strong>Goal Progress</Typography.Text>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                <Typography.Text type="secondary">Connection Achievability Metric</Typography.Text>
+                <Typography.Text strong>{achievability}%</Typography.Text>
+              </div>
+            </Space>
+          )}
         </Card>
       </Space>
 
@@ -166,7 +198,9 @@ export default function WebBoard() {
               Your Network Web
             </Typography.Title>
             <Typography.Text type="secondary">
-              Interactively rerank your relationships. Expand your web, reinforce its roots.
+              Interactively reranking your relationships.
+              <br />
+              Expand your web, reinforce its roots.
             </Typography.Text>
           </div>
 

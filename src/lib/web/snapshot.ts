@@ -1,4 +1,5 @@
 import type {
+  ActivityStatus,
   AlignmentTier,
   DegreeLevel,
   GoalQuery,
@@ -25,6 +26,8 @@ export interface PersonInput {
   relevanceScore?: number
   /** Optional headline (role at company) shown under the node name. */
   headline?: string
+  /** Optional outreach-activity status driving the activity-ring colour. */
+  activityStatus?: ActivityStatus
   /** For 2nd-degree people: the 1st-degree connector (warm-path bridge) id. */
   via?: string
 }
@@ -60,6 +63,7 @@ function toNode(p: PersonInput): WebNode {
     relevanceScore,
     position: { x: 0, y: 0 },
     ...(p.headline ? { headline: p.headline } : {}),
+    ...(p.activityStatus ? { activityStatus: p.activityStatus } : {}),
   }
 }
 

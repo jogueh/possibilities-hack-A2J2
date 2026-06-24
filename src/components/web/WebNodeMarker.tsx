@@ -2,7 +2,7 @@
 
 import type { KeyboardEvent } from 'react'
 import type { WebNode } from '@/types/web'
-import { tierColor, tierRadius } from '@/lib/web/layout'
+import { tierColor, tierRadius, activityRingColor, activityRingLabel } from '@/lib/web/layout'
 
 /**
  * Per-node visual decorations injected by sibling workflows. Workflow 1 owns the
@@ -30,7 +30,12 @@ export default function WebNodeMarker({
   decoration,
 }: WebNodeMarkerProps) {
   const r = tierRadius(node.alignmentTier)
-  const ring = tierColor(node.alignmentTier)
+  // The avatar ring encodes outreach-activity status (blue/amber/red). Falls back
+  // to the alignment-tier colour for nodes that don't carry an activity status.
+  const ring = node.activityStatus
+    ? activityRingColor(node.activityStatus)
+    : tierColor(node.alignmentTier)
+  const activityTooltip = node.activityStatus ? activityRingLabel(node.activityStatus) : undefined
   const interactive = Boolean(onSelect)
   const hasJobOverlap = Boolean(decoration?.hasJobOverlap)
 
@@ -55,9 +60,15 @@ export default function WebNodeMarker({
       onClick={interactive ? () => onSelect?.(node.id) : undefined}
       onKeyDown={interactive ? handleKeyDown : undefined}
     >
-      {/* Selection halo */}
+      {/* Native hover tooltip describing the activity-ring nudge */}
+      {activityTooltip && <title>{activityTooltip}</title>}
+
+      {/* Selection halo — soft glow + ring */}
       {selected && (
-        <circle r={r + 5} fill="none" stroke={ring} strokeWidth={2} opacity={0.35} />
+        <>
+          <circle r={r + 11} fill={ring} opacity={0.12} />
+          <circle r={r + 6} fill="none" stroke={ring} strokeWidth={2.5} opacity={0.55} />
+        </>
       )}
 
       {/* Avatar disc + alignment ring */}

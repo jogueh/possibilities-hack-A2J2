@@ -1,4 +1,4 @@
-import type { AlignmentTier, WebEdge, WebNode } from '@/types/web'
+import type { ActivityStatus, AlignmentTier, WebEdge, WebNode } from '@/types/web'
 
 // Pure, deterministic geometry + styling helpers for the Graph Canvas.
 // No React / DOM imports here so this module is trivially unit-testable.
@@ -39,6 +39,31 @@ export function tierColor(tier: AlignmentTier): string {
 
 export function tierRadius(tier: AlignmentTier): number {
   return TIER_RADIUS[tier]
+}
+
+/**
+ * Activity-status → ring colour. This is the "activity ring" shown around node
+ * avatars: blue = active, amber = moderate, red = inactive.
+ */
+export const ACTIVITY_RING_COLORS: Record<ActivityStatus, string> = {
+  active: '#3B82F6',
+  moderate: '#F59E0B',
+  inactive: '#EF4444',
+}
+
+/** Activity-status → hover tooltip copy (the outreach nudge). */
+export const ACTIVITY_RING_LABELS: Record<ActivityStatus, string> = {
+  active: 'Great time to reach out',
+  moderate: 'Worth a nudge',
+  inactive: 'Lead with shared context',
+}
+
+export function activityRingColor(status: ActivityStatus): string {
+  return ACTIVITY_RING_COLORS[status]
+}
+
+export function activityRingLabel(status: ActivityStatus): string {
+  return ACTIVITY_RING_LABELS[status]
 }
 
 const round2 = (n: number): number => Math.round(n * 100) / 100
