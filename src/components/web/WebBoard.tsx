@@ -135,9 +135,9 @@ export default function WebBoard() {
               type="text"
               size="small"
               aria-label={showSuggestions ? 'Collapse suggestions' : 'Expand suggestions'}
+              aria-expanded={showSuggestions}
               icon={showSuggestions ? <UpOutlined /> : <DownOutlined />}
               onClick={() => setShowSuggestions((v) => !v)}
-            />
           }
         >
           {showSuggestions && (
