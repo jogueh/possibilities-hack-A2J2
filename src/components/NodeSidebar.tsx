@@ -2,7 +2,7 @@
 // W3-OWNED. Node profile sidebar: shell + header + experience + commonalities + AI tip.
 // 2nd-degree preview (Step 5) and Actions bar (Step 6) slot in below. See plan.md
 import { useEffect, useRef, useState } from "react";
-import type { WebNode } from "@/mocks/web";
+import type { WebNode } from "@/types/web";
 import type { SharedContext } from "@/types/sharedContext";
 import type { UserWithJobs } from "@/types/data";
 import { useWebStore } from "@/mocks/useWebStore";

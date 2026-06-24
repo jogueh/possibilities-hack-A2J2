@@ -7,7 +7,7 @@ import {
   useWebStore,
 } from "@/mocks/useWebStore";
 import { renderHook } from "@testing-library/react";
-import type { WebEdge, WebNode } from "@/mocks/web";
+import type { WebEdge, WebNode } from "@/types/web";
 
 function n(id: string, degree: 1 | 2, label: string): WebNode {
   return {

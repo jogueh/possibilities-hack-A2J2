@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { NodeSidebar } from "@/components/NodeSidebar";
 import { __setMockWebState } from "@/mocks/useWebStore";
 import { MOCK_USERS } from "@/mocks/userApi";
-import type { WebNode, WebEdge } from "@/mocks/web";
+import type { WebNode, WebEdge } from "@/types/web";
 
 const aliceNode: WebNode = {
   id: "n_alice",

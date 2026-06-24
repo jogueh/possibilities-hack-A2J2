@@ -4,7 +4,7 @@ import { renderHook, act } from "@testing-library/react";
 import { ALIGNMENT_COLORS, alignmentColor } from "@/mocks/alignmentColors";
 import { fetchUserWithJobs, MOCK_USERS } from "@/mocks/userApi";
 import { useWebStore, __resetMockWebState } from "@/mocks/useWebStore";
-import type { WebNode } from "@/mocks/web";
+import type { WebNode } from "@/types/web";
 
 const node2: WebNode = {
   id: "n2",

@@ -8,7 +8,7 @@ import { JobsPanel, JOBS_PANEL_WIDTH } from "@/components/JobsPanel";
 import { JobsPanelToggle } from "@/components/JobsPanelToggle";
 import { __setMockWebState } from "@/mocks/useWebStore";
 import { MOCK_USERS } from "@/mocks/userApi";
-import type { WebNode } from "@/mocks/web";
+import type { WebNode } from "@/types/web";
 
 // Bob (user_4579) worked at Google + Innovatech; Alice (user_1001) worked at Google.
 // A software-engineering goal surfaces Google SWE roles → web overlap on both.

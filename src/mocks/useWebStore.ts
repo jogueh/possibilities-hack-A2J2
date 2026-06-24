@@ -3,7 +3,7 @@
 // real W1 store is a pure import change. Only exposes the slice W3 reads/calls.
 import { useSyncExternalStore } from "react";
 import { useRef } from "react";
-import type { GoalQuery, WebEdge, WebNode } from "@/mocks/web";
+import type { GoalQuery, WebEdge, WebNode } from "@/types/web";
 import type { UserWithJobs } from "@/types/data";
 
 export interface WebStoreState {
