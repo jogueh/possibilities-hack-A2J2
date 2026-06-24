@@ -5,11 +5,11 @@ import {
   roleAtCompany,
   overlappingUserIds,
 } from "@/lib/webOverlap";
-import { jobInnovatech, jobAcmeSwe, userBob } from "@/test/fixtures";
+import { jobInnovatech, jobAcmeSwe, userBobWithJobs } from "@/test/fixtures";
 
-// userBob's job_history includes job_550126 (Innovatech / Marketing Specialist).
-const bobWithJobs: UserWithJobs = { ...userBob, job_history: [jobInnovatech] };
-const bobNoJobs: UserWithJobs = { ...userBob, job_history: [] };
+// userBobWithJobs.job_history includes job_550126 (Innovatech / Marketing Specialist).
+const bobWithJobs: UserWithJobs = userBobWithJobs;
+const bobNoJobs: UserWithJobs = { ...userBobWithJobs, job_history: [] };
 
 describe("roleAtCompany", () => {
   it("returns the role when the user worked at the company (case-insensitive)", () => {
