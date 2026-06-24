@@ -197,7 +197,12 @@ export default function WebCanvas({
                 : style.gradient
                   ? `url(#edge-grad-${edge.id})`
                   : style.color
-              const pulse = style.pulse && !edge.isDotted
+const pulse =
+                style.pulse &&
+                !edge.isDotted &&
+                !(
+                  window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false
+                )
               return (
                 <motion.line
                   key={edge.id}
