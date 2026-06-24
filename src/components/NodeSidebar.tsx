@@ -6,6 +6,7 @@ import type { WebNode } from "@/types/web";
 import type { SharedContext } from "@/types/sharedContext";
 import type { UserWithJobs } from "@/types/data";
 import { useWebStore } from "@/store/useWebStore";
+import { fetchUserWithJobs } from "@/lib/userApi";
 import { ALIGNMENT_LABELS, alignmentColor } from "@/lib/alignmentColors";
 import { parseGoalFallback } from "@/lib/goalParser";
 import { filterRelevantJobs } from "@/lib/relevance";
@@ -14,19 +15,6 @@ import { LI, SIDEBAR_WIDTH } from "@/lib/linkedinTokens";
 import { CareerTimelineSlot } from "@/components/CareerTimelineSlot";
 import { SecondDegreePreview } from "@/components/SecondDegreePreview";
 import { ActionsBar } from "@/components/ActionsBar";
-
-/**
- * Resolves a userId → UserWithJobs via the real W2 endpoint
- * `GET /api/user/[userId]`. Returns null for 404 (so callers can render an
- * error state) and throws for any other transport failure (so the caller's
- * `.catch` arm can set the error state).
- */
-async function fetchUserWithJobs(userId: string): Promise<UserWithJobs | null> {
-  const res = await fetch(`/api/user/${encodeURIComponent(userId)}`);
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`Failed to load user ${userId}: ${res.status}`);
-  return (await res.json()) as UserWithJobs;
-}
 
 interface NodeSidebarProps {
   node: WebNode | null;
@@ -40,7 +28,7 @@ const tipCache = new Map<string, string>();
 export function __resetNodeSidebarTipCache() {
   tipCache.clear();
 }
-function viewerSummary(viewer: UserWithJobs | null): string {
+function viewerSummary(viewer: Pick<UserWithJobs, "job_history" | "skills"> | null): string {
   if (!viewer) return "";
   const role = viewer.job_history[0];
   const skills = viewer.skills.slice(0, 3).filter(Boolean).join(", ");

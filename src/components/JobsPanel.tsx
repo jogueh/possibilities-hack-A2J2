@@ -14,6 +14,7 @@ import { useWebStore } from "@/store/useWebStore";
 import { parseGoalFallback } from "@/lib/goalParser";
 import { fetchJobMatches } from "@/lib/jobMatchesClient";
 import { deriveAlignmentTier } from "@/lib/scoring";
+import { RECENTLY_IN_FIELD_YEARS } from "@/lib/webOverlap";
 import { LI } from "@/lib/linkedinTokens";
 
 export const JOBS_PANEL_WIDTH = 360;
@@ -242,6 +243,7 @@ interface JobCardProps {
 function JobCard({ match, expanded, onToggle, onOpenConnection }: JobCardProps) {
   const { job, relevanceScore, webConnections } = match;
   const tier = deriveAlignmentTier(relevanceScore);
+  const hasRecentInsider = webConnections.some((c) => c.recentlyInField);
 
   return (
     <article
@@ -307,6 +309,22 @@ function JobCard({ match, expanded, onToggle, onOpenConnection }: JobCardProps) 
               }}
             >
               Easy Apply
+            </span>
+          )}
+          {hasRecentInsider && (
+            <span
+              data-testid="recently-in-field-badge"
+              title={`A connection here graduated within the last ${RECENTLY_IN_FIELD_YEARS} years — fresh, relevant context`}
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: LI.green,
+                border: `1px solid ${LI.green}`,
+                borderRadius: 12,
+                padding: "2px 8px",
+              }}
+            >
+              Recently in your field
             </span>
           )}
         </div>
