@@ -7,9 +7,14 @@ import type { ParsedGoal } from "@/types/goal";
 import type { JobMatch } from "@/types/job";
 import { buildJobMatches } from "@/lib/jobMatches";
 import { MOCK_USERS } from "@/mocks/userApi";
-import jobsData from "@/data/jobs_data.json";
+let jobsCache: Job[] | null = null;
 
-const JOBS = jobsData as Job[];
+async function getJobs(): Promise<Job[]> {
+  if (jobsCache) return jobsCache;
+  const { default: jobsData } = await import("@/data/jobs_data.json");
+  jobsCache = jobsData as Job[];
+  return jobsCache;
+}
 
 /**
  * Resolve the web's node user ids to full `UserWithJobs` records and rank the
@@ -22,5 +27,6 @@ export async function fetchJobMatches(
   const webUsers: UserWithJobs[] = webUserIds
     .map((id) => MOCK_USERS[id] as UserWithJobs | undefined)
     .filter((u): u is UserWithJobs => Boolean(u));
-  return buildJobMatches(JOBS, webUsers, goal);
+  const jobs = await getJobs();
+  return buildJobMatches(jobs, webUsers, goal);
 }
