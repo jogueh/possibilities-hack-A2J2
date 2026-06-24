@@ -66,15 +66,19 @@ const clampStrength = (strength: number): number =>
  * so out-of-range values fall into the nearest tier (NaN is treated as the
  * weakest tier).
  */
-export function edgeStrengthTier(strength: number): EdgeStrengthTier {
-  const s = clampStrength(Number.isNaN(strength) ? EDGE_STRENGTH_MIN : strength);
+export function edgeStrengthTier(strength0to100: number): EdgeStrengthTier {
+  const s = clampStrength(
+    Number.isNaN(strength0to100) ? EDGE_STRENGTH_MIN : strength0to100,
+  );
   if (s <= EDGE_TIER_THRESHOLDS.faint) return "faint";
   if (s <= EDGE_TIER_THRESHOLDS.steady) return "steady";
   if (s <= EDGE_TIER_THRESHOLDS.strong) return "strong";
   return "vibrant";
 }
 
-export function edgeStrengthStyle(strength: number): EdgeStrengthStyle {
-  const style = STYLES[edgeStrengthTier(strength)];
-  return style.gradient ? { ...style, gradient: { ...style.gradient } } : { ...style };
+export function edgeStrengthStyle(strength0to100: number): EdgeStrengthStyle {
+  const style = STYLES[edgeStrengthTier(strength0to100)];
+  return style.gradient
+    ? { ...style, gradient: { ...style.gradient } }
+    : { ...style };
 }
