@@ -4,7 +4,7 @@
 // end-to-end via `npm run dev` → http://localhost:3000/w3-demo. See docs/workflow-3.
 import { useEffect, useState } from "react";
 import { NodeSidebar } from "@/components/NodeSidebar";
-import { __setMockWebState } from "@/mocks/useWebStore";
+import { __setMockWebState } from "@/store/useWebStore";
 import { MOCK_USERS } from "@/mocks/userApi";
 import type { WebNode, WebEdge } from "@/types/web";
 

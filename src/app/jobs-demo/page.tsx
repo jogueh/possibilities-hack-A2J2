@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { JobsPanel, JOBS_PANEL_WIDTH } from "@/components/JobsPanel";
 import { JobsPanelToggle } from "@/components/JobsPanelToggle";
-import { __setMockWebState } from "@/mocks/useWebStore";
+import { __setMockWebState } from "@/store/useWebStore";
 import { MOCK_USERS } from "@/mocks/userApi";
 import type { WebNode } from "@/types/web";
 

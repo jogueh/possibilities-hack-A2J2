@@ -3,7 +3,7 @@
 // connected to the open 1st-degree node and lets the viewer add them to the web. See plan.md
 import { useState } from "react";
 import type { WebNode } from "@/types/web";
-import { useWebStore } from "@/mocks/useWebStore";
+import { useWebStore } from "@/store/useWebStore";
 import { ALIGNMENT_LABELS, alignmentColor } from "@/mocks/alignmentColors";
 import { LI } from "@/lib/linkedinTokens";
 

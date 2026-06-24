@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/react";
 import { JobsPanel } from "@/components/JobsPanel";
-import { __setMockWebState, __resetMockWebState } from "@/mocks/useWebStore";
+import { __setMockWebState, __resetMockWebState } from "@/store/useWebStore";
 import type { WebNode } from "@/types/web";
 import type { Job } from "@/types/data";
 import type { JobMatch } from "@/types/job";

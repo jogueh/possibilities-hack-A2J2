@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import type { JobMatch } from "@/types/job";
 import type { AlignmentTier } from "@/types/web";
-import { useWebStore } from "@/mocks/useWebStore";
+import { useWebStore } from "@/store/useWebStore";
 import { parseGoalRaw } from "@/mocks/goalParser";
 import { fetchJobMatches } from "@/mocks/jobsApi";
 import { deriveAlignmentTier } from "@/lib/scoring";

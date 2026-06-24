@@ -5,7 +5,7 @@ import {
   __setMockWebState,
   __resetMockWebState,
   useWebStore,
-} from "@/mocks/useWebStore";
+} from "@/store/useWebStore";
 import { renderHook } from "@testing-library/react";
 import type { WebEdge, WebNode } from "@/types/web";
 
@@ -71,15 +71,17 @@ describe("SecondDegreePreview", () => {
     expect(screen.getAllByRole("button", { name: /Add .* to web/ })).toHaveLength(3);
   });
 
-  it("adds a solid edge to the mock store when added", () => {
+  it("appends a bridge edge to the store when added", () => {
     __setMockWebState({ nodes: [parent, child], edges: [edge] });
     const { result } = renderHook(() => useWebStore((s) => s.edges));
     render(<SecondDegreePreview parentNode={parent} parentName="Alice" />);
     fireEvent.click(screen.getByRole("button", { name: "Add Carol to web" }));
 
+    // Real W1 store: addSecondDegreeNode wires a dotted bridge edge with the
+    // repo-wide `${source}__${target}` id convention.
     expect(
       result.current.some(
-        (e) => e.source === "n1" && e.target === "n2" && e.isDotted === false,
+        (e) => e.id === "n1__n2" && e.source === "n1" && e.target === "n2",
       ),
     ).toBe(true);
   });
