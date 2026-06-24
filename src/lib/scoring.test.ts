@@ -53,6 +53,9 @@ describe("signal primitives", () => {
     expect(matchesLocation("San Francisco, CA", goal)).toBe(true);
     expect(matchesLocation("San Francisco", goal)).toBe(true);
     expect(matchesLocation("Los Angeles, CA", goal)).toBe(false);
+    // A different city sharing a token ("san") must NOT match — all city
+    // tokens are required, and "San Jose" is missing "francisco".
+    expect(matchesLocation("San Jose, CA", goal)).toBe(false);
   });
 
   it("matchesLocation allows state overlap for state-only goals", () => {
