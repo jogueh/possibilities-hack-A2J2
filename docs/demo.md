@@ -6,6 +6,24 @@ A presentation-facing walkthrough of the flagship **"Map My Web"** flow (`/web`)
 this as the script and the slide diagram. For the engineering-level data contract, see
 [`user-flows.md`](./user-flows.md).
 
+---
+
+## ⏱️ 90-Second Cut (the demo-video script)
+
+Hit only these beats — total **≤ 1:30**. Skip the Premium gate and re-prompt loop.
+
+| Time | Beat | What you do / say |
+|------|------|-------------------|
+| **0:00–0:10** | **State A — blank web** | "Your network, organized around a goal." Open `/web`. Motto: _"Expand your web, reinforce its roots."_ |
+| **0:10–0:20** | **Map it** | Click the suggestion `Grow my software engineering network in San Francisco.` → press Enter → web draws. |
+| **0:20–0:35** | **State B — the match** | "One on-target path, not 500 noisy connections." Point at **Kimberly Nguyen — Software Engineer · San Francisco** (top tier). |
+| **0:35–0:55** | **The AI copilot beat** | Click her node → sidebar shows goal-relevant profile + **shared context** + a **drafted warm intro**. "It tells me exactly how to reach out." |
+| **0:55–1:15** | **State C — warm paths** | Click **Connect** → 2nd-degree offshoots unlock (e.g. Margaret Clark, SF). "Now I can see who introduces me next." |
+| **1:15–1:30** | **Depth + close** | Hit **🔗 Linked up** → the edge thickens. Close on the motto: _"Keep weaving. Keep connecting."_ |
+
+> **Tightest 60s:** drop the State-C "Linked up" beat (1:15–1:30) and end right after the
+> warm-path unlock. The must-keep moment is **0:35–0:55** (the AI warm intro).
+
 > **Data note (important):** the running app resolves jobs from the **remote** dataset
 > (`https://pit.najera.cc/jobs_data.json`, see `src/lib/data.ts`), not the committed
 > `src/data/jobs_data.json`. Every name/role below was verified against what the **live
