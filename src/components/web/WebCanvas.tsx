@@ -6,7 +6,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import type { WebSnapshot } from '@/types/web'
 import { edgeStrokeDasharray } from '@/lib/web/layout'
 import { edgeStrengthStyleUnit } from '@/lib/edgeStrength'
@@ -59,6 +59,7 @@ export default function WebCanvas({
   const [view, setView] = useState<ViewTransform>({ tx: 0, ty: 0, k: 1 })
   const [panning, setPanning] = useState(false)
   const drag = useRef<{ x: number; y: number } | null>(null)
+  const reduceMotion = useReducedMotion()
 
   // Resolve any edge endpoint (a node id, or the self/goal id) to a point.
   const positionById = new Map<string, { x: number; y: number }>(
@@ -197,12 +198,7 @@ export default function WebCanvas({
                 : style.gradient
                   ? `url(#edge-grad-${edge.id})`
                   : style.color
-const pulse =
-                style.pulse &&
-                !edge.isDotted &&
-                !(
-                  window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false
-                )
+              const pulse = style.pulse && !edge.isDotted && !reduceMotion
               return (
                 <motion.line
                   key={edge.id}
