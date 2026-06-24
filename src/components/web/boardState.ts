@@ -284,9 +284,9 @@ export function boardReducer(
         // real connections the viewer is already part of, so revealing the
         // suggestions reachable through them is always allowed. Rebuilding
         // from the seeded snapshot first collapses any other connector that
-        // was previously expanded — but pinned warm paths (see `applyPins`
-        // below) are then re-materialized so any explicitly retained
-        // person survives the rebuild.
+        // was previously expanded — but pinned and connected warm paths are
+        // then re-materialized so explicitly retained people survive the
+        // rebuild.
         const seeded = buildSnapshot(
           state.snapshot.goal,
           people,
@@ -306,7 +306,13 @@ export function boardReducer(
       // For unconnected 2nd+ nodes, fall through with `snapshot = state.snapshot`
       // — selection still updates so the sidebar opens with the "Connect" CTA,
       // but the canvas does not reveal further suggestions until they accept.
-      snapshot = applyPins(snapshot, state.pinnedIds, people, config.options)
+      const retainedIds = [...new Set([...state.pinnedIds, ...state.connectedIds])]
+      snapshot = applyPins(
+        snapshot,
+        retainedIds,
+        people,
+        config.options,
+      )
       return {
         ...state,
         snapshot: applyMeetups(

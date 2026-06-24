@@ -148,6 +148,22 @@ describe('boardReducer', () => {
     expect(s.snapshot.edges.find((e) => e.id === 'a__c')?.isDotted).toBe(false)
   })
 
+  it('keeps a connected 2nd-degree person on the canvas across branch switches', () => {
+    let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
+    s = reduce(s, { type: 'submitGoal' })
+    s = reduce(s, { type: 'selectNode', id: 'a' })
+    s = reduce(s, { type: 'connectNode', id: 'c' })
+
+    s = reduce(s, { type: 'selectNode', id: 'b' })
+
+    expect(s.snapshot.nodes.some((n) => n.id === 'e')).toBe(true)
+    expect(s.snapshot.nodes.some((n) => n.id === 'c')).toBe(true)
+    const bridge = s.snapshot.edges.find((e) => e.id === 'a__c')
+    expect(bridge).toBeDefined()
+    expect(bridge?.isDotted).toBe(false)
+    expect(bridge?.strength).toBeGreaterThanOrEqual(0.9)
+  })
+
   it('connectNode is idempotent and resets on a new goal', () => {
     let s = reduce(createInitialBoardState(), { type: 'setGoalText', value: 'Become a PM' })
     s = reduce(s, { type: 'submitGoal' })
