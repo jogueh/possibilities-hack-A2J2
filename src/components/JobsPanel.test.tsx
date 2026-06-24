@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/react";
 import { JobsPanel } from "@/components/JobsPanel";
-import { __setMockWebState, __resetMockWebState } from "@/mocks/useWebStore";
-import type { WebNode } from "@/mocks/web";
+import { __setMockWebState, __resetMockWebState } from "@/store/useWebStore";
+import type { WebNode } from "@/types/web";
 import type { Job } from "@/types/data";
 import type { JobMatch } from "@/types/job";
 
@@ -10,7 +10,7 @@ import type { JobMatch } from "@/types/job";
 // panel deterministically (no dependency on the 1000-row jobs dataset).
 const state = vi.hoisted(() => ({ matches: [] as JobMatch[] }));
 
-vi.mock("@/mocks/jobsApi", () => ({
+vi.mock("@/lib/jobMatchesClient", () => ({
   fetchJobMatches: vi.fn(async () => state.matches),
 }));
 
@@ -116,6 +116,29 @@ describe("JobsPanel", () => {
     expect(openSpy).toHaveBeenCalledWith("user_4579");
   });
 
+  it("shows the 'Recently in your field' badge only when a connection is recently in field", async () => {
+    state.matches = [
+      {
+        job: job({ id: "fresh" }),
+        relevanceScore: 90,
+        webConnections: [
+          { userId: "u1", name: "Fresh Grad", role: "Engineer", recentlyInField: true },
+        ],
+      },
+      {
+        job: job({ id: "stale" }),
+        relevanceScore: 80,
+        webConnections: [
+          { userId: "u2", name: "Veteran", role: "Engineer", recentlyInField: false },
+        ],
+      },
+    ];
+    render(<JobsPanel open onClose={() => {}} />);
+    await screen.findAllByTestId("job-card");
+    expect(screen.getAllByTestId("recently-in-field-badge")).toHaveLength(1);
+    expect(screen.getByText("Recently in your field")).toBeTruthy();
+  });
+
   it("never renders salary data", async () => {
     state.matches = [
       { job: job({ id: "j1", salary_range: { from: "999111", to: "999222" } }), relevanceScore: 80, webConnections: [] },
@@ -126,7 +149,7 @@ describe("JobsPanel", () => {
   });
 
   it("shows an error state (not the empty state) when the fetch rejects", async () => {
-    const { fetchJobMatches } = await import("@/mocks/jobsApi");
+    const { fetchJobMatches } = await import("@/lib/jobMatchesClient");
     vi.mocked(fetchJobMatches).mockRejectedValueOnce(new Error("network down"));
     render(<JobsPanel open onClose={() => {}} />);
     const err = await screen.findByTestId("jobs-error-state");
@@ -135,7 +158,7 @@ describe("JobsPanel", () => {
   });
 
   it("retries the fetch when the retry button is clicked", async () => {
-    const { fetchJobMatches } = await import("@/mocks/jobsApi");
+    const { fetchJobMatches } = await import("@/lib/jobMatchesClient");
     vi.mocked(fetchJobMatches).mockRejectedValueOnce(new Error("network down"));
     state.matches = [
       { job: job({ id: "j1", position: "Backend Engineer" }), relevanceScore: 85, webConnections: [] },

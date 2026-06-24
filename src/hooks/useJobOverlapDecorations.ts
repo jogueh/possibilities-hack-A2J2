@@ -10,16 +10,17 @@
 // back to their `WebNode.id`. All decision logic lives in the pure, unit-tested
 // `overlappingNodeIds` helper (@/lib/webOverlap); this hook is just the glue.
 //
-// DATA SOURCE: currently the W4 mock `@/mocks/jobsApi` (mirrors the future
-// `GET /api/jobs/matches`). Swap that single import for the real route at
-// integration — the rest of the hook is unaffected.
+// DATA SOURCE: `@/lib/jobMatchesClient` calls the real `POST /api/jobs/matches`
+// route; the server parses the goal (LLM-aware via OpenRouter) and runs
+// `buildJobMatches` over the shared `fetchJobs` cache from `@/lib/data`. This
+// hook only needs the raw goal string + the web's userIds.
 // =============================================================================
 
 import { useEffect, useMemo, useState } from "react";
 import type { JobMatch } from "@/types/job";
 import type { NodeDecoration } from "@/components/web/WebCanvas";
 import { useWebStore } from "@/store/useWebStore";
-import { fetchJobMatches } from "@/mocks/jobsApi";
+import { fetchJobMatches } from "@/lib/jobMatchesClient";
 import { overlappingNodeIds } from "@/lib/webOverlap";
 
 /**
@@ -29,20 +30,13 @@ import { overlappingNodeIds } from "@/lib/webOverlap";
  */
 export function useJobOverlapDecorations(): Record<string, NodeDecoration> {
   const goal = useWebStore((s) => s.goal);
-  const parsedGoal = useWebStore((s) => s.parsedGoal);
   const nodes = useWebStore((s) => s.nodes);
 
   const webUserIds = nodes.map((n) => n.userId);
   // Stable key so we only refetch when the goal or the web's membership changes.
-  const parsedGoalKey = parsedGoal
-    ? [parsedGoal.intent, parsedGoal.targetRole, parsedGoal.targetIndustry, parsedGoal.targetLocation]
-        .filter(Boolean)
-        .join("|")
+  const requestKey = goal
+    ? `${goal.raw}::${[...webUserIds].sort().join(",")}`
     : null;
-  const requestKey =
-    goal && parsedGoalKey
-      ? `${goal.raw}::${parsedGoalKey}::${[...webUserIds].sort().join(",")}`
-      : null;
 
   // React 19: never call setState synchronously in an effect — only from the
   // async callback. The key guards against stale responses overwriting newer
@@ -53,9 +47,9 @@ export function useJobOverlapDecorations(): Record<string, NodeDecoration> {
   } | null>(null);
 
   useEffect(() => {
-    if (!goal || !parsedGoal || !requestKey) return;
+    if (!goal || !requestKey) return;
     let cancelled = false;
-    fetchJobMatches(parsedGoal, webUserIds)
+    fetchJobMatches(goal.raw, webUserIds)
       .then((matches) => {
         if (!cancelled) setResult({ key: requestKey, matches });
       })

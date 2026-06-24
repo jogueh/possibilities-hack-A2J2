@@ -32,7 +32,11 @@ describe("buildJobMatches", () => {
     const acmeJob = sweJob("job_acme_2", { company: "Innovatech" });
     const [match] = buildJobMatches([acmeJob], [bobAtInnovatech], goalSwe);
     expect(match.webConnections).toEqual([
-      { userId: "user_4579", name: "Bob Smith", role: "Marketing Specialist" },
+      expect.objectContaining({
+        userId: "user_4579",
+        name: "Bob Smith",
+        role: "Marketing Specialist",
+      }),
     ]);
   });
 

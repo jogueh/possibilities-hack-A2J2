@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useReducer } from 'react'
+import { useEffect, useMemo, useReducer } from 'react'
 import {
   Button,
   Card,
@@ -9,31 +9,22 @@ import {
   Progress,
   Select,
   Space,
-  Tag,
   Typography,
 } from 'antd'
-import { AnimatePresence, motion } from 'framer-motion'
 import { AimOutlined, ReloadOutlined } from '@ant-design/icons'
-import type { AlignmentTier } from '@/types/web'
 import WebCanvas from './WebCanvas'
 import {
   boardReducer,
   createInitialBoardState,
   type BoardConfig,
 } from './boardState'
-import { TIER_COLORS } from '@/lib/web/layout'
 import { SELF_USER_ID, webPeople } from '@/data/web_people'
+import { NodeSidebar } from '@/components/NodeSidebar'
+import { __setMockWebState } from '@/store/useWebStore'
+import { fetchUserWithJobs } from '@/lib/userApi'
 
-const CANVAS_WIDTH = 760
-const CANVAS_HEIGHT = 560
-
-// Tag text per tier. The Tag colour reuses TIER_COLORS (the same palette the
-// node rings use) so the tier's colour semantic stays consistent across the UI.
-const TIER_LABEL: Record<AlignmentTier, string> = {
-  strong: 'Strong fit',
-  moderate: 'Moderate fit',
-  weak: 'Weak fit',
-}
+const CANVAS_WIDTH = 820
+const CANVAS_HEIGHT = 620
 
 // Static goal suggestions — clicking one pre-fills the goal box (no API call).
 const SUGGESTIONS = [
@@ -71,6 +62,25 @@ export default function WebBoard() {
   const { snapshot, selectedId, goalText } = state
   const selected = snapshot.nodes.find((n) => n.id === selectedId) ?? null
   const isEmpty = snapshot.state === 'empty'
+
+  // Bridge the reducer-driven board to the store NodeSidebar reads: when a goal
+  // is mapped, seed the goal and fetch the viewer's own profile (used for the
+  // "what you have in common" + AI talking-point sections). Cleared on reset.
+  const goal = snapshot.goal
+  useEffect(() => {
+    if (!goal) {
+      __setMockWebState({ goal: null, viewerProfile: null })
+      return
+    }
+    __setMockWebState({ goal: { raw: goal.raw, userId: goal.userId } })
+    let cancelled = false
+    fetchUserWithJobs(goal.userId).then((viewer) => {
+      if (!cancelled) __setMockWebState({ viewerProfile: viewer })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [goal])
 
   // Presentational "metrics" derived from the seeded web. Real scoring is
   // owned by Workflow 2; these are deterministic placeholders for the demo.
@@ -196,42 +206,10 @@ export default function WebBoard() {
               )}
             </div>
 
-            <AnimatePresence mode="wait">
-              {selected && (
-                <motion.div
-                  key={selected.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                  style={{ width: 240, flexShrink: 0 }}
-                >
-                  <Card size="small" style={{ width: '100%' }} title={selected.label}>
-                    <Space orientation="vertical" size="small" style={{ width: '100%' }}>
-                      {selected.headline && (
-                        <Typography.Text type="secondary">{selected.headline}</Typography.Text>
-                      )}
-                      <Tag color={TIER_COLORS[selected.alignmentTier]}>
-                        {TIER_LABEL[selected.alignmentTier]}
-                      </Tag>
-                      <Typography.Text type="secondary">
-                        {selected.degree === 1 ? '1st-degree connection' : '2nd-degree (warm path)'}
-                      </Typography.Text>
-                      {selected.degree === 1 ? (
-                        <Typography.Text type="secondary">
-                          Click to reveal who they can introduce you to.
-                        </Typography.Text>
-                      ) : (
-                        // Placeholder hook for Workflow 4 (AI double-opt-in intro).
-                        <Button type="primary" block disabled>
-                          Draft warm intro
-                        </Button>
-                      )}
-                    </Space>
-                  </Card>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <NodeSidebar
+              node={selected}
+              onClose={() => dispatch({ type: 'clearSelection' })}
+            />
           </div>
 
           {/* Dynamic filters (presentational; filtering owned by W2/W4). */}

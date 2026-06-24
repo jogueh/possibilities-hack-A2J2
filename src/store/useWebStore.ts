@@ -133,3 +133,31 @@ export const useWebStore = create<WebStoreState>()((set) => ({
 
   setViewerProfile: (viewerProfile) => set({ viewerProfile }),
 }))
+
+// Capture the store's initial state (snapshot fields + all actions) so the
+// test-only `__resetMockWebState` helper can put the store back to first-mount
+// behaviour even when a previous test has replaced an action with a spy.
+const initialState = useWebStore.getState()
+
+// ── Test/dev helpers (NOT part of the planned W1 store API) ──────────────────
+// Preserved from the W3 mock store at @/mocks/useWebStore so the migration is
+// a one-line import swap for the components and demo pages that already use
+// these names. Production code should never call these directly.
+
+/**
+ * TEST-ONLY: partial overwrite of store state, including action fields.
+ * Used by component tests (NodeSidebar, JobsPanel, SecondDegreePreview) to
+ * stub `addSecondDegreeNode` with a spy and to preload nodes/edges/goal.
+ */
+export function __setMockWebState(partial: Partial<WebStoreState>): void {
+  useWebStore.setState(partial)
+}
+
+/**
+ * TEST-ONLY: reset the store to its initial state, including restoring any
+ * actions that were replaced by `__setMockWebState`. Required so spy stubs
+ * installed by one test don't leak into the next.
+ */
+export function __resetMockWebState(): void {
+  useWebStore.setState(initialState, true)
+}

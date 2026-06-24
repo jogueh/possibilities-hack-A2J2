@@ -26,6 +26,11 @@ export interface PersonInput {
   relevanceScore?: number
   /** Optional headline (role at company) shown under the node name. */
   headline?: string
+  /**
+   * Real member id in `user_data.json`, used by the node sidebar to fetch the
+   * full profile. Defaults to `id` (the graph/layout id) when omitted.
+   */
+  userId?: string
   /** For 2nd-degree people: the 1st-degree connector (warm-path bridge) id. */
   via?: string
 }
@@ -52,7 +57,7 @@ function toNode(p: PersonInput): WebNode {
   const relevanceScore = p.relevanceScore ?? DEFAULT_RELEVANCE
   return {
     id: p.id,
-    userId: p.id,
+    userId: p.userId ?? p.id,
     label: p.name,
     degree: p.degree,
     avatarInitials: initialsFromName(p.name),

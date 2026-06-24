@@ -2,12 +2,12 @@
 // W3-OWNED. Node profile sidebar: shell + header + experience + commonalities + AI tip.
 // 2nd-degree preview (Step 5) and Actions bar (Step 6) slot in below. See plan.md
 import { useEffect, useRef, useState } from "react";
-import type { WebNode } from "@/mocks/web";
+import type { WebNode } from "@/types/web";
 import type { SharedContext } from "@/types/sharedContext";
-import type { UserWithJobs } from "@/mocks/data";
-import { useWebStore } from "@/mocks/useWebStore";
-import { fetchUserWithJobs } from "@/mocks/userApi";
-import { ALIGNMENT_LABELS, alignmentColor } from "@/mocks/alignmentColors";
+import type { UserWithJobs } from "@/types/data";
+import { useWebStore } from "@/store/useWebStore";
+import { fetchUserWithJobs } from "@/lib/userApi";
+import { ALIGNMENT_LABELS, alignmentColor } from "@/lib/alignmentColors";
 import { filterRelevantJobs } from "@/lib/relevance";
 import { getSharedContext } from "@/lib/sharedContext";
 import { LI, SIDEBAR_WIDTH } from "@/lib/linkedinTokens";
@@ -27,7 +27,7 @@ const tipCache = new Map<string, string>();
 export function __resetNodeSidebarTipCache() {
   tipCache.clear();
 }
-function viewerSummary(viewer: UserWithJobs | null): string {
+function viewerSummary(viewer: Pick<UserWithJobs, "job_history" | "skills"> | null): string {
   if (!viewer) return "";
   const role = viewer.job_history[0];
   const skills = viewer.skills.slice(0, 3).filter(Boolean).join(", ");

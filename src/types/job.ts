@@ -8,6 +8,7 @@ export interface WebConnectionRef {
   name: string;
   role: string; // their role at this company
   overlapYears?: string; // approximate, e.g. "~2021–2023" (no exact dates in dataset)
+  recentlyInField?: boolean; // most recent graduation ≤3 years ago → fresh context
 }
 
 // A single scored job posting cross-referenced against the user's web.
@@ -18,7 +19,7 @@ export interface JobMatch {
   webConnections: WebConnectionRef[];
 }
 
-// Response shape for GET /api/jobs/matches
+// Response shape for POST /api/jobs/matches
 export interface JobMatchesResponse {
   matches: JobMatch[];
 }
