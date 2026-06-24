@@ -33,8 +33,8 @@ const CANVAS_HEIGHT = 620
 // Static goal suggestions — clicking one pre-fills the goal box (no API call).
 const SUGGESTIONS = [
   'Grow my software engineering network in San Francisco.',
-  'Find short, actionable connection and outreach tips.',
-  'Meet people who can introduce me to my target community.',
+  'Find people who can help me break into product management.',
+  'Meet people who can introduce me to recruiters at FutureWorks.',
 ]
 
 // Presentational filter options. Real filtering is owned by sibling workflows
