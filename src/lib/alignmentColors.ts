@@ -1,5 +1,5 @@
-// ⚠️ W3 MOCK — replace with W1 real impl at `src/lib/alignmentColors.ts`. See plan.md
-// Avatar ring color by goal-alignment tier (W1 design system). Same export names as W1.
+// Avatar ring colour + label by goal-alignment tier (W1 design system, promoted
+// from src/mocks/alignmentColors.ts as part of the mock-to-real migration).
 import type { AlignmentTier } from "@/types/web";
 
 export const ALIGNMENT_COLORS: Record<AlignmentTier, string> = {

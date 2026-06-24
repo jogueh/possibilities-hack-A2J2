@@ -4,7 +4,7 @@
 import { useState } from "react";
 import type { WebNode } from "@/types/web";
 import { useWebStore } from "@/store/useWebStore";
-import { ALIGNMENT_LABELS, alignmentColor } from "@/mocks/alignmentColors";
+import { ALIGNMENT_LABELS, alignmentColor } from "@/lib/alignmentColors";
 import { LI } from "@/lib/linkedinTokens";
 
 interface SecondDegreePreviewProps {

@@ -7,7 +7,7 @@ import type { SharedContext } from "@/types/sharedContext";
 import type { UserWithJobs } from "@/types/data";
 import { useWebStore } from "@/store/useWebStore";
 import { fetchUserWithJobs } from "@/mocks/userApi";
-import { ALIGNMENT_LABELS, alignmentColor } from "@/mocks/alignmentColors";
+import { ALIGNMENT_LABELS, alignmentColor } from "@/lib/alignmentColors";
 import { parseGoalRaw } from "@/mocks/goalParser";
 import { filterRelevantJobs } from "@/lib/relevance";
 import { getSharedContext } from "@/lib/sharedContext";
