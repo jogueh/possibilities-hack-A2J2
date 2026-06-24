@@ -1,10 +1,14 @@
 import { describe, it, expect } from "vitest";
 import {
   EDGE_TIER_THRESHOLDS,
+  EDGE_OPACITY_MIN,
+  EDGE_OPACITY_MAX,
   edgeStrengthStyle,
   edgeStrengthStyleUnit,
   edgeStrengthTier,
   edgeStrengthTierUnit,
+  edgeStrengthOpacity,
+  edgeStrengthOpacityUnit,
   type EdgeStrengthTier,
 } from "./edgeStrength";
 
@@ -105,5 +109,32 @@ describe("edgeStrength 0..1 unit adapters (canvas scale)", () => {
   it("treats NaN as the weakest tier", () => {
     expect(edgeStrengthTierUnit(NaN)).toBe("faint");
     expect(edgeStrengthStyleUnit(NaN).tier).toBe("faint");
+  });
+});
+
+describe("edgeStrengthOpacity", () => {
+  it("renders the weakest tie at the opacity floor and the strongest at the ceiling", () => {
+    expect(edgeStrengthOpacity(0)).toBe(EDGE_OPACITY_MIN);
+    expect(edgeStrengthOpacity(100)).toBe(EDGE_OPACITY_MAX);
+  });
+
+  it("makes weaker connections more transparent (monotonic increase)", () => {
+    const points = [0, 25, 50, 75, 100].map((s) => edgeStrengthOpacity(s));
+    for (let i = 1; i < points.length; i++) {
+      expect(points[i]).toBeGreaterThan(points[i - 1]);
+    }
+  });
+
+  it("clamps out-of-range values and treats NaN as most transparent", () => {
+    expect(edgeStrengthOpacity(-10)).toBe(EDGE_OPACITY_MIN);
+    expect(edgeStrengthOpacity(150)).toBe(EDGE_OPACITY_MAX);
+    expect(edgeStrengthOpacity(NaN)).toBe(EDGE_OPACITY_MIN);
+  });
+
+  it("maps a 0..1 unit strength the same as scaling ×100", () => {
+    for (const u of [0, 0.3, 0.5, 0.9, 1]) {
+      expect(edgeStrengthOpacityUnit(u)).toBe(edgeStrengthOpacity(u * 100));
+    }
+    expect(edgeStrengthOpacityUnit(NaN)).toBe(EDGE_OPACITY_MIN);
   });
 });

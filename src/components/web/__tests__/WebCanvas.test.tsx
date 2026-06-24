@@ -68,6 +68,20 @@ describe('WebCanvas', () => {
     expect(container.querySelector('#edge-grad-self_1__b')).toBeNull()
   })
 
+  it('renders weaker connections more transparent via stroke-opacity', () => {
+    const seeded = buildSnapshot(goal, people, options)
+    const { container } = render(<WebCanvas snapshot={seeded} />)
+    // `a` (interactionScore 0.9) is a stronger tie than `b` (0.4), so a's line
+    // is more opaque (less transparent) than b's.
+    const strong = container.querySelector('[data-testid="web-edge-self_1__a"]')
+    const weak = container.querySelector('[data-testid="web-edge-self_1__b"]')
+    const strongOpacity = Number(strong?.getAttribute('stroke-opacity'))
+    const weakOpacity = Number(weak?.getAttribute('stroke-opacity'))
+    expect(strongOpacity).toBeGreaterThan(weakOpacity)
+    // Even the weakest tie stays faintly visible (never fully transparent).
+    expect(weakOpacity).toBeGreaterThan(0)
+  })
+
   it('renders a met-up connection line with the violet→pink gradient stroke', () => {
     const seeded = buildSnapshot(goal, people, options)
     const metUp = {
